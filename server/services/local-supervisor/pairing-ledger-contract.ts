@@ -20,10 +20,17 @@ export const pairingApprovalSchema = z.object({
   chatId: ref,
   environment: z.object({ roomId: ref, runId: ref }).strict().nullable(),
   scope: z.literal("exact_chat_steering"),
-  policyRevision: z.literal(1),
+  // Absence is copy-only legacy consent, never automatic delivery authority.
+  invitationDelivery: z.literal("automatic").optional(),
+  policyRevision: z.union([z.literal(1), z.literal(2)]),
+  replacement: z.object({ pairingId: ref, revision: z.number().int().positive() }).strict().optional(),
   invitationSeconds: z.union([z.literal(300), z.literal(900), z.literal(3600)]).default(900),
   pairingSeconds: z.union([z.literal(3600), z.literal(28800), z.literal(86400)]).default(28800),
-}).strict();
+}).strict().superRefine((approval, ctx) => {
+  if ((approval.policyRevision === 2) !== Boolean(approval.replacement)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "pairing_replacement_policy_mismatch" });
+  }
+});
 export type PairingApproval = z.infer<typeof pairingApprovalSchema>;
 
 export const pairingLedgerRowSchema = z.object({
@@ -39,6 +46,7 @@ export const pairingLedgerRowSchema = z.object({
   createdAt: z.string().datetime(), invitationExpiresAt: z.string().datetime(),
   pairingExpiresAt: z.string().datetime(),
   acceptedAt: z.string().datetime().nullable(), revokedAt: z.string().datetime().nullable(),
+  supersession: z.object({ pairingId: ref, at: z.string().datetime() }).strict().optional(),
 }).strict().superRefine((row, ctx) => {
   const created = Date.parse(row.createdAt);
   const invalid = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message });
@@ -56,8 +64,21 @@ export const pairingLedgerRowSchema = z.object({
   if (row.acceptedAt && row.revokedAt && Date.parse(row.revokedAt) < Date.parse(row.acceptedAt)) {
     invalid("pairing_revocation_before_acceptance");
   }
+  if (row.supersession && (!row.acceptedAt || row.supersession.pairingId === row.id || row.revision < 3 ||
+      Date.parse(row.supersession.at) < Date.parse(row.acceptedAt) ||
+      Date.parse(row.supersession.at) >= Date.parse(row.pairingExpiresAt))) invalid("pairing_supersession_invalid");
+  if (row.approval.replacement?.pairingId === row.id) invalid("pairing_self_replacement");
 });
 export type PairingLedgerRow = z.infer<typeof pairingLedgerRowSchema>;
+
+// Shares the ledger's unique owner/request slot, but carries no consent,
+// destination or acceptance secret. It can only prevent future issuance.
+export const pairingRequestCancellationSchema = z.object({
+  schema: z.literal("helix.pairing_request_cancellation.v1"),
+  id: ref, ownerProfileId: ref, revision: z.literal(1), requestDigest: digest,
+  cancelledAt: z.string().datetime(),
+}).strict();
+export type PairingRequestCancellation = z.infer<typeof pairingRequestCancellationSchema>;
 
 const nowMs = (now: Date) => {
   const value = now.getTime();
@@ -68,8 +89,10 @@ export function pairingState(row: PairingLedgerRow, now: Date) {
   const value = nowMs(now);
   if (value < Date.parse(row.createdAt)) throw new Error("pairing_clock_before_creation");
   if ((row.acceptedAt && value < Date.parse(row.acceptedAt)) ||
-      (row.revokedAt && value < Date.parse(row.revokedAt))) throw new Error("pairing_clock_before_transition");
+      (row.revokedAt && value < Date.parse(row.revokedAt)) ||
+      (row.supersession && value < Date.parse(row.supersession.at))) throw new Error("pairing_clock_before_transition");
   if (row.revokedAt) return "revoked" as const;
+  if (row.supersession) return "superseded" as const;
   if (value >= Date.parse(row.pairingExpiresAt)) return "expired" as const;
   if (row.acceptedAt) return "accepted" as const;
   return value >= Date.parse(row.invitationExpiresAt) ? "expired" as const : "pending" as const;
@@ -100,9 +123,37 @@ export function acceptPairingLedgerRow(raw: PairingLedgerRow, actor: PairingDest
     if (identity[key] !== row.approval.destination[key]) throw new Error("pairing_destination_mismatch");
   }
   const state = pairingState(row, now);
-  if (state === "revoked" || state === "expired") throw new Error(`pairing_${state}`);
+  if (state === "revoked" || state === "expired" || state === "superseded") throw new Error(`pairing_${state}`);
   if (state === "accepted") return row;
+  if (row.approval.replacement) throw new Error("pairing_replacement_required");
   return pairingLedgerRowSchema.parse({ ...row, revision: row.revision + 1, acceptedAt: now.toISOString(), acceptanceSecret: null });
+}
+
+/** Policy only: both returned rows MUST be committed atomically. This function
+ * neither authenticates the caller nor mutates/persists either input. */
+export function acceptPairingReplacement(raw: PairingLedgerRow, predecessorRaw: PairingLedgerRow,
+  actor: PairingDestination, now: Date) {
+  const replacement = pairingLedgerRowSchema.parse(raw);
+  const predecessor = pairingLedgerRowSchema.parse(predecessorRaw);
+  const identity = pairingDestinationSchema.parse(actor);
+  for (const key of Object.keys(identity) as Array<keyof PairingDestination>) {
+    if (identity[key] !== replacement.approval.destination[key]) throw new Error("pairing_destination_mismatch");
+  }
+  const reviewed = replacement.approval.replacement;
+  if (!reviewed || reviewed.pairingId !== predecessor.id || reviewed.revision !== predecessor.revision) {
+    throw new Error("pairing_replacement_conflict");
+  }
+  if (predecessor.approval.destination.profileId !== identity.profileId ||
+      predecessor.approval.destination.installationId !== identity.installationId ||
+      predecessor.approval.chatId !== replacement.approval.chatId) throw new Error("pairing_replacement_scope_mismatch");
+  if (pairingState(predecessor, now) !== "accepted") throw new Error("pairing_predecessor_unavailable");
+  if (pairingState(replacement, now) !== "pending") throw new Error("pairing_replacement_not_pending");
+  return {
+    predecessor: pairingLedgerRowSchema.parse({ ...predecessor, revision: predecessor.revision + 1,
+      supersession: { pairingId: replacement.id, at: now.toISOString() }, acceptanceSecret: null }),
+    replacement: pairingLedgerRowSchema.parse({ ...replacement, revision: replacement.revision + 1,
+      acceptedAt: now.toISOString(), acceptanceSecret: null }),
+  };
 }
 
 export function revokePairingLedgerRow(raw: PairingLedgerRow, profileId: string, now: Date): PairingLedgerRow {
@@ -123,6 +174,8 @@ export function projectPairingLedgerRow(raw: PairingLedgerRow, profileId: string
     state: pairingState(row, now), createdAt: row.createdAt,
     invitationExpiresAt: row.invitationExpiresAt, pairingExpiresAt: row.pairingExpiresAt,
     acceptedAt: row.acceptedAt, revokedAt: row.revokedAt,
+    ...(row.approval.replacement ? { replacement: row.approval.replacement } : {}),
+    ...(row.supersession ? { supersession: row.supersession } : {}),
     executionAuthority: false as const, answerAuthority: false as const,
     // This projection says nothing about current transport, model or game state.
   };

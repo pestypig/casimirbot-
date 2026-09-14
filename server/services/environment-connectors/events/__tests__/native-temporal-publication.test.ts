@@ -17,6 +17,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { readTemporalPublicationClock } from "../../temporal-plans/temporal-publication-clock";
 import { auditTemporalCorrelatedBudget } from "../../temporal-plans/temporal-correlated-budget";
 import { publishTemporalPerceptionFrontier } from "../../temporal-plans/temporal-frontier-publisher";
+import { EnvironmentTemporalFrontierStore } from "../../temporal-plans/temporal-frontier-store";
 import * as perceptionContext from "../../temporal-plans/temporal-perception-context";
 import * as successorContext from "../../temporal-plans/temporal-successor-context";
 import { buildHelixEnvironmentAffordanceFrontier } from "@shared/helix-environment-time";
@@ -69,13 +70,27 @@ it
       name === "native-compiled-publication" &&
       process.env.HELIX_NATIVE_BROKER_ROUNDTRIP === "1";
     const wideRunway = roundtrip && process.env.HELIX_NATIVE_BROKER_WIDE_RUNWAY === "1";
+    const continuous = roundtrip && process.env.HELIX_NATIVE_BROKER_CONTINUOUS === "1";
+    const continuousStop = continuous ? process.env.HELIX_NATIVE_BROKER_CONTINUOUS_STOP : undefined;
+    const continuousLostThird = continuous && process.env.HELIX_NATIVE_BROKER_CONTINUOUS_LOST_THIRD === "1";
+    const continuousLostBatchAck = continuous && process.env.HELIX_NATIVE_BROKER_CONTINUOUS_LOST_BATCH_ACK === "1";
+    if (continuousLostBatchAck && (continuousStop || continuousLostThird)) throw new Error("Choose one continuous fault per run");
+    if (continuousLostThird && continuousStop) throw new Error("Choose one continuous fault per run");
+    if (continuousStop && !["cancel", "emergency", "manual"].includes(continuousStop)) throw new Error("Unknown continuous stop fixture");
     const nativeArtifactName = wideRunway ? "native-compiled-wide-publication" : name;
-    let native = JSON.parse(
+    let native = continuous ? null : JSON.parse(
       readFileSync(
         `minecraft/helix-fabric-player-agent/build/${nativeArtifactName}.json`,
         "utf8",
       ),
     );
+    if (continuous) {
+      const recorded = JSON.parse(readFileSync("minecraft/helix-fabric-player-agent/build/native-continuous-runtime.json", "utf8"));
+      native = { root: recorded.wires[0], child: recorded.wires[1],
+        events: recorded.publications.filter((item: any) => item.path === "/requests/event").map((item: any) => item.body),
+        batches: recorded.publications.filter((item: any) => item.path === "/events/batch").map((item: any) => item.body),
+        wires: recorded.wires };
+    }
     const lostResponse =
       roundtrip &&
       (process.env.HELIX_NATIVE_BROKER_LOST_RESPONSE === "1" ||
@@ -88,6 +103,8 @@ it
     if (lostResponse && lateResponse)
       throw new Error("Choose one connected delivery fault per run");
     if (wideRunway && (lostResponse || lateResponse)) throw new Error("Wide positive mode must not mix fault fixtures");
+    if (continuous && (wideRunway || lostResponse || lateResponse || process.env.HELIX_NATIVE_BROKER_PERSISTENCE === "1"))
+      throw new Error("Continuous fixture has its own simulated clock and in-memory database mode");
     for (const event of native.events)
       helixEnvironmentActionWorkflowEventSchema.parse(event);
     expect(native.batches.length).toBeGreaterThan(0);
@@ -155,12 +172,15 @@ it
         [first.producer_epoch_ref, claim.actionDomainAdapter],
       );
       if (name === "native-compiled-publication") {
-        const compiledPair = JSON.parse(
+        const compiledPair = continuous ? {} : JSON.parse(
           readFileSync(
             `minecraft/helix-fabric-player-agent/build/server-compiled-handoff${wideRunway ? "-wide" : ""}.json`,
             "utf8",
           ),
         );
+        const compiledChain = continuous ? JSON.parse(readFileSync(
+          "minecraft/helix-fabric-player-agent/build/server-compiled-continuous-chain.json", "utf8")) : null;
+        if (continuous) Object.assign(compiledPair, { root: compiledChain[0], child: compiledChain[1] });
         await pool.query(`CREATE TABLE helix_environment_action_requests (
         action_request_id text PRIMARY KEY, request_payload jsonb, status text,
         action_authority_id text, workflow_id text, connector_manifest_id text,
@@ -207,8 +227,9 @@ it
         };
         let childRequest: any;
         let rootRequest: any;
-        for (const key of ["root", "child"]) {
-          const wire = native[key];
+        const continuousRequests: any[] = [];
+        for (const key of continuous ? ["root", "child", "child:2", "child:3"] : ["root", "child"]) {
+          const wire = continuous ? native.wires[continuousRequests.length] : native[key];
           const request = helixEnvironmentActionRequestSchema.parse({
             ...wire,
             schema: "helix.environment_action.request.v1",
@@ -251,8 +272,9 @@ it
             raw_content_included: false,
           });
           if (roundtrip) {
+            if (continuous) continuousRequests.push(request);
             if (key === "child") childRequest = request;
-            else rootRequest = request;
+            else if (key === "root") rootRequest = request;
             continue;
           }
           await pool.query(
@@ -587,6 +609,8 @@ it
             let snapshotRejections = 0;
             let deliveries = 0;
             let reconciliations = 0;
+            let droppedBatch: any = null;
+            let batchAckReplays = 0;
             const fixtureServer = createServer(async (req, res) => {
               try {
                 const chunks: Buffer[] = [];
@@ -599,6 +623,23 @@ it
                     event: body,
                   });
                 } else if (req.url === "/requests/result") {
+                  if (continuous && !continuousStop && !continuousLostThird) {
+                    // Isolated database snapshots give each rejected variant the
+                    // same real-handler input state, then restore the positive run.
+                    const before = db.backup();
+                    const children = (await pool.query("SELECT action_request_id,status,completed_at,updated_at FROM helix_environment_action_requests WHERE action_request_id<>'root' ORDER BY action_request_id")).rows;
+                    for (const variant of ["wrong-player", "missing-motion", "late"] as const) {
+                      try {
+                        if (variant === "late") await pool.query("UPDATE helix_environment_action_requests SET deadline_at=$1 WHERE action_request_id='root'", [new Date(Date.now() - 1000).toISOString()]);
+                        const rejected = await submitEnvironmentActionResult({
+                          claim: variant === "wrong-player" ? { ...claim, subjectNativeId: "wrong-player" } : claim,
+                          result: variant === "missing-motion" ? { ...body, player_motion_performed: false } : body,
+                        });
+                        expect(rejected.observation.outcome).not.toBe("succeeded");
+                        expect((await pool.query("SELECT action_request_id,status,completed_at,updated_at FROM helix_environment_action_requests WHERE action_request_id<>'root' ORDER BY action_request_id")).rows).toEqual(children);
+                      } finally { before.restore(); }
+                    }
+                  }
                   result = await submitEnvironmentActionResult({
                     claim,
                     result: body,
@@ -614,20 +655,37 @@ it
                             handler(pool),
                         }),
                   });
+                  if (continuousLostBatchAck) {
+                    if (droppedBatch === null) {
+                      expect((result as any).replayed).toBe(false);
+                      droppedBatch = body;
+                      res.writeHead(503, { "content-type": "application/json" });
+                      res.end(JSON.stringify({ ok: false, error: "fixture_batch_ack_lost_after_commit" }));
+                      return;
+                    }
+                    if (body.batch_id === droppedBatch.batch_id) {
+                      expect(body).toEqual(droppedBatch);
+                      expect((result as any).replayed).toBe(true);
+                      batchAckReplays++;
+                    }
+                  }
                 } else if (req.url === "/requests/temporal-successor") {
                   deliveries++;
                   serverTiming.successor_poll_received_ms = elapsedMs();
                   await pool.query(
                     "UPDATE helix_environment_action_connector_heartbeats SET received_at=now()",
                   );
-                  if (deliveries === 1) {
+                  if (deliveries === 1 || (continuous && deliveries <= 3)) {
+                    const successor = continuous ? compiledChain[deliveries] : compiledPair.child;
+                    const predecessor = continuous ? compiledChain[deliveries - 1] : compiledPair.root;
+                    const successorRequest = continuous ? continuousRequests[deliveries] : childRequest;
                     const projection = (
                       await pool.query(
                         "SELECT event_payload FROM helix_environment_events ORDER BY sequence DESC LIMIT 1",
                       )
                     ).rows[0].event_payload;
                     serverTiming.successor_evidence_read_ms = elapsedMs();
-                    const planIdentity = compiledPair.child.source.identity;
+                    const planIdentity = successor.source.identity;
                     // Fixture authority/perception resolution; publication, schema,
                     // revision allocation and storage below are production code.
                     vi.spyOn(perceptionContext, "resolveTemporalPerceptionContext").mockResolvedValue({
@@ -646,21 +704,21 @@ it
                         resident_clock_observation: null },
                     } as never);
                     vi.spyOn(successorContext, "readTemporalSuccessorContext").mockResolvedValue({
-                      available: true, previous_plan_id: compiledPair.root.source.plan_id,
+                      available: true, previous_plan_id: predecessor.source.plan_id,
                       checkpoint: { checkpoint_id: body.checkpoint_id },
                     } as never);
                     const { frontier } = await publishTemporalPerceptionFrontier({
                       profileId: "fixture:profile", participantId: "participant",
                       goalId: planIdentity.goal_id, expectedRevision: planIdentity.goal_revision,
-                    } as never);
+                    } as never, new EnvironmentTemporalFrontierStore(roomDatabase.withSharedRealtimeRoomTransaction));
                     serverTiming.successor_admission_start_ms = elapsedMs();
                     await enqueueEnvironmentAction(
-                      { profileId: "fixture:profile", request: childRequest },
+                      { profileId: "fixture:profile", request: successorRequest },
                       {
                         retention: {
                           preflight: {
-                            plan: compiledPair.child.source,
-                            compilation: compiledPair.child.artifact,
+                            plan: successor.source,
+                            compilation: successor.artifact,
                             frontier,
                             binding: {
                               ...delivery.bindingStore.inspect(),
@@ -684,6 +742,31 @@ it
                       },
                     );
                     serverTiming.successor_admission_end_ms = elapsedMs();
+                    if (continuous && deliveries === 3) {
+                      // A newer authenticated publication supersedes the
+                      // observation used by this still-unleased candidate.
+                      // Restore only the isolated database to continue the
+                      // unchanged positive native run after the negative check.
+                      const beforeNewObservation = db.backup();
+                      try {
+                        const { affordance_revision: _oldRevision, ...identity } = frontier.identity;
+                        await new EnvironmentTemporalFrontierStore(roomDatabase.withSharedRealtimeRoomTransaction).publish({
+                          profileId: "fixture:profile", participantId: "participant",
+                          observationEvidenceRef: "fixture:newer-successor-observation",
+                          observationProducerEpochRef: planIdentity.producer_epoch,
+                          retainedUntil: new Date(Date.now() + 60_000).toISOString(),
+                          draft: { identity: { ...identity, observation_revision: identity.observation_revision + 1 },
+                            clocks: frontier.clocks, entries: frontier.entries,
+                            expires_at_environment_sequence: frontier.expires_at_environment_sequence },
+                        });
+                        expect(await leasePendingEnvironmentTemporalSuccessor({ ...delivery,
+                          residentActionRequestId: body.resident_action_request_id,
+                          predecessorPlanId: body.predecessor_plan_id, predecessorPlanHash: body.predecessor_plan_hash,
+                          checkpointId: body.checkpoint_id } as never), "New observation must invalidate the unleased successor").toBeNull();
+                        expect((await pool.query("SELECT status,attempt_count FROM helix_environment_action_requests WHERE action_request_id=$1",
+                          [successorRequest.action_request_id])).rows).toEqual([{ status: "admitted", attempt_count: 0 }]);
+                      } finally { beforeNewObservation.restore(); }
+                    }
                   }
                   serverTiming.successor_lease_start_ms = elapsedMs();
                   const renameFault = snapshotFailure
@@ -706,8 +789,8 @@ it
                     renameFault?.mockRestore();
                   }
                   serverTiming.successor_lease_end_ms = elapsedMs();
-                  if (lostResponse) {
-                    expect(child?.action_request_id).toBe("child");
+                  if (lostResponse || (continuousLostThird && deliveries === 3)) {
+                    expect(child?.action_request_id).toBe(continuousLostThird ? "child:3" : "child");
                     res.writeHead(503, { "content-type": "application/json" });
                     res.end(
                       JSON.stringify({
@@ -795,7 +878,17 @@ it
                     "-NoProfile",
                     "-NonInteractive",
                     "-Command",
-                    wideRunway
+                    continuous
+                      ? continuousLostThird
+                        ? "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test --rerun -x runGameTest --tests '*PlayerActionRuntimeTransportTest.continuousCompiledChainLostThirdResponseNeverReplaysDelivery'; exit $LASTEXITCODE"
+                        : continuousStop === "cancel"
+                        ? "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test --rerun -x runGameTest --tests '*PlayerActionRuntimeTransportTest.continuousCompiledChainCancellationDiscardsThirdSuccessor'; exit $LASTEXITCODE"
+                        : continuousStop === "emergency"
+                        ? "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test --rerun -x runGameTest --tests '*PlayerActionRuntimeTransportTest.continuousCompiledChainEmergencyStopDiscardsThirdSuccessor'; exit $LASTEXITCODE"
+                        : continuousStop === "manual"
+                        ? "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test --rerun -x runGameTest --tests '*PlayerActionRuntimeTransportTest.continuousCompiledChainManualObservationDiscardsThirdSuccessor'; exit $LASTEXITCODE"
+                        : "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test --rerun -x runGameTest --tests '*PlayerActionRuntimeTransportTest.continuousCompiledChainPollsThreeSuccessorsInOneResidentRuntime'; exit $LASTEXITCODE"
+                      : wideRunway
                       ? "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test -x runGameTest --tests '*PlayerActionRuntimeTransportTest.elapsedClockAcceptsWithinDeclaredWideRunway'; exit $LASTEXITCODE"
                       : advancingClock
                       ? "& $env:HELIX_NATIVE_GRADLE_PATH --no-daemon --max-workers=1 test -x runGameTest --tests '*PlayerActionRuntimeTransportTest.elapsedClockExpiresWhileSuccessorHttpIsInFlight'; exit $LASTEXITCODE"
@@ -849,6 +942,62 @@ it
                 });
               });
               expect(failures).toEqual([]);
+              if (continuous) {
+                expect(deliveries).toBe(3);
+                expect(admissionDiagnostics).toHaveLength(4);
+                expect(deliveryDiagnostics).toHaveLength(3);
+                const requests = (await pool.query("SELECT action_request_id,status,attempt_count FROM helix_environment_action_requests ORDER BY action_request_id")).rows;
+                expect(requests).toHaveLength(4);
+                expect(requests.every((request: any) => request.attempt_count === 1)).toBe(true);
+                if (continuousStop || continuousLostThird) {
+                  const stopOutcome = continuousLostThird || continuousStop === "manual" ? "cancel" : continuousStop;
+                  expect(reconciliations).toBe(continuousLostThird ? 3 : 0);
+                  expect(requests.every((request: any) => request.status === (stopOutcome === "cancel" ? "canceled" : "emergency_stopped"))).toBe(true);
+                  expect(requests.find((request: any) => request.action_request_id === "root")?.status)
+                    .toBe(stopOutcome === "cancel" ? "canceled" : "emergency_stopped");
+                  const artifactSuffix = continuousLostThird ? "lost-third-deadline" : continuousStop;
+                  const stopped = JSON.parse(readFileSync(`minecraft/helix-fabric-player-agent/build/native-continuous-${artifactSuffix}.json`, "utf8"));
+                  const lastPoll = stopped.polls.at(-1);
+                  const beforeStopReplay = (await pool.query("SELECT action_request_id,status,attempt_count,completed_at,updated_at FROM helix_environment_action_requests ORDER BY action_request_id")).rows;
+                  const stopEvent = stopped.publications.filter((item: any) => item.path === "/requests/event").at(-1).body;
+                  expect((await submitEnvironmentActionWorkflowEvent({ claim, event: stopEvent })).replayed).toBe(true);
+                  expect((await pool.query("SELECT action_request_id,status,attempt_count,completed_at,updated_at FROM helix_environment_action_requests ORDER BY action_request_id")).rows).toEqual(beforeStopReplay);
+                  expect(await leasePendingEnvironmentTemporalSuccessor({ ...delivery,
+                    residentActionRequestId: lastPoll.resident_action_request_id,
+                    predecessorPlanId: lastPoll.predecessor_plan_id,
+                    predecessorPlanHash: lastPoll.predecessor_plan_hash,
+                    checkpointId: lastPoll.checkpoint_id } as never)).toBeNull();
+                  const stoppedReadDb = vi.spyOn(roomDatabase, "readSharedRealtimeRoomDatabase").mockResolvedValue(deliveryDb as never);
+                  try { expect((await leasePendingEnvironmentActions({ claim, limit: 10 })).requests).toEqual([]); }
+                  finally { stoppedReadDb.mockRestore(); }
+                  expect((await pool.query("SELECT action_request_id FROM helix_environment_action_results")).rows).toEqual([{ action_request_id: "root" }]);
+                  writeFileSync(`minecraft/helix-fabric-player-agent/build/native-continuous-broker-${artifactSuffix}.json`, JSON.stringify({
+                    requests, admissionDiagnostics, deliveryDiagnostics, reconciliations, live_acceptance: false,
+                    simulated_clock_and_player: true, post_stop_delivery: null, ordinary_replay: false,
+                  }, null, 2));
+                  return;
+                }
+                expect(requests.every((request: any) => request.status === "succeeded")).toBe(true);
+                expect(requests.find((request: any) => request.action_request_id === "root")?.status).toBe("succeeded");
+                expect(requests.find((request: any) => request.action_request_id === "child:3")?.status).toBe("succeeded");
+                expect((await pool.query("SELECT action_request_id FROM helix_environment_action_results")).rows).toEqual([{ action_request_id: "root" }]);
+                const nativeRun = JSON.parse(readFileSync("minecraft/helix-fabric-player-agent/build/native-continuous-runtime.json", "utf8"));
+                const terminal = nativeRun.publications.find((item: any) => item.path === "/requests/result").body;
+                const beforeReplay = (await pool.query("SELECT action_request_id,status,attempt_count,completed_at,updated_at FROM helix_environment_action_requests ORDER BY action_request_id")).rows;
+                expect((await submitEnvironmentActionResult({ claim, result: terminal })).replayed).toBe(true);
+                expect((await pool.query("SELECT action_request_id,status,attempt_count,completed_at,updated_at FROM helix_environment_action_requests ORDER BY action_request_id")).rows).toEqual(beforeReplay);
+                await expect(submitEnvironmentActionResult({ claim, result: { ...terminal, summary: "conflicting replay" } })).rejects.toMatchObject({ code: "action_result_conflict" });
+                if (continuousLostBatchAck) {
+                  expect(droppedBatch).not.toBeNull();
+                  expect(batchAckReplays).toBe(1);
+                }
+                writeFileSync(`minecraft/helix-fabric-player-agent/build/native-continuous-broker${continuousLostBatchAck ? "-lost-batch-ack" : ""}.json`, JSON.stringify({
+                  requests, admissionDiagnostics, deliveryDiagnostics, frontierDiagnostics,
+                  ...(continuousLostBatchAck ? { dropped_batch_id: droppedBatch.batch_id, batch_ack_replays: batchAckReplays } : {}),
+                  live_acceptance: false, simulated_clock_and_player: true,
+                }, null, 2));
+                return;
+              }
               expect(deliveries).toBe(1);
               expect(deliveryDiagnostics).toHaveLength(snapshotFailure ? 0 : 1);
               if (!snapshotFailure) {

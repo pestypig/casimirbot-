@@ -33,6 +33,11 @@ export interface HelixProfileStorageWriteRequest {
   artifacts: HelixWorkspaceMemoryArtifact[];
 }
 
+export interface HelixProfileStorageHttpWriteRequest extends HelixProfileStorageWriteRequest {
+  // A consistency precondition; the authenticated session still owns storage authority.
+  expected_profile_id: string;
+}
+
 export interface HelixProfileStorageWriteReceipt {
   schema: typeof HELIX_PROFILE_STORAGE_WRITE_RECEIPT_SCHEMA;
   ok: boolean;

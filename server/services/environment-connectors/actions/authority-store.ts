@@ -1131,6 +1131,34 @@ export const emergencyStopEnvironmentActionAuthority = async (input: {
         "Only the room owner or paired player may stop this authority.",
       );
     }
+    if (authority.status === "suspended") {
+      const pending = await db.query<{ control_request_id: string; deadline_at: Date | string; request_payload: unknown; request_hash: string }>(
+        `SELECT control_request_id, deadline_at, request_payload, request_hash FROM helix_environment_action_control_requests
+         WHERE action_authority_id=$1 AND workflow_id IS NULL AND control_kind='emergency_stop'
+           AND status IN ('pending','leased') AND deadline_at>now()
+         ORDER BY created_at DESC LIMIT 1;`, [authority.action_authority_id]);
+      if (pending.rows[0]) {
+        let replay: HelixEnvironmentActionControlRequest | null = null;
+        try {
+          replay = helixEnvironmentActionControlRequestSchema.parse(typeof pending.rows[0].request_payload === "string"
+            ? JSON.parse(pending.rows[0].request_payload) : pending.rows[0].request_payload);
+        } catch { /* Invalid retained controls cannot authorize a replacement. */ }
+        if (!replay || sha256(replay) !== pending.rows[0].request_hash ||
+            replay.control_request_id !== pending.rows[0].control_request_id ||
+            Date.parse(replay.deadline_at) !== Date.parse(iso(pending.rows[0].deadline_at)) ||
+            replay.control_kind !== "emergency_stop" || replay.workflow_id !== null || !replay.release_all_controls ||
+            Date.parse(replay.deadline_at) <= Date.now() ||
+            replay.action_authority_id !== authority.action_authority_id ||
+            replay.environment_binding_id !== authority.environment_binding_id || replay.room_id !== authority.room_id ||
+            replay.source_id !== authority.source_id || replay.world_id !== authority.world_id ||
+            replay.participant_id !== authority.participant_id || replay.subject_binding_id !== authority.subject_binding_id) {
+          throw new EnvironmentActionAuthorityError("action_control_invalid", 409,
+            "The retained emergency-stop control does not match this exact authority.");
+        }
+        // The transaction's required snapshot still runs on this read-only retry.
+        return { authority: projectAuthority(authority), controlRequest: replay };
+      }
+    }
     const now = new Date();
     const controlRequest = helixEnvironmentActionControlRequestSchema.parse({
       schema: HELIX_ENVIRONMENT_ACTION_CONTROL_REQUEST_SCHEMA,
@@ -1186,7 +1214,10 @@ export const emergencyStopEnvironmentActionAuthority = async (input: {
       authority: projectAuthority({ ...authority, status: "suspended" }),
       controlRequest,
     };
-  });
+  }, { requireLocalSnapshot: true, snapshotTables: [
+    "helix_environment_action_authorities", "helix_environment_action_requests",
+    "helix_environment_action_control_requests",
+  ] });
   void requestDesktopMcpTunnelReadOnlyForSafety(
     "environment_emergency_stop",
   ).catch(() => false);

@@ -189,6 +189,15 @@ delivery tasks, not new program gates or inherited capability acceptance.
 | CFP-5 — Attended paid pilot | blocked | CFP-4 closure; explicit owner production activation and attended commercial/external-user acceptance with rollback evidence. |
 | CFP-6 — Release decision | blocked | CFP-5 closure; all applicable G8 requirements, claim/evidence review, and owner release decision. |
 
+The owner's 2026-09-14 platform focus is specified in
+`docs/work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md`: this product
+task prepares personal/hosted journeys, account continuity, developer
+integration and delivery handoffs while Minecraft capabilities evolve under
+their existing NAV/CS/ET owners. The eventual game feature set need not be
+fixed to prepare the platform. Exact implementation/evaluation slices and
+release claims still require frozen scope and evidence. CFP-1 remains active
+as specification; no dependent implementation or maturity is promoted.
+
 CFP-0's read-only audits and CFP-1's later specifications may coexist with
 already permitted G8 lanes because they do not execute or change those lanes'
 open prerequisites. Implementation remains blocked by the exact technical
@@ -311,6 +320,53 @@ The user-requested durable-pairing and deterministic-testability repair plan is
 `docs/work-packets/eh-g8-cs-onboarding-pairing-plan-v1.md`. It is subordinate to
 the same CS1-CS4 exits and does not dispatch the separately gated CFP-2 program
 or promote any existing evidence to integrated acceptance.
+The current narrow Ready up latency repair is
+`docs/work-packets/eh-g8-cs-ready-up-durability-cost-v1.md`. It preserves fresh
+durable authorization checks and the existing observation deadline; its
+component results do not close CS1 or qualify the packaged workflow.
+The reproduced launcher startup classification repair is
+`docs/work-packets/eh-g8-cs-launcher-loading-recovery-v1.md`; a successful
+inspected retry does not establish a one-call cold-launch workflow.
+The first frozen root movement refusals and expiry-diagnostic repair follow
+`docs/work-packets/eh-g8-cs3-root-motion-baseline-v1.md` and
+`docs/work-packets/eh-g8-cs3-perception-expiry-diagnostic-v1.md`. A candidate,
+frontier or rejected submission does not establish actual resident movement.
+Finite run-expiry continuation follows
+`docs/work-packets/eh-g8-cs-expired-run-goal-continuation-v1.md`; an explicit
+owner checkpoint preserves the existing goal without qualifying automatic
+recovery. The reproduced pairing-review polling and stale run-choice repair is
+`docs/work-packets/eh-g8-cs-pairing-review-polling-v1.md`. Neither preparation
+nor editable controls constitute human approval or integrated acceptance.
+Direct review recovery after the previous finite pairing ends follows
+`docs/work-packets/eh-g8-cs-expired-pairing-review-v1.md`; this presentation
+repair must retain submitted requests and require fresh human approval.
+The admitted root's measured start-deadline failure and unchanged durable-read
+cost investigation follow `docs/work-packets/eh-g8-cs3-durable-binding-read-cost-v1.md`.
+Component write-count reduction is not measured resident throughput.
+The [2026-09-14 accepted-pairing/root handoff](evidence/eh-g8-et6-continuous-session-build-v1/2026-09-14-pairing-read-cost-cs5-handoff.md)
+records one successful fixed-budget packaged root and retains all 17 exits;
+three successors and automatic Ready up after the latest restart remain open.
+The current automatic Ready up failure localization follows
+`docs/work-packets/eh-g8-cs-ready-up-failure-localization-v1.md`.
+The [2026-09-14 persistence repair handoff](evidence/eh-g8-et6-continuous-session-build-v1/2026-09-14-snapshot-confirmation-cs5-handoff.md)
+records the deterministic queued-read race and repaired packaged same-pairing
+recovery, three automatic Ready up reads, ordinary EXE Ready up and exact-chat
+prompt pickup/acknowledgement. The full 17 exits remain open as recorded;
+three linked successors and complete interruption/recovery are not qualified.
+The [2026-09-14 retained-outcome handoff](evidence/eh-g8-et6-continuous-session-build-v1/2026-09-14-retained-outcome-cs5-handoff.md)
+retains the distinct linked-walk root's 8.8-block movement and missing-successor
+exhaustion, with zero successors submitted. The exact-result projection repair
+follows `docs/work-packets/eh-g8-cs3-retained-interruption-status-v1.md`;
+27 focused cases and packaged recovery of that original result pass. Same-pairing
+recovery and automatic Ready up pass on the repaired package. These do not qualify
+three-successor capacity, human interruption or the complete ordinary workflow.
+The latest [controlled-course preflight handoff](evidence/eh-g8-et6-continuous-session-build-v1/2026-09-14-course-preflight-cs5-handoff.md)
+retains all 17 exits and records trial 2 stopping before submission because
+fresh forward geometry is blocked. The small observed platform cannot provide
+the proposed long straight course. The unexecuted bounded setup proposal follows
+`docs/work-packets/eh-g8-cs3-controlled-corridor-preparation-v1.md`; governed
+snapshot and setup execution remain prerequisites before separate human World
+Authority consent. No course was built and no stage is promoted.
 G8 remains the sole active gate. ET6 remains specified and unproven; existing
 ET0–ET5 and NAV0 evidence is unchanged. NAV1 now depends on the separate
 NAV-EQ direct-MCP execution qualification; CS1–CS5 and full ET6 retain their
@@ -402,6 +458,19 @@ fixture-tested rather than live accepted. Next is integration into the existing
 admitted observation path and read-only qualification. Full NAV1, NAV-EQ and
 gameplay acceptance remain open; no deployment occurred. Evidence is
 `docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-08-nav1c-bounded-capture-acceptance.json`.
+
+NAV1-O admitted observation result (2026-09-13): the opt-in fixed 125-cell
+collision extension through the existing MCP/probe/broker/Fabric read path is
+`deterministically verified`. Exact subject, dimension, origin, tick and size
+checks, both broker result forms, default opt-out and typed old-sensor
+unavailability are covered by 144 focused TypeScript and 26 native tests.
+Full discipline (101 tests), server build and adapter run 2691 PASS with
+certificate integrity true completed after repairing routing-test ledger
+isolation. Evidence:
+`docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-13-nav1o-deterministic-acceptance.json`;
+packet: `docs/work-packets/eh-g8-nav1o-admitted-collision-observation-v1.md`.
+No matching live source/runtime was available, so live capture and its latency
+remain unaccepted. Full NAV1, NAV-EQ, movement and downstream gates stay open.
 
 ## Closed gate: G1 canonical lifecycle authority
 

@@ -9,7 +9,7 @@ import { useBrowserReasoningBindingStore } from "@/lib/agent-access/reasoningTas
 vi.mock("../HelixAskLegacyRuntimeBridge", () => ({ HelixAskLegacyRuntimeBridge: () => <div>Default chat renderer</div> }));
 vi.mock("../HelixOperatorActivityPanel", () => ({ HelixOperatorActivityPanel: () => null }));
 vi.mock("../agent-run-observer/AgentRunObserverBindingSurface", () => ({ AgentRunObserverBindingSurface: () => null }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals();
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers();
   useAgiChatStore.setState({ activeId: undefined });
   useBrowserReasoningBindingStore.setState({ current: null });
 });
@@ -23,6 +23,27 @@ const event = { schema: "helix.reasoning_steering_event.v1", steering_event_ref:
   created_at: "2026-09-08T12:00:00.000Z", expires_at: "2026-09-08T12:10:00.000Z", acknowledged_at: null,
   advisory_only: true, execution_requested: false, evidence_satisfied: false,
   provider_thread_content_included: false, hidden_reasoning_included: false, answer_authority: false, terminal_eligible: false };
+it.each(["fetch", "body"])("bounds a hung %s, clears stale display and recovers without a remount", async stage => {
+  vi.useFakeTimers();
+  const body = { display_only: true, deliveries: [{ event, instruction_text: "Inspect the platform" }] };
+  let release!: (value: any) => void;
+  const hung = new Promise(resolve => { release = resolve; });
+  const fetcher = vi.fn().mockImplementationOnce(async () => new Response(JSON.stringify(body)))
+    .mockImplementationOnce(() => stage === "fetch" ? hung : Promise.resolve({ ok: true, json: () => hung }))
+    .mockImplementation(async () => new Response(JSON.stringify({ display_only: true, deliveries: [] })));
+  vi.stubGlobal("fetch", fetcher);
+  await act(async () => { render(<BoundAgentPromptDisplay binding={binding} />); });
+  expect(screen.getByText("Inspect the platform")).toBeTruthy();
+  await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+  expect(screen.queryByText("Inspect the platform")).toBeNull();
+  expect(screen.getByText("Agent prompt display unavailable; no pickup is claimed.")).toBeTruthy();
+  expect(fetcher.mock.calls[1][1].signal.aborted).toBe(true);
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  await act(async () => { release(stage === "fetch" ? new Response(JSON.stringify(body)) : body); });
+  expect(screen.queryByText("Inspect the platform")).toBeNull();
+  expect(screen.queryByText("Agent prompt display unavailable; no pickup is claimed.")).toBeNull();
+});
 it("shows acknowledged agent ingress in the default packaged renderer only for its selected active chat", async () => {
   const fetcher = vi.fn(async () => new Response(JSON.stringify({ display_only: true,
     deliveries: [{ event: { ...event, delivery_state: "acknowledged", acknowledged_at: "2026-09-08T12:01:00.000Z" },

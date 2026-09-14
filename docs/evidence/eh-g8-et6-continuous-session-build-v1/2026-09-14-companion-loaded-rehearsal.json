@@ -1,0 +1,534 @@
+{
+  "schema": "casimirbot.companion_loaded_rehearsal.v1",
+  "observed_at": "2026-09-14T11:31:29.688Z",
+  "scope": "Loaded companion, supported local launch and recovery subset; not continuous movement or interruption acceptance.",
+  "installed_evidence": "2026-09-14-companion-qualified-install.json",
+  "initial_launch": {
+    "schema": "helix.minecraft_local_lifecycle_error.v1",
+    "error": "minecraft_fabric_profile_selection_required",
+    "message": "Minecraft lifecycle stopped at minecraft_fabric_profile_selection_required. Inspect current client/server state before another launch.",
+    "server_lifecycle": {
+      "schema": "helix.minecraft.local_server_lifecycle.v1",
+      "status": "listening",
+      "server_process_id": 27252,
+      "process_started_at": "2026-09-14T01:24:10.3132425Z",
+      "observed_at": "2026-09-14T11:23:29.5416138Z",
+      "server_address": "127.0.0.1:25566",
+      "launcher_action": "reused_server",
+      "profile_digest": "3fc759a38838d4060fbc1ba9d1aa85bf390d4db39bf7eb69b4b469e278e6f88a",
+      "credentials_exposed": false,
+      "authority_widened": false
+    },
+    "retryable": false,
+    "credential_included": false,
+    "content_role": "minecraft_local_lifecycle_error_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "error_code": "INVALID_ARGUMENT"
+  },
+  "inspected_retry": {
+    "operation": "environment.minecraft.fabric_loopback.launch_and_join",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+    "launch_authority_basis": "active_player_embodiment",
+    "status": "connected",
+    "receipt": {
+      "schema": "helix.minecraft.workstation_launch_receipt.v1",
+      "status": "connected",
+      "profile_id": "helix-combat-c0-isolated",
+      "profile_version": "fabric-loader-0.18.4-1.21.8",
+      "isolated_game_directory": true,
+      "client_process_id": 23960,
+      "server_address": "127.0.0.1:25566",
+      "launcher_action": "launched_client",
+      "connection_action": "autojoin_staged",
+      "play_control_point": "853,717",
+      "mod_loaded": true,
+      "memory_used_percent": 84.4,
+      "credentials_exposed": false,
+      "server_lifecycle": {
+        "schema": "helix.minecraft.local_server_lifecycle.v1",
+        "status": "listening",
+        "server_process_id": 27252,
+        "process_started_at": "2026-09-14T01:24:10.3132425Z",
+        "observed_at": "2026-09-14T11:25:07.9498018Z",
+        "server_address": "127.0.0.1:25566",
+        "launcher_action": "reused_server",
+        "profile_digest": "3fc759a38838d4060fbc1ba9d1aa85bf390d4db39bf7eb69b4b469e278e6f88a",
+        "credentials_exposed": false,
+        "authority_widened": false
+      }
+    },
+    "authority_widened": false,
+    "credential_included": false,
+    "content_role": "minecraft_local_lifecycle_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "profile_diagnostic": {
+    "observed_at": "2026-09-14T11:23:45.3646786Z",
+    "visible_button_count": 3,
+    "total_button_count": 3,
+    "matching_button_count": 0,
+    "candidate_profile_buttons": [],
+    "expected_profile": "helix-combat-c0-isolated",
+    "expected_version": "fabric-loader-0.18.4-1.21.8"
+  },
+  "native_visible_profile_after_initial_failure": "helix-combat-c0-isolated fabric-loader-0.18.4-1.21.8",
+  "native_profile_changed": false,
+  "first_ready_up": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+        "observed_at_ms": 1789385220960,
+        "ready": false,
+        "valid_until_ms": null,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "service_instance:64f720b3dfd2c4167939e25f6818a4d7",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "reasoning_binding:8883f85e82cf8056fbdc10c4c310593f",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "reasoning_binding:8883f85e82cf8056fbdc10c4c310593f",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": 1789389344122,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": 1789385249309,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "blocked",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "session_check:perception",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_evidence_identity_mismatch"
+            ],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [
+          {
+            "layer": "perception",
+            "state": "blocked",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "session_check:perception",
+            "observed_at_ms": 1789385219919,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_evidence_identity_mismatch"
+            ],
+            "human_approval_required": false
+          }
+        ],
+        "next_check": "perception",
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [
+        {
+          "layer": "goal",
+          "changed": true,
+          "reason_code": "goal_recovery_checked"
+        }
+      ],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789387687647
+      }
+    },
+    "requested_by": "authenticated_mcp_task",
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "next_explicit_ready_up": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+        "observed_at_ms": 1789385253419,
+        "ready": true,
+        "valid_until_ms": 1789385255727,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "service_instance:64f720b3dfd2c4167939e25f6818a4d7",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "reasoning_binding:8883f85e82cf8056fbdc10c4c310593f",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "reasoning_binding:8883f85e82cf8056fbdc10c4c310593f",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": 1789389344122,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": 1789385282332,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "verified",
+            "context_ref": "sha256:fa6ff600c0084b3e471690bdd92c07fb6cf6cf3144215aa35d40d3ae7598ae15",
+            "evidence_ref": "environment_probe_evidence:454e339fd7cf13b0f322427ec7c6270ca220b159",
+            "observed_at_ms": 1789385252446,
+            "expires_at_ms": 1789385255727,
+            "reason_codes": [],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [],
+        "next_check": null,
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789387687647
+      }
+    },
+    "requested_by": "authenticated_mcp_task",
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "goal": {
+    "schema": "helix.environment_durable_goal_projection.v1",
+    "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+    "revision": 13,
+    "latest_event_hash": "sha256:d716ec32aa795667c03bf3a07450d542c1842ffd8e14ca5157dd44fcbf6b94e8",
+    "status": "active",
+    "objective": {
+      "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+      "goal_kind": "custom_survival",
+      "domain": "minecraft",
+      "game_version": "1.21.8",
+      "mechanics_collection_ref": null,
+      "milestones": [
+        {
+          "milestone_id": "cs-course-readiness",
+          "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+          "dependency_milestone_ids": [],
+          "required_postcondition_ids": [
+            "cs-fresh-safe-course"
+          ]
+        },
+        {
+          "milestone_id": "cs-three-linked-successors",
+          "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+          "dependency_milestone_ids": [
+            "cs-course-readiness"
+          ],
+          "required_postcondition_ids": [
+            "cs-linked-motion-trace"
+          ]
+        },
+        {
+          "milestone_id": "cs-interruption-recovery",
+          "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+          "dependency_milestone_ids": [
+            "cs-three-linked-successors"
+          ],
+          "required_postcondition_ids": [
+            "cs-interruption-recovery-trace"
+          ]
+        }
+      ]
+    },
+    "identity": {
+      "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+      "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+      "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+      "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+      "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+      "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+      "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+      "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+      "world_id": "minecraft:minehut:8fc80440-6fe",
+      "producer_epoch_ref": "environment_action_epoch:899a5658-3e00-4dcc-81ef-5a16f7ba731a",
+      "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+      "authority_policy_version": 1,
+      "authority_expires_at": "2026-09-14T15:35:00.911Z",
+      "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+      "turn_id": "environment_session_preparation:74556957f6307e2b6967abd85cb6537d7d536b3194ca781185b2787a9d8d4816"
+    },
+    "active_milestone_id": null,
+    "milestones": [
+      {
+        "milestone_id": "cs-course-readiness",
+        "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+        "status": "candidate",
+        "required_postcondition_ids": [
+          "cs-fresh-safe-course"
+        ],
+        "completed_postcondition_ids": []
+      },
+      {
+        "milestone_id": "cs-three-linked-successors",
+        "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+        "status": "candidate",
+        "required_postcondition_ids": [
+          "cs-linked-motion-trace"
+        ],
+        "completed_postcondition_ids": []
+      },
+      {
+        "milestone_id": "cs-interruption-recovery",
+        "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+        "status": "candidate",
+        "required_postcondition_ids": [
+          "cs-interruption-recovery-trace"
+        ],
+        "completed_postcondition_ids": []
+      }
+    ],
+    "recent_attempts": [],
+    "attempt_count": 0,
+    "latest_checkpoint": {
+      "checkpoint_id": "checkpoint:ready-up:sha256:34a4a1f3cd1cc48586fae176dddfc85deb639b8ebbeaa2e40f067d35a7dd130c",
+      "event_id": "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+      "observation_revision": 1789385214553,
+      "verified_facts": {
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "observation_revision": 1789385214553
+      },
+      "evidence_refs": [
+        "environment_probe_evidence:79f0f81d73faae674297be20d3167bd38ae55574"
+      ]
+    },
+    "recovery": {
+      "required": false,
+      "reason": null,
+      "rebound_event_id": "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca"
+    },
+    "consumed_semantic_wake_refs": [],
+    "event_refs": [
+      "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302",
+      "environment_durable_goal_event:79fc641e-fd33-41dd-8dda-5de11fc0164c",
+      "environment_durable_goal_event:525050f7-639a-4476-954a-4e90024ee609",
+      "environment_durable_goal_event:d1974220-1b9f-45e4-b9da-d8bef43fd887",
+      "environment_durable_goal_event:1a3bbaa9-914f-40aa-a8ab-b0fc1e487cd8",
+      "environment_durable_goal_event:acdf5464-44ca-4969-a844-63f5f06eb3f4",
+      "environment_durable_goal_event:17fe37f1-43da-4619-9efc-de0e4f4e6d13",
+      "environment_durable_goal_event:b8af0ee4-81f2-498e-bc67-ad9e5f50bb25",
+      "environment_durable_goal_event:1ba28bb9-f5a5-4ed2-9a0c-fb21581063e1",
+      "environment_durable_goal_event:790ef28f-ec5b-42e5-9da7-96d940396863",
+      "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca",
+      "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+      "environment_durable_goal_event:d6c650d8-318c-44c9-bf76-fa4416d96cfd"
+    ],
+    "content_role": "environment_durable_goal_projection_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "credential_rotated": false,
+  "authority_renewed": false,
+  "gameplay_submitted": false,
+  "cs1_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "credential_included": false,
+  "hidden_reasoning_included": false
+}

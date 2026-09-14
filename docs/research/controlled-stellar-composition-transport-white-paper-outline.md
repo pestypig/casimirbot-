@@ -106,6 +106,22 @@ instability ledgers.
 
 ### 11. Limitations and conclusion
 
+Include the deferred [three-dimensional convection study](./controlled-stellar-composition-transport-3d-convection-plan.md)
+as future methods work: calibrated MESA background, bounded flow simulation,
+converged transport measurements, justified stellar closure, and independent
+observational comparison. Discuss EOS/entropy/heating compatibility and the
+limits of incompressible benchmarks for anelastic stellar flow. Results enter
+the manuscript only through the applicable closed program gates.
+
+Keep the proposed broader Solar Transport laboratory in future-work scope,
+not as a prerequisite or result of the intervention paper. Distinguish imposed,
+fitted, assimilated, and predicted quantities; document held-out measurements,
+surface corrections, and instrument operators. Report per-observation
+disagreements rather than allowing aggregate improvements to hide failures.
+Any optional closure benchmark must distinguish its filter, equation regime,
+closure error, and numerical error, with independent stellar transfer tests
+before claiming benefit to solar predictions.
+
 State model-systematic limitations, observational coverage, solar calibration
 degeneracies, transport-family incompleteness, and the difference between an
 idealized admissible field and a realizable intervention.
@@ -170,4 +186,3 @@ Sections may be drafted early as methods or preregistration text, but result
 language can only be populated from closed-gate artifacts. A schema seal,
 fixture, mock result, imported profile, or successful orchestration test cannot
 be cited as solver execution or physical closure.
-

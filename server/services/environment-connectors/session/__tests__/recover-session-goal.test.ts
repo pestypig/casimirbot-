@@ -29,7 +29,7 @@ function fixture(reason = "fabric_restart") {
     database: vi.fn().mockResolvedValue({}),
     identity: vi.fn().mockResolvedValue({ ...identity, producer_epoch_ref: "epoch:new" }),
     perception: vi.fn().mockResolvedValue({ evidence: { observation: {
-      evidence_ref: "evidence:a", result: { observation_revision: 10 },
+      evidence_ref: "evidence:a", observation_revision: 10, result: { observation_revision: 3 },
     } } }),
   };
   const binding = { verifyTaskAssociation: vi.fn() };
@@ -56,7 +56,7 @@ it.each(["manual_override", "emergency_stop", "authority_revoked", "death"])("do
 
 it("does not append when evidence expires before the first write", async () => {
   const f = fixture();
-  f.dependencies.perception.mockResolvedValueOnce({ evidence: { observation: { evidence_ref: "evidence:a", result: { observation_revision: 10 } } } })
+  f.dependencies.perception.mockResolvedValueOnce({ evidence: { observation: { evidence_ref: "evidence:a", observation_revision: 10, result: { observation_revision: 3 } } } })
     .mockRejectedValueOnce(new Error("expired evidence"));
   await expect(f.run()).rejects.toThrow("expired evidence");
   expect(f.dependencies.goals.append).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ it("stops on binding revocation before the first append", async () => {
 it.each([null, "10", NaN, -1, 1.5])("rejects malformed observation revision %s", async revision => {
   const f = fixture();
   f.dependencies.perception.mockResolvedValue({ evidence: { observation: {
-    evidence_ref: "evidence:a", result: { observation_revision: revision },
+    evidence_ref: "evidence:a", observation_revision: revision, result: { observation_revision: 3 },
   } } });
   await expect(f.run()).rejects.toThrow("exact observation revision");
   expect(f.dependencies.goals.append).not.toHaveBeenCalled();

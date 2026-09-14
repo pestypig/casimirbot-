@@ -20,6 +20,13 @@ const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 const ENCRYPTED_SNAPSHOT_PREFIX = "v1";
 
+export class ProfileStorageReadError extends Error {
+  constructor() {
+    super("profile_storage_restore_unavailable");
+    this.name = "ProfileStorageReadError";
+  }
+}
+
 const normalize = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
@@ -246,8 +253,10 @@ export async function readProfileStorageSnapshot(
         ? JSON.parse(rows[0].snapshot) as HelixProfileStorageSnapshot
         : rows[0].snapshot
       );
-    if (parsed?.schema !== HELIX_PROFILE_STORAGE_SNAPSHOT_SCHEMA) {
-      return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
+    if (parsed?.schema !== HELIX_PROFILE_STORAGE_SNAPSHOT_SCHEMA ||
+        parsed.profile_id !== normalizedProfileId ||
+        !Array.isArray(parsed.entries) || !Array.isArray(parsed.artifacts)) {
+      throw new ProfileStorageReadError();
     }
     return {
       ...emptySnapshot(normalizedProfileId),
@@ -257,7 +266,10 @@ export async function readProfileStorageSnapshot(
       raw_profile_content_included: true,
     };
   } catch {
-    return { ...emptySnapshot(normalizedProfileId), quota_bytes: quotaBytes };
+    // Missing rows are empty profiles. An unreadable existing row is not: the
+    // renderer must not overwrite it with a fresh-origin snapshot on recovery.
+    // Keep protection details and native broker errors out of the response.
+    throw new ProfileStorageReadError();
   }
 }
 
@@ -452,14 +464,24 @@ export async function getProfileStorageUsage(
   const quotaBytes = resolveQuotaBytes(options.quota_bytes);
   const normalizedProfileId = normalize(profileId);
   if (normalizedProfileId) {
-    const snapshot = await readProfileStorageSnapshot(normalizedProfileId, { quota_bytes: quotaBytes });
+    // Usage is sanitized database metadata, not a content restore. Keep it
+    // inspectable while protection is unavailable without claiming zero data.
+    await ensureDatabase();
+    const { rows } = await getPool().query<{
+      total_entry_bytes: string | number; updated_at: Date | string | null;
+    }>(
+      `SELECT total_entry_bytes, updated_at FROM helix_account_profile_storage
+       WHERE profile_id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [normalizedProfileId],
+    );
+    const row = rows[0];
     return {
       profile_id: normalizedProfileId,
-      size_bytes: snapshot.total_entry_bytes,
+      size_bytes: Number(row?.total_entry_bytes ?? 0),
       quota_bytes: quotaBytes,
-      snapshot_count: snapshot.updated_at ? 1 : 0,
+      snapshot_count: row ? 1 : 0,
       path_ref: `profile://db/${encodeURIComponent(normalizedProfileId)}`,
-      updated_at: snapshot.updated_at,
+      updated_at: row?.updated_at instanceof Date ? row.updated_at.toISOString() : normalize(row?.updated_at) || null,
     };
   }
 

@@ -1,0 +1,3453 @@
+{
+  "schema": "casimirbot.continuous_session_retained_outcome_repair.v1",
+  "recorded_at": "2026-09-14T17:13:58.938Z",
+  "classification": "evidence normalization; evidence re-entry",
+  "scope": "Deterministic repair and packaged recovery of one prior canceled root; no three-successor acceptance",
+  "launch": {
+    "package": "apps/desktop/release-retained-outcome-20260914/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "b0ea252960c39db6311013f77c8144f1e55c1d989f03849117679c4dee5e2629",
+    "service_sha256": "886caf8ade56dec27f51d74f1321784658099f7fd54a2bff1238932b572fd7cb",
+    "ready_at": "2026-09-14T17:11:28.353Z",
+    "origin": "http://127.0.0.1:51996",
+    "service_pid": 13832,
+    "normal_native_close_and_launch": true,
+    "runtime_manifest_sha256": "257e11d0b2e0705d05627fe9ac86996c62aa36b7380eafe1c40a8b5cdd73921b"
+  },
+  "presence": {
+    "ok": true,
+    "presence": {
+      "schema": "helix.local_supervisor_coordination.v1",
+      "service_instance_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+      "client_session_ref": "supervisor_client:0d03d4715da4cdeb3592e0ae6b7ed0be",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_objective_summary": "Continue CS1–CS4 and record full CS5; verify repaired retained result for exact canceled CS3 root without replay.",
+      "declared_objective_is_verified": false,
+      "lifecycle_basis": "authenticated_client_heartbeat",
+      "lifecycle_state": "active",
+      "thread_observability_bridge": {
+        "supported_levels": [
+          "tool_activity_only"
+        ],
+        "requested_level": "tool_activity_only",
+        "checkpoint_publication": null,
+        "declaration_basis": "authenticated_client_declaration",
+        "provider_thread_content_included": false,
+        "hidden_reasoning_included": false,
+        "answer_authority": false,
+        "terminal_eligible": false
+      },
+      "resource_claims": [],
+      "room_ref": null,
+      "environment_ref": null,
+      "run_ref": null,
+      "verified_room_identity": null,
+      "verified_connector_identity": null,
+      "verified_retained_runtime_identity": null,
+      "verified_execution_lease_identity": null,
+      "blocker_summary": null,
+      "observed_at": "2026-09-14T17:11:36.606Z",
+      "heartbeat_expires_at": "2026-09-14T17:14:36.606Z",
+      "active": true,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "native_account_identity_included": false,
+      "content_role": "supervisor_presence_advisory",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "identity_basis": {
+      "authenticated_profile": "server_verified",
+      "authenticated_mcp_client": "server_verified",
+      "conversation_thread": "client_declared",
+      "client_session": "server_derived"
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "transport_request": {
+    "ok": true,
+    "request": {
+      "schema": "helix.desktop_tunnel_transition.v1",
+      "transition_request_ref": "desktop_tunnel_request:113852ba-04b6-408c-9d67-3b8acbf2b6c3",
+      "service_instance_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+      "client_session_ref": "supervisor_client:0d03d4715da4cdeb3592e0ae6b7ed0be",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_task_summary": "Restore previously consented Full Harness transport after verified retained-outcome package replacement.",
+      "declared_task_is_verified": false,
+      "requested_scope": "full_helix_agent",
+      "requested_lease_seconds": 300,
+      "status": "delegated",
+      "delegation_ref": "desktop_tunnel_delegation:2ad429f3-7ee3-4028-b121-0e0df153dd45",
+      "delegation_expires_at": "2026-09-14T17:16:43.251Z",
+      "created_at": "2026-09-14T17:11:43.238Z",
+      "updated_at": "2026-09-14T17:11:43.251Z",
+      "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+      "independent_external_oauth_client_bound": false,
+      "authority_limited_to_tunnel_transport": true,
+      "environment_authority_granted": false,
+      "trading_authority_granted": false,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "content_role": "desktop_tunnel_transition_request_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "receipt": {
+      "schema": "helix.desktop_tunnel_transition_receipt.v1",
+      "receipt_ref": "desktop_tunnel_receipt:d133e355-43a3-4aae-be14-8b9d7ecb7109",
+      "sequence": 2,
+      "transition_request_ref": "desktop_tunnel_request:113852ba-04b6-408c-9d67-3b8acbf2b6c3",
+      "delegation_ref": "desktop_tunnel_delegation:2ad429f3-7ee3-4028-b121-0e0df153dd45",
+      "service_instance_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+      "client_session_ref": "supervisor_client:0d03d4715da4cdeb3592e0ae6b7ed0be",
+      "event_type": "delegated",
+      "target_scope": "full_helix_agent",
+      "reason_code": "developer_delegation_granted",
+      "observed_at": "2026-09-14T17:11:43.251Z",
+      "previous_receipt_hash": "81acabb25bd6a4269c4fb8df201adb92857ff26f213899e03fda2b13098efee2",
+      "receipt_hash": "5ad61b18fd99fc94d8e71a8fd91a8c75e2992ebe5e56eb71ac3db85395316697",
+      "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+      "independent_external_oauth_client_bound": false,
+      "immutable_event": true,
+      "authority_limited_to_tunnel_transport": true,
+      "environment_authority_granted": false,
+      "trading_authority_granted": false,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "content_role": "desktop_tunnel_transition_receipt_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "existing_request_reused": false,
+    "trusted_device_delegation_applied": true,
+    "tool_list_changed_requested": false,
+    "native_attention_requested": true,
+    "native_attention_presentation_only": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false,
+    "stable_scope_routing": true,
+    "shared_live_room_catalog_pre_advertised": true,
+    "tool_list_changed_supported": true,
+    "authority_limited_to_tunnel_transport": true,
+    "environment_authority_granted": false,
+    "trading_authority_granted": false,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "transport_execute": {
+    "ok": true,
+    "accepted": true,
+    "receipt": {
+      "schema": "helix.desktop_tunnel_transition_receipt.v1",
+      "receipt_ref": "desktop_tunnel_receipt:08596b01-7f8d-46d1-abe4-dd51f3233908",
+      "sequence": 3,
+      "transition_request_ref": "desktop_tunnel_request:113852ba-04b6-408c-9d67-3b8acbf2b6c3",
+      "delegation_ref": "desktop_tunnel_delegation:2ad429f3-7ee3-4028-b121-0e0df153dd45",
+      "service_instance_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+      "client_session_ref": "supervisor_client:0d03d4715da4cdeb3592e0ae6b7ed0be",
+      "event_type": "transition_accepted",
+      "target_scope": "full_helix_agent",
+      "reason_code": "native_transition_pending",
+      "observed_at": "2026-09-14T17:11:52.731Z",
+      "previous_receipt_hash": "5ad61b18fd99fc94d8e71a8fd91a8c75e2992ebe5e56eb71ac3db85395316697",
+      "receipt_hash": "19139de1ada4ccf7feecad55c248376563b1edcb5419c0e68771be6a1ab29341",
+      "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+      "independent_external_oauth_client_bound": false,
+      "immutable_event": true,
+      "authority_limited_to_tunnel_transport": true,
+      "environment_authority_granted": false,
+      "trading_authority_granted": false,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "content_role": "desktop_tunnel_transition_receipt_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "native_receipt_ref": "native_transition_receipt:0niz7rT-6Tnlkyd5zqG2ZTYz",
+    "idempotency_replayed": false,
+    "native_transition_resubmitted": true,
+    "tool_list_changed_requested": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false,
+    "stable_scope_routing": true,
+    "shared_live_room_catalog_pre_advertised": true,
+    "tool_list_changed_supported": true,
+    "authority_limited_to_tunnel_transport": true,
+    "environment_authority_granted": false,
+    "trading_authority_granted": false,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "pairing_recovery": {
+    "ok": true,
+    "pairing": {
+      "schema": "helix.pairing_status.v1",
+      "id": "pairing:88fe3e2d-5217-40f6-8214-43237cb58915",
+      "revision": 2,
+      "destinationDigest": "690f1f336017b2f435e380af52e9d9a4cef247de10ee12aa4e127829db8dca98",
+      "chatId": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "environment": {
+        "roomId": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "runId": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9"
+      },
+      "state": "accepted",
+      "createdAt": "2026-09-14T14:00:36.357Z",
+      "invitationExpiresAt": "2026-09-14T14:15:36.357Z",
+      "pairingExpiresAt": "2026-09-14T22:00:36.357Z",
+      "acceptedAt": "2026-09-14T14:06:34.062Z",
+      "revokedAt": null,
+      "executionAuthority": false,
+      "answerAuthority": false
+    },
+    "binding": {
+      "schema": "helix.reasoning_task_binding.v1",
+      "reasoning_binding_id": "reasoning_binding:838061660dcd296daeb2513f921011b8",
+      "pairing_id": "pairing:88fe3e2d-5217-40f6-8214-43237cb58915",
+      "binding_epoch": 1,
+      "status": "active",
+      "service_instance_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "client_session_ref": "supervisor_client:0d03d4715da4cdeb3592e0ae6b7ed0be",
+      "provider_thread_ref_hash": "cdd431671a857f216c0cca08b0300683dc50d253d1e6e727083e0b7b99320e3c",
+      "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "mission_id": null,
+      "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+      "reasoning_role": "principal",
+      "continuation_transport": "polling",
+      "negotiated_observability_level": "tool_activity_only",
+      "created_by": "signed_in_operator",
+      "created_at": "2026-09-14T14:00:36.357Z",
+      "expires_at": "2026-09-14T22:00:36.357Z",
+      "claimed_at": "2026-09-14T14:06:34.062Z",
+      "revoked_at": null,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "execution_authority": false,
+      "evidence_authority": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "runtime_binding_active": true,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "bound_presence": {
+    "ok": true,
+    "presence": {
+      "schema": "helix.local_supervisor_coordination.v1",
+      "service_instance_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+      "client_session_ref": "supervisor_client:0d03d4715da4cdeb3592e0ae6b7ed0be",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_objective_summary": "Verify retained canceled-workflow outcome and remaining CS1–CS4 with full CS5 evidence.",
+      "declared_objective_is_verified": false,
+      "lifecycle_basis": "authenticated_client_heartbeat",
+      "lifecycle_state": "active",
+      "thread_observability_bridge": {
+        "supported_levels": [
+          "tool_activity_only"
+        ],
+        "requested_level": "tool_activity_only",
+        "checkpoint_publication": null,
+        "declaration_basis": "authenticated_client_declaration",
+        "provider_thread_content_included": false,
+        "hidden_reasoning_included": false,
+        "answer_authority": false,
+        "terminal_eligible": false
+      },
+      "resource_claims": [
+        {
+          "resource_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "claim_class": "read",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:room_membership:9cdb9164ac2c1ed6f4f80abfbfac9eb4",
+          "collision_authority": false
+        },
+        {
+          "resource_ref": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+          "claim_class": "retained_runtime",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:retained_agent_run:22f709ea3e6c6774ce38923895b6bfac",
+          "collision_authority": true
+        }
+      ],
+      "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "environment_ref": null,
+      "run_ref": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+      "verified_room_identity": {
+        "basis": "server_verified",
+        "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "participant_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "verification_ref": "supervisor_verification:room_membership:9cdb9164ac2c1ed6f4f80abfbfac9eb4"
+      },
+      "verified_connector_identity": null,
+      "verified_retained_runtime_identity": {
+        "basis": "server_verified",
+        "run_ref": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+        "run_version": 1,
+        "run_room_binding_ref": "agent_room_binding:edac407c-0d43-426b-8f5a-5a03c06b8a2f",
+        "run_room_binding_version": 1,
+        "verification_ref": "supervisor_verification:retained_agent_run:22f709ea3e6c6774ce38923895b6bfac"
+      },
+      "verified_execution_lease_identity": null,
+      "blocker_summary": null,
+      "observed_at": "2026-09-14T17:12:16.201Z",
+      "heartbeat_expires_at": "2026-09-14T17:15:16.201Z",
+      "active": true,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "native_account_identity_included": false,
+      "content_role": "supervisor_presence_advisory",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "identity_basis": {
+      "authenticated_profile": "server_verified",
+      "authenticated_mcp_client": "server_verified",
+      "conversation_thread": "client_declared",
+      "client_session": "server_derived"
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "ready_up": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+        "observed_at_ms": 1789405962777,
+        "ready": true,
+        "valid_until_ms": 1789405967222,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "service_instance:f2cf417b2f16319a9e859a2040f131cb",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "reasoning_binding:838061660dcd296daeb2513f921011b8",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "reasoning_binding:838061660dcd296daeb2513f921011b8",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": 1789407846075,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": 1789408695074,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": 1789405992507,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "verified",
+            "context_ref": "sha256:1e4130a695fcf4866a0d746928e6f8884e836c3986c0a1ae4ad3a722a1805678",
+            "evidence_ref": "environment_probe_evidence:6ba16092c7bdf6bd900b5d3374c915f06465cc37",
+            "observed_at_ms": 1789405962490,
+            "expires_at_ms": 1789405967222,
+            "reason_codes": [],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [],
+        "next_check": null,
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789416850898
+      }
+    },
+    "requested_by": "authenticated_mcp_task",
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "exact_prior_workflow": {
+    "operation": "minecraft.player.workflow.status",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "status": "completed",
+    "summary": "The exact workflow is not currently running. Its retained result is request_canceled, recorded at 2026-09-14T17:00:41.512Z. Recorded control release is historical, not a current control-state check.",
+    "observation": {
+      "schema": "helix.environment_action.control_observation.v1",
+      "control_request_ref": "environment_action_control:2957cbe9-0011-40e4-bf50-82e141d5bd68",
+      "workflow_ref": "workflow:cs3-linked-walk-20260914-01-0",
+      "control_kind": "status",
+      "outcome": "not_running",
+      "summary": "The exact workflow was not running in this Fabric client.",
+      "affected_workflow_refs": [],
+      "workflow_state": null,
+      "controls_released": false,
+      "evidence_refs": [],
+      "evidence_ref": "environment_action_control_evidence:5c0cc5a66438b8e809a3188bfec5b1bd833efd1a5",
+      "observed_at": "2026-09-14T17:12:17.490Z",
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "content_role": "environment_action_control_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "retained_result": {
+      "schema": "helix.environment_action.observation.v1",
+      "action_request_ref": "action_request:cs3-linked-walk-20260914-01-0",
+      "workflow_ref": "workflow:cs3-linked-walk-20260914-01-0",
+      "action_execution_ref": "environment_action_execution:c03b4014-54d3-49c6-86c0-7e427dd223c4",
+      "capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+      "capability_version": 1,
+      "action_kind": "execute_sequence",
+      "outcome": "request_canceled",
+      "summary": "temporal_runway_exhausted",
+      "result": {
+        "control_engine": "native_fabric",
+        "started_clock": {
+          "schema": "helix.environment_clock_snapshot.v1",
+          "clock_id": "minecraft_client_tick_clock:f0e93265-87c7-4e17-a6d6-5fc522e90632",
+          "clock_kind": "minecraft_game_tick",
+          "tick_rate_hz": 20,
+          "tick_index": 72310,
+          "world_tick_index": 14678555,
+          "monotonic": {
+            "origin_id": "minecraft_monotonic_clock:bb727335-fa9a-4c12-ae84-3ce828daf8e4",
+            "elapsed_ms": 3615903.1429
+          },
+          "synchronization": "server_synchronized",
+          "observed_at": "2026-09-14T17:00:29.772550900Z"
+        },
+        "completed_clock": {
+          "schema": "helix.environment_clock_snapshot.v1",
+          "clock_id": "minecraft_client_tick_clock:f0e93265-87c7-4e17-a6d6-5fc522e90632",
+          "clock_kind": "minecraft_game_tick",
+          "tick_rate_hz": 20,
+          "tick_index": 72539,
+          "world_tick_index": 14678784,
+          "monotonic": {
+            "origin_id": "minecraft_monotonic_clock:bb727335-fa9a-4c12-ae84-3ce828daf8e4",
+            "elapsed_ms": 3627407.4404
+          },
+          "synchronization": "server_synchronized",
+          "observed_at": "2026-09-14T17:00:41.276591Z"
+        },
+        "duration_ticks": 229,
+        "postconditions": [
+          {
+            "condition_id": "cs3-linked-walk-20260914-01-0:initial",
+            "condition_kind": "checkpoint",
+            "required": true,
+            "status": "not_checked",
+            "summary": "The workflow did not complete, so this postcondition was not claimed as satisfied.",
+            "evidence_refs": [
+              "environment_action_event:9f93956f-784b-4e76-8763-cc3f7df7996a",
+              "environment_action_event:854b2c74-8ca8-40da-bc5d-5a1daa75b306",
+              "environment_action_event:92ac2888-a908-4a49-93dd-98e84fb05eca",
+              "environment_action_event:94bd69a5-7370-4597-a9f5-7481f386eb05",
+              "environment_action_event:77404e1a-dec6-4fd8-9e10-e966ec79f3ee",
+              "environment_action_event:7cfab3ca-725f-4e49-88a2-aac62d24746a",
+              "environment_action_event:4908a78d-8706-450d-a3e2-43109ab0caf6",
+              "environment_action_event:0fceef35-151f-4cf1-b785-76584d11f51c",
+              "environment_action_event:56e2bc7f-1f97-4dd7-abec-cdd27e6b6f6a",
+              "environment_action_event:35db7bf0-bccb-4a11-a78a-196a4706bd57",
+              "environment_action_event:af33983d-f599-4011-8f8e-23e0758e6030",
+              "environment_action_event:91e88171-32d6-40a4-8148-4ae85c6ac768",
+              "environment_action_event:99416c55-5518-4314-af23-ac7b59680d5c",
+              "environment_action_event:bde2bc8e-426a-48af-9a2f-83cfdd90447d",
+              "environment_action_event:055bfd09-5aed-46f9-af19-31688f86b5a5"
+            ],
+            "checked_at": "2026-09-14T17:00:41.278886200Z"
+          }
+        ],
+        "verified_terminal_measurements": {
+          "active_control_ticks": 230,
+          "answer_authority": false,
+          "checkpoint_settlements": [
+            {
+              "checkpoint_id": "checkpoint:cs3-linked-walk-20260914-01-0",
+              "monotonic_elapsed_ns": 4280400,
+              "node_id": "initial",
+              "scheduler_ticks_elapsed": 51,
+              "tick_index": 50
+            },
+            {
+              "checkpoint_id": "align.post.0",
+              "monotonic_elapsed_ns": 500552400,
+              "node_id": "align.post.0",
+              "scheduler_ticks_elapsed": 62,
+              "tick_index": 61
+            }
+          ],
+          "condition_observation_count": 6,
+          "condition_observations": [
+            {
+              "condition_kind": "position_within",
+              "node_id": "initial",
+              "satisfied": true,
+              "tick_index": 50
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "align",
+              "satisfied": true,
+              "tick_index": 50
+            },
+            {
+              "condition_kind": "health_at_least",
+              "node_id": "align.pre.1",
+              "satisfied": true,
+              "tick_index": 50
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "align.post.0",
+              "satisfied": true,
+              "tick_index": 61
+            },
+            {
+              "condition_kind": "player_grounded",
+              "node_id": "walk",
+              "satisfied": true,
+              "tick_index": 80
+            },
+            {
+              "condition_kind": "health_at_least",
+              "node_id": "walk.pre.1",
+              "satisfied": true,
+              "tick_index": 80
+            }
+          ],
+          "deviation_count": 0,
+          "dispatch_to_client_accept_ms": 33,
+          "dispatch_to_first_tick_ms": 37,
+          "executed_node_count": 8,
+          "executed_node_ids": [
+            "initial",
+            "align",
+            "align.pre.1",
+            "align.execute",
+            "align.post.0",
+            "walk",
+            "walk.pre.1",
+            "walk.execute"
+          ],
+          "inventory_mutation_performed": false,
+          "inventory_mutations_performed": 0,
+          "last_temporal_acceptance_timing": null,
+          "last_temporal_activation_timing": null,
+          "manual_or_safety_to_release_ms": null,
+          "measurement_authority": false,
+          "missed_ticks": 4,
+          "node_outcomes": {
+            "align": "succeeded",
+            "align.execute": "succeeded",
+            "align.post.0": "succeeded",
+            "align.pre.1": "succeeded",
+            "initial": "succeeded",
+            "walk": "succeeded",
+            "walk.pre.1": "succeeded"
+          },
+          "oldest_pending_age_ms": 1263,
+          "planned_runway_ticks_at_accept": 950,
+          "player_interaction_performed": false,
+          "player_motion_performed": true,
+          "queue_depth_at_lease": 1,
+          "required_checkpoints_satisfied": 1,
+          "resident_computation_ms": 75,
+          "resident_inventory_observation": {
+            "action_attribution": "unestablished",
+            "available": true,
+            "between_sample_effects_observed": false,
+            "gap_detected": false,
+            "item_count_change_lower_bound": 0
+          },
+          "retry_count": 0,
+          "ruleset": "survival_tas",
+          "runway_ticks_remaining": 720,
+          "satisfied_checkpoint_ids": [
+            "checkpoint:cs3-linked-walk-20260914-01-0",
+            "align.post.0"
+          ],
+          "scheduler_ticks": 230,
+          "scheduler_ticks_elapsed": 279,
+          "sequence_completed": false,
+          "sequence_id": "plan:cs3-linked-walk-20260914-01-0",
+          "stabilization_entered": false,
+          "stalled_ticks": 0,
+          "temporal_poll_count": 0,
+          "temporal_poll_max_ms": null,
+          "temporal_poll_total_ms": null,
+          "temporal_reconciliation_count": 0,
+          "temporal_reconciliation_max_ms": null,
+          "temporal_reconciliation_total_ms": null,
+          "temporal_remaining_ticks": 0,
+          "temporal_window_reason": "temporal_runway_exhausted",
+          "terminal_eligible": false,
+          "terminal_reason_code": "sequence_running",
+          "wall_clock_elapsed_ms": 11407,
+          "world_mutations_performed": 0
+        },
+        "side_effects_performed": true,
+        "player_motion_performed": true,
+        "player_interaction_performed": false,
+        "inventory_mutation_performed": false,
+        "world_mutation_performed": false,
+        "manual_override_detected": false,
+        "manual_override_reason": null,
+        "controls_released": true,
+        "host_access_performed": false,
+        "automatic_replay_performed": false,
+        "model_invoked": false
+      },
+      "progress_observation_refs": [
+        "environment_action_event:9f93956f-784b-4e76-8763-cc3f7df7996a",
+        "environment_action_event:854b2c74-8ca8-40da-bc5d-5a1daa75b306",
+        "environment_action_event:92ac2888-a908-4a49-93dd-98e84fb05eca",
+        "environment_action_event:94bd69a5-7370-4597-a9f5-7481f386eb05",
+        "environment_action_event:77404e1a-dec6-4fd8-9e10-e966ec79f3ee",
+        "environment_action_event:7cfab3ca-725f-4e49-88a2-aac62d24746a",
+        "environment_action_event:4908a78d-8706-450d-a3e2-43109ab0caf6",
+        "environment_action_event:0fceef35-151f-4cf1-b785-76584d11f51c",
+        "environment_action_event:56e2bc7f-1f97-4dd7-abec-cdd27e6b6f6a",
+        "environment_action_event:35db7bf0-bccb-4a11-a78a-196a4706bd57",
+        "environment_action_event:af33983d-f599-4011-8f8e-23e0758e6030",
+        "environment_action_event:91e88171-32d6-40a4-8148-4ae85c6ac768",
+        "environment_action_event:99416c55-5518-4314-af23-ac7b59680d5c",
+        "environment_action_event:bde2bc8e-426a-48af-9a2f-83cfdd90447d",
+        "environment_action_event:055bfd09-5aed-46f9-af19-31688f86b5a5"
+      ],
+      "postcondition_evidence_refs": [
+        "environment_action_event:9f93956f-784b-4e76-8763-cc3f7df7996a",
+        "environment_action_event:854b2c74-8ca8-40da-bc5d-5a1daa75b306",
+        "environment_action_event:92ac2888-a908-4a49-93dd-98e84fb05eca",
+        "environment_action_event:94bd69a5-7370-4597-a9f5-7481f386eb05",
+        "environment_action_event:77404e1a-dec6-4fd8-9e10-e966ec79f3ee",
+        "environment_action_event:7cfab3ca-725f-4e49-88a2-aac62d24746a",
+        "environment_action_event:4908a78d-8706-450d-a3e2-43109ab0caf6",
+        "environment_action_event:0fceef35-151f-4cf1-b785-76584d11f51c",
+        "environment_action_event:56e2bc7f-1f97-4dd7-abec-cdd27e6b6f6a",
+        "environment_action_event:35db7bf0-bccb-4a11-a78a-196a4706bd57",
+        "environment_action_event:af33983d-f599-4011-8f8e-23e0758e6030",
+        "environment_action_event:91e88171-32d6-40a4-8148-4ae85c6ac768",
+        "environment_action_event:99416c55-5518-4314-af23-ac7b59680d5c",
+        "environment_action_event:bde2bc8e-426a-48af-9a2f-83cfdd90447d",
+        "environment_action_event:055bfd09-5aed-46f9-af19-31688f86b5a5"
+      ],
+      "evidence_ref": "environment_action_evidence:190e43bd0d26645801af521476af509bb3b47db1a",
+      "observed_at": "2026-09-14T17:00:41.512Z",
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "content_role": "environment_action_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "fresh_authority": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 1,
+        "issued_at": "2026-09-14T07:35:00.977Z",
+        "expires_at": "2026-09-14T17:58:15.074Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "state": "ready",
+        "ready_for_actions": true,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-14T16:00:14.790Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": true,
+        "heartbeat_received_at": "2026-09-14T17:13:10.434Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "fresh_perception": {
+    "operation": "minecraft.situation.probe",
+    "mcp_evidence": {
+      "schema": "helix.mcp_evidence_observation.v1",
+      "observation_ref": "mcp_evidence_observation:helix.minecraft.situation.observe_result:e73b148f-8161-439d-bf40-7cd447a0b44b",
+      "capability_id": "helix.minecraft.situation.observe_result",
+      "capability_version": 1,
+      "tool_call_ref": "mcp_tool_call:helix_minecraft_situation_probe:715178d6-13db-45ab-9797-e4b6de6aff40",
+      "handler_id": "helix.minecraft.situation.handler",
+      "handler_contract_version": "helix.environment_connector.probe_observation.v1",
+      "producer_ref": "casimirbot-profile:user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "subject_refs": [
+        "account-profile:user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_probe_request:6b9f9508-f685-4768-86c8-45a5c3254fc0",
+        "com.casimirbot.minecraft.perception_snapshot.read"
+      ],
+      "request_fingerprint": "sha256:419985d956af811e03fbacda9696bbbf9e2a331832581ef1c91bad2daa306811",
+      "outcome": "succeeded",
+      "summary": "Observed one bounded Minecraft situation for exact durable-run re-entry.",
+      "payload_schema": "helix.environment_connector.probe_observation.v1",
+      "payload": {
+        "schema": "helix.environment_connector.probe_observation.v1",
+        "probe_request_ref": "environment_probe_request:6b9f9508-f685-4768-86c8-45a5c3254fc0",
+        "probe_attempt_ref": "environment_probe_attempt:8a943535-56a5-493d-997f-8b5cfd5a06a6",
+        "capability_id": "com.casimirbot.minecraft.perception_snapshot.read",
+        "capability_version": 2,
+        "outcome": "succeeded",
+        "summary": "Bounded same-revision Minecraft perception snapshot completed.",
+        "result": {
+          "result_summary": "Bounded same-revision Minecraft perception snapshot completed.",
+          "entities": [],
+          "snapshot_schema": "helix.minecraft_perception_snapshot.v1",
+          "observation_revision": 14694083,
+          "game_tick": 14694083,
+          "capture_duration_ms": 2.43,
+          "dimension": "minecraft:overworld",
+          "actor": {
+            "air": 300,
+            "food_level": 20,
+            "freezing": false,
+            "health": 20,
+            "max_health": 20,
+            "on_fire": false,
+            "on_ground": true,
+            "pitch": 0,
+            "position": {
+              "x": -2.1,
+              "y": 65,
+              "z": 7.7
+            },
+            "velocity": {
+              "x": 0,
+              "y": -0.08,
+              "z": 0
+            },
+            "yaw": 0
+          },
+          "focus": {
+            "aim_position": {
+              "x": -2.5,
+              "y": 66.5,
+              "z": 8.5
+            },
+            "block_id": "minecraft:smooth_stone",
+            "distance_blocks": 0.3,
+            "kind": "block",
+            "line_of_sight": true,
+            "occlusion": "none",
+            "position": {
+              "x": -3,
+              "y": 66,
+              "z": 8
+            }
+          },
+          "projectiles": [],
+          "hazards": [],
+          "movement_candidates": [
+            {
+              "cardinal_direction": "south",
+              "drop_depth_blocks": 0,
+              "drop_scan_complete": true,
+              "evidence_complete": true,
+              "feet_clear": false,
+              "head_clear": false,
+              "nearby_fluid_count": 0,
+              "nearby_hazard_count": 0,
+              "relative_direction": "forward",
+              "safe_candidate": false,
+              "support_block": "minecraft:smooth_stone",
+              "support_position": {
+                "x": -3,
+                "y": 64,
+                "z": 8
+              },
+              "target_feet_position": {
+                "x": -3,
+                "y": 65,
+                "z": 8
+              }
+            },
+            {
+              "cardinal_direction": "west",
+              "drop_depth_blocks": 0,
+              "drop_scan_complete": true,
+              "evidence_complete": true,
+              "feet_clear": true,
+              "head_clear": true,
+              "nearby_fluid_count": 0,
+              "nearby_hazard_count": 0,
+              "relative_direction": "right",
+              "safe_candidate": true,
+              "support_block": "minecraft:smooth_stone",
+              "support_position": {
+                "x": -4,
+                "y": 64,
+                "z": 7
+              },
+              "target_feet_position": {
+                "x": -4,
+                "y": 65,
+                "z": 7
+              }
+            },
+            {
+              "cardinal_direction": "north",
+              "drop_depth_blocks": 0,
+              "drop_scan_complete": true,
+              "evidence_complete": true,
+              "feet_clear": true,
+              "head_clear": true,
+              "nearby_fluid_count": 0,
+              "nearby_hazard_count": 0,
+              "relative_direction": "back",
+              "safe_candidate": true,
+              "support_block": "minecraft:smooth_stone",
+              "support_position": {
+                "x": -3,
+                "y": 64,
+                "z": 6
+              },
+              "target_feet_position": {
+                "x": -3,
+                "y": 65,
+                "z": 6
+              }
+            },
+            {
+              "cardinal_direction": "east",
+              "drop_depth_blocks": 0,
+              "drop_scan_complete": true,
+              "evidence_complete": true,
+              "feet_clear": true,
+              "head_clear": true,
+              "nearby_fluid_count": 0,
+              "nearby_hazard_count": 0,
+              "relative_direction": "left",
+              "safe_candidate": true,
+              "support_block": "minecraft:smooth_stone",
+              "support_position": {
+                "x": -2,
+                "y": 64,
+                "z": 7
+              },
+              "target_feet_position": {
+                "x": -2,
+                "y": 65,
+                "z": 7
+              }
+            }
+          ],
+          "navigation_frontier": {
+            "coverage_boundary_reached": true,
+            "evidence_complete": true,
+            "frontier_schema": "helix.minecraft_navigation_frontier.v1",
+            "horizontal_radius": 7,
+            "movement_model": [
+              "walk",
+              "diagonal",
+              "ascend",
+              "descend"
+            ],
+            "origin": {
+              "x": -3,
+              "y": 65,
+              "z": 7
+            },
+            "planner": "casimirbot_native_bounded_dijkstra",
+            "ranked_frontiers": [
+              {
+                "cost": 104,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": 4,
+                  "y": 65,
+                  "z": 0
+                },
+                "displacement_blocks": 9.9,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 1
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 1
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 4,
+                      "y": 65,
+                      "z": 0
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 94,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 0
+                },
+                "displacement_blocks": 9.22,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 1
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 1
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 0
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 100,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": 4,
+                  "y": 65,
+                  "z": 1
+                },
+                "displacement_blocks": 9.22,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 4,
+                      "y": 65,
+                      "z": 1
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 90,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": -8,
+                  "y": 65,
+                  "z": 0
+                },
+                "displacement_blocks": 8.6,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -4,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -4,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -5,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -5,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -6,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -6,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -7,
+                      "y": 65,
+                      "z": 1
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -7,
+                      "y": 65,
+                      "z": 1
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -8,
+                      "y": 65,
+                      "z": 0
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 90,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 0
+                },
+                "displacement_blocks": 8.6,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 1
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 1
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 0
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 96,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": 4,
+                  "y": 65,
+                  "z": 2
+                },
+                "displacement_blocks": 8.6,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 4,
+                      "y": 65,
+                      "z": 2
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 90,
+                "coverage_boundary": false,
+                "destination": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 1
+                },
+                "displacement_blocks": 8.49,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -2,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -1,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": 0,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 1,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": 2,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": 3,
+                      "y": 65,
+                      "z": 1
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              },
+              {
+                "cost": 86,
+                "coverage_boundary": true,
+                "destination": {
+                  "x": -7,
+                  "y": 65,
+                  "z": 0
+                },
+                "displacement_blocks": 8.06,
+                "steps": [
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 7
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 6
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 5
+                    }
+                  },
+                  {
+                    "cost": 10,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 5
+                    },
+                    "movement": "walk",
+                    "to": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 4
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -3,
+                      "y": 65,
+                      "z": 4
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -4,
+                      "y": 65,
+                      "z": 3
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -4,
+                      "y": 65,
+                      "z": 3
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -5,
+                      "y": 65,
+                      "z": 2
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -5,
+                      "y": 65,
+                      "z": 2
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -6,
+                      "y": 65,
+                      "z": 1
+                    }
+                  },
+                  {
+                    "cost": 14,
+                    "from": {
+                      "x": -6,
+                      "y": 65,
+                      "z": 1
+                    },
+                    "movement": "diagonal",
+                    "to": {
+                      "x": -7,
+                      "y": 65,
+                      "z": 0
+                    }
+                  }
+                ],
+                "vertical_gain_blocks": 0
+              }
+            ],
+            "reachable_foothold_count": 98,
+            "route_step_limit_reached": false,
+            "selection_authority": "runtime_codex",
+            "vertical_radius": 2
+          },
+          "inventory": {
+            "item_count": 3,
+            "slots": [
+              {
+                "count": 1,
+                "item": "minecraft:iron_sword",
+                "slot": 0
+              },
+              {
+                "count": 1,
+                "item": "minecraft:golden_apple",
+                "slot": 1
+              },
+              {
+                "count": 4,
+                "item": "minecraft:rotten_flesh",
+                "slot": 2
+              }
+            ]
+          },
+          "coverage": {
+            "entities_complete": true,
+            "hazards_complete": true,
+            "horizontal_radius": 7,
+            "loaded_region_complete": true,
+            "omitted_categories": [
+              "client_screen",
+              "manual_input_attribution"
+            ],
+            "projectiles_complete": true,
+            "unknown_cell_count": 0,
+            "vertical_radius": 2
+          },
+          "ui_state": {
+            "client_screen_state": "unobserved",
+            "freshness": "unobserved",
+            "input_activity": false,
+            "input_capture_known": false,
+            "same_revision": false,
+            "server_container_open": false
+          },
+          "world_rules": {
+            "keep_inventory": true
+          },
+          "semantic_fingerprint": "sha256:f53d3173812a0f84eed07fac7226c35f7640202eb8294425933f369912a9d43d"
+        },
+        "evidence_ref": "environment_probe_evidence:1bd82e80ab4b994c5d78bf9563796de2c9e35379",
+        "observation_revision": 1789406006516,
+        "observed_at": "2026-09-14T17:13:26.516Z",
+        "freshness_age_ms": 293,
+        "provenance_valid": true,
+        "eligible_for_current_turn_reentry": true,
+        "late_result_disposition": null,
+        "content_role": "environment_probe_observation_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      },
+      "support_refs": [
+        "environment_probe_evidence:1bd82e80ab4b994c5d78bf9563796de2c9e35379"
+      ],
+      "missing_or_uncertain": [],
+      "observed_at": "2026-09-14T17:13:26.516Z",
+      "freshness": {
+        "state": "fresh",
+        "age_ms": 293,
+        "expires_at": "2026-09-14T17:13:31.417Z"
+      },
+      "provenance": {
+        "valid": true,
+        "payload_sha256": "sha256:9af226036a74e91a67d9bff4140a831dc85b03b6a23467391d1878fafee8b0d7",
+        "source_refs": [
+          "environment_probe_evidence:1bd82e80ab4b994c5d78bf9563796de2c9e35379"
+        ]
+      },
+      "retryability": {
+        "state": "not_retryable",
+        "reason_codes": [],
+        "missing_requirement_ids": []
+      },
+      "claim_ceiling": {
+        "class": "bounded_observation",
+        "description": "Supports only the exact bounded Minecraft probe observation while fresh; it grants no path-safety, execution, answer, or terminal authority."
+      },
+      "retention": {
+        "class": "profile_durable",
+        "retrieval_allowed": true,
+        "retained_until": "2026-09-15T17:13:26.731Z",
+        "revocation_ref": null
+      },
+      "authority": {
+        "assistant_answer": false,
+        "answer_authority": false,
+        "agent_executable": false,
+        "terminal_eligible": false,
+        "raw_content_included": false,
+        "reentry_required": true
+      }
+    },
+    "prior_turn_id": "mcp_environment_probe_turn:4b8d71d8-04ec-4151-a72c-2463168ed23a",
+    "probe_kind": "perception_snapshot",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "status": "completed",
+    "summary": "Bounded same-revision Minecraft perception snapshot completed.",
+    "observation": {
+      "schema": "helix.environment_connector.probe_observation.v1",
+      "probe_request_ref": "environment_probe_request:6b9f9508-f685-4768-86c8-45a5c3254fc0",
+      "probe_attempt_ref": "environment_probe_attempt:8a943535-56a5-493d-997f-8b5cfd5a06a6",
+      "capability_id": "com.casimirbot.minecraft.perception_snapshot.read",
+      "capability_version": 2,
+      "outcome": "succeeded",
+      "summary": "Bounded same-revision Minecraft perception snapshot completed.",
+      "result": {
+        "result_summary": "Bounded same-revision Minecraft perception snapshot completed.",
+        "entities": [],
+        "snapshot_schema": "helix.minecraft_perception_snapshot.v1",
+        "observation_revision": 14694083,
+        "game_tick": 14694083,
+        "capture_duration_ms": 2.43,
+        "dimension": "minecraft:overworld",
+        "actor": {
+          "air": 300,
+          "food_level": 20,
+          "freezing": false,
+          "health": 20,
+          "max_health": 20,
+          "on_fire": false,
+          "on_ground": true,
+          "pitch": 0,
+          "position": {
+            "x": -2.1,
+            "y": 65,
+            "z": 7.7
+          },
+          "velocity": {
+            "x": 0,
+            "y": -0.08,
+            "z": 0
+          },
+          "yaw": 0
+        },
+        "focus": {
+          "aim_position": {
+            "x": -2.5,
+            "y": 66.5,
+            "z": 8.5
+          },
+          "block_id": "minecraft:smooth_stone",
+          "distance_blocks": 0.3,
+          "kind": "block",
+          "line_of_sight": true,
+          "occlusion": "none",
+          "position": {
+            "x": -3,
+            "y": 66,
+            "z": 8
+          }
+        },
+        "projectiles": [],
+        "hazards": [],
+        "movement_candidates": [
+          {
+            "cardinal_direction": "south",
+            "drop_depth_blocks": 0,
+            "drop_scan_complete": true,
+            "evidence_complete": true,
+            "feet_clear": false,
+            "head_clear": false,
+            "nearby_fluid_count": 0,
+            "nearby_hazard_count": 0,
+            "relative_direction": "forward",
+            "safe_candidate": false,
+            "support_block": "minecraft:smooth_stone",
+            "support_position": {
+              "x": -3,
+              "y": 64,
+              "z": 8
+            },
+            "target_feet_position": {
+              "x": -3,
+              "y": 65,
+              "z": 8
+            }
+          },
+          {
+            "cardinal_direction": "west",
+            "drop_depth_blocks": 0,
+            "drop_scan_complete": true,
+            "evidence_complete": true,
+            "feet_clear": true,
+            "head_clear": true,
+            "nearby_fluid_count": 0,
+            "nearby_hazard_count": 0,
+            "relative_direction": "right",
+            "safe_candidate": true,
+            "support_block": "minecraft:smooth_stone",
+            "support_position": {
+              "x": -4,
+              "y": 64,
+              "z": 7
+            },
+            "target_feet_position": {
+              "x": -4,
+              "y": 65,
+              "z": 7
+            }
+          },
+          {
+            "cardinal_direction": "north",
+            "drop_depth_blocks": 0,
+            "drop_scan_complete": true,
+            "evidence_complete": true,
+            "feet_clear": true,
+            "head_clear": true,
+            "nearby_fluid_count": 0,
+            "nearby_hazard_count": 0,
+            "relative_direction": "back",
+            "safe_candidate": true,
+            "support_block": "minecraft:smooth_stone",
+            "support_position": {
+              "x": -3,
+              "y": 64,
+              "z": 6
+            },
+            "target_feet_position": {
+              "x": -3,
+              "y": 65,
+              "z": 6
+            }
+          },
+          {
+            "cardinal_direction": "east",
+            "drop_depth_blocks": 0,
+            "drop_scan_complete": true,
+            "evidence_complete": true,
+            "feet_clear": true,
+            "head_clear": true,
+            "nearby_fluid_count": 0,
+            "nearby_hazard_count": 0,
+            "relative_direction": "left",
+            "safe_candidate": true,
+            "support_block": "minecraft:smooth_stone",
+            "support_position": {
+              "x": -2,
+              "y": 64,
+              "z": 7
+            },
+            "target_feet_position": {
+              "x": -2,
+              "y": 65,
+              "z": 7
+            }
+          }
+        ],
+        "navigation_frontier": {
+          "coverage_boundary_reached": true,
+          "evidence_complete": true,
+          "frontier_schema": "helix.minecraft_navigation_frontier.v1",
+          "horizontal_radius": 7,
+          "movement_model": [
+            "walk",
+            "diagonal",
+            "ascend",
+            "descend"
+          ],
+          "origin": {
+            "x": -3,
+            "y": 65,
+            "z": 7
+          },
+          "planner": "casimirbot_native_bounded_dijkstra",
+          "ranked_frontiers": [
+            {
+              "cost": 104,
+              "coverage_boundary": true,
+              "destination": {
+                "x": 4,
+                "y": 65,
+                "z": 0
+              },
+              "displacement_blocks": 9.9,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 1
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 1
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 4,
+                    "y": 65,
+                    "z": 0
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 94,
+              "coverage_boundary": true,
+              "destination": {
+                "x": 3,
+                "y": 65,
+                "z": 0
+              },
+              "displacement_blocks": 9.22,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 1
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 1
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 0
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 100,
+              "coverage_boundary": true,
+              "destination": {
+                "x": 4,
+                "y": 65,
+                "z": 1
+              },
+              "displacement_blocks": 9.22,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 4,
+                    "y": 65,
+                    "z": 1
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 90,
+              "coverage_boundary": true,
+              "destination": {
+                "x": -8,
+                "y": 65,
+                "z": 0
+              },
+              "displacement_blocks": 8.6,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -4,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -4,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -5,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -5,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -6,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -6,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -7,
+                    "y": 65,
+                    "z": 1
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -7,
+                    "y": 65,
+                    "z": 1
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -8,
+                    "y": 65,
+                    "z": 0
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 90,
+              "coverage_boundary": true,
+              "destination": {
+                "x": 2,
+                "y": 65,
+                "z": 0
+              },
+              "displacement_blocks": 8.6,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 1
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 1
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 0
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 96,
+              "coverage_boundary": true,
+              "destination": {
+                "x": 4,
+                "y": 65,
+                "z": 2
+              },
+              "displacement_blocks": 8.6,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 4,
+                    "y": 65,
+                    "z": 2
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 90,
+              "coverage_boundary": false,
+              "destination": {
+                "x": 3,
+                "y": 65,
+                "z": 1
+              },
+              "displacement_blocks": 8.49,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -2,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -1,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": 0,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 1,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": 2,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": 3,
+                    "y": 65,
+                    "z": 1
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            },
+            {
+              "cost": 86,
+              "coverage_boundary": true,
+              "destination": {
+                "x": -7,
+                "y": 65,
+                "z": 0
+              },
+              "displacement_blocks": 8.06,
+              "steps": [
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 7
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 6
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 5
+                  }
+                },
+                {
+                  "cost": 10,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 5
+                  },
+                  "movement": "walk",
+                  "to": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 4
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -3,
+                    "y": 65,
+                    "z": 4
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -4,
+                    "y": 65,
+                    "z": 3
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -4,
+                    "y": 65,
+                    "z": 3
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -5,
+                    "y": 65,
+                    "z": 2
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -5,
+                    "y": 65,
+                    "z": 2
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -6,
+                    "y": 65,
+                    "z": 1
+                  }
+                },
+                {
+                  "cost": 14,
+                  "from": {
+                    "x": -6,
+                    "y": 65,
+                    "z": 1
+                  },
+                  "movement": "diagonal",
+                  "to": {
+                    "x": -7,
+                    "y": 65,
+                    "z": 0
+                  }
+                }
+              ],
+              "vertical_gain_blocks": 0
+            }
+          ],
+          "reachable_foothold_count": 98,
+          "route_step_limit_reached": false,
+          "selection_authority": "runtime_codex",
+          "vertical_radius": 2
+        },
+        "inventory": {
+          "item_count": 3,
+          "slots": [
+            {
+              "count": 1,
+              "item": "minecraft:iron_sword",
+              "slot": 0
+            },
+            {
+              "count": 1,
+              "item": "minecraft:golden_apple",
+              "slot": 1
+            },
+            {
+              "count": 4,
+              "item": "minecraft:rotten_flesh",
+              "slot": 2
+            }
+          ]
+        },
+        "coverage": {
+          "entities_complete": true,
+          "hazards_complete": true,
+          "horizontal_radius": 7,
+          "loaded_region_complete": true,
+          "omitted_categories": [
+            "client_screen",
+            "manual_input_attribution"
+          ],
+          "projectiles_complete": true,
+          "unknown_cell_count": 0,
+          "vertical_radius": 2
+        },
+        "ui_state": {
+          "client_screen_state": "unobserved",
+          "freshness": "unobserved",
+          "input_activity": false,
+          "input_capture_known": false,
+          "same_revision": false,
+          "server_container_open": false
+        },
+        "world_rules": {
+          "keep_inventory": true
+        },
+        "semantic_fingerprint": "sha256:f53d3173812a0f84eed07fac7226c35f7640202eb8294425933f369912a9d43d"
+      },
+      "evidence_ref": "environment_probe_evidence:1bd82e80ab4b994c5d78bf9563796de2c9e35379",
+      "observation_revision": 1789406006516,
+      "observed_at": "2026-09-14T17:13:26.516Z",
+      "freshness_age_ms": 293,
+      "provenance_valid": true,
+      "eligible_for_current_turn_reentry": true,
+      "late_result_disposition": null,
+      "content_role": "environment_probe_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "monitor_projection": {
+      "disposition": "not_requested",
+      "monitor_id": null,
+      "evidence_ref": null
+    },
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "durable_goal": {
+    "operation": "com.casimirbot.environment.durable_goal.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "goal": {
+      "schema": "helix.environment_durable_goal_projection.v1",
+      "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+      "revision": 22,
+      "latest_event_hash": "sha256:c8e659eae1561c42b0031de895fbf2b075cd3c69068ec93eb63086bebe3f1eb4",
+      "status": "active",
+      "objective": {
+        "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+        "goal_kind": "custom_survival",
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "mechanics_collection_ref": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ]
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "dependency_milestone_ids": [
+              "cs-course-readiness"
+            ],
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ]
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "dependency_milestone_ids": [
+              "cs-three-linked-successors"
+            ],
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ]
+          }
+        ]
+      },
+      "identity": {
+        "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+        "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "producer_epoch_ref": "environment_action_epoch:a33d32be-5145-495c-b144-0424e167c4bd",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "authority_policy_version": 1,
+        "authority_expires_at": "2026-09-14T17:58:15.074Z",
+        "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+        "turn_id": "cs-human-authority-renewal-20260914-01"
+      },
+      "active_milestone_id": null,
+      "milestones": [
+        {
+          "milestone_id": "cs-course-readiness",
+          "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-fresh-safe-course"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-three-linked-successors",
+          "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-linked-motion-trace"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-interruption-recovery",
+          "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-interruption-recovery-trace"
+          ],
+          "completed_postcondition_ids": []
+        }
+      ],
+      "recent_attempts": [],
+      "attempt_count": 0,
+      "latest_checkpoint": {
+        "checkpoint_id": "checkpoint:human-authority-renewal-20260914-01",
+        "event_id": "environment_durable_goal_event:2d0b84b1-fa6b-4771-8a06-f9ba06936d16",
+        "observation_revision": 1789402006317,
+        "verified_facts": {
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "observation_revision": 1789402006317,
+          "actor_position": {
+            "x": -2.1,
+            "y": 65,
+            "z": -1.1
+          },
+          "actor_health": 20,
+          "actor_on_ground": true,
+          "observed_hazard_count": 0
+        },
+        "evidence_refs": [
+          "environment_probe_evidence:1cf72840295c2bc7080c7dad8b18da21ee49ba25"
+        ]
+      },
+      "recovery": {
+        "required": false,
+        "reason": null,
+        "rebound_event_id": "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944"
+      },
+      "consumed_semantic_wake_refs": [],
+      "event_refs": [
+        "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302",
+        "environment_durable_goal_event:79fc641e-fd33-41dd-8dda-5de11fc0164c",
+        "environment_durable_goal_event:525050f7-639a-4476-954a-4e90024ee609",
+        "environment_durable_goal_event:d1974220-1b9f-45e4-b9da-d8bef43fd887",
+        "environment_durable_goal_event:1a3bbaa9-914f-40aa-a8ab-b0fc1e487cd8",
+        "environment_durable_goal_event:acdf5464-44ca-4969-a844-63f5f06eb3f4",
+        "environment_durable_goal_event:17fe37f1-43da-4619-9efc-de0e4f4e6d13",
+        "environment_durable_goal_event:b8af0ee4-81f2-498e-bc67-ad9e5f50bb25",
+        "environment_durable_goal_event:1ba28bb9-f5a5-4ed2-9a0c-fb21581063e1",
+        "environment_durable_goal_event:790ef28f-ec5b-42e5-9da7-96d940396863",
+        "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca",
+        "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+        "environment_durable_goal_event:d6c650d8-318c-44c9-bf76-fa4416d96cfd",
+        "environment_durable_goal_event:83c0cecf-693c-4d07-8000-dd678778c0dd",
+        "environment_durable_goal_event:780d9db5-89cb-4a39-9236-8a9db0556def",
+        "environment_durable_goal_event:511adc2b-ee57-4784-87f7-031b5f798185",
+        "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+        "environment_durable_goal_event:cc3e99ab-e867-4c57-876d-dc6f6703b265",
+        "environment_durable_goal_event:646b0936-ca75-485b-a43f-a60f32f08685",
+        "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944",
+        "environment_durable_goal_event:2d0b84b1-fa6b-4771-8a06-f9ba06936d16",
+        "environment_durable_goal_event:bb0dc50f-bb87-4544-806e-1ce86b0bd69d"
+      ],
+      "content_role": "environment_durable_goal_projection_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "content_role": "environment_durable_goal_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "tests": {
+    "red": {
+      "failed": 9,
+      "passed": 10,
+      "log": ".tmp/retained-outcome-mapping-red-20260914.log"
+    },
+    "green": {
+      "passed": 27,
+      "files": 2,
+      "log": ".tmp/retained-outcome-mapping-green-20260914.log"
+    }
+  },
+  "interpretation": {
+    "root_replayed": false,
+    "successors_submitted": 0,
+    "stop_reason": "temporal_runway_exhausted",
+    "manual_override_detected": false,
+    "recorded_control_release_is_historical": true,
+    "current_idle_controls_separately_verified": true,
+    "root_displacement_blocks": 8.8,
+    "useful_motion_duration_ms": null,
+    "no_effects_after_restart_pose_unchanged": true
+  },
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false,
+  "pre_restart_acknowledged_ui": "￼\n￼\nNew chat\nHELIX ASK SESSION\nGUIDE\nAccount & Sessions\nx\nAgent Access\nx\n+\nWorkspace\nPanels\nAgent Access\nworkspace://workspace/panels/agent-access\n￼\n￼\nAGENT CONNECTIONS\nAI app connected\nStart Harness\nREVIEW TASK BINDING\nConnection checked. Next: review the exact-task binding below. Connection readiness alone does not bind this chat or grant game actions.\nThis device is trusted for Full Harness\nRemember approval for short, logged tunnel leases and for starting or stopping installed local environment applications on this profile and device. This never grants in-environment Minecraft actions, trading, answer, or terminal authority.\nRemove Full Harness device trust\nCatalog probe: current. Chat attachment: current. Continuation: polling under the approved pairing.\nThread visibility: tool activity only. Checkpoint publication: not requested.\nThe approved task can pick up queued steering when running. This does not wake an idle task or enable automatic delivery.\nThis proves connection readiness only. It does not expose private reasoning or grant environment actions.\nPair an existing AI task\nPairing permits exact-chat steering. Environment action permission is separate. Task registration does not mean the AI is currently active.\nRegistered AI task\n￼\nRefresh registered tasks\nHelix chat: 534a24b1-62e2-4feb-9e47-48a8f6caff64\nTask identity declared by the authenticated client: codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d\nInvitation expires after\n￼\nPairing duration\n￼\n￼\n￼\nUse Copy invitation and send it to the selected task for authenticated acceptance. Automatic delivery is unavailable for this connection.\nPairing: accepted. Current task availability has not been verified.\nSession binding recovered. Ready up can check the environment prerequisites.\nInvitation deadline: 2026-09-14T14:15:36.357Z. Pairing deadline: 2026-09-14T22:00:36.357Z.\nReview replacement pairingCheck acceptanceRevoke pairing\nAI task presence: 0:17 remaining (local clock estimate).\nBind the current Helix chat to this exact AI task\nThis does not create or control an AI-app chat. It authorizes only the authenticated task shown above to poll for steering from the selected local Helix chat.\nChat binding: active. A missing heartbeat does not revoke this binding.\nAI availability: current connection check passed; polling pickup still requires the AI task to run.\nAn associated run does not by itself prove current game connectivity or action permission.\nReady up\nChecks the bound environment session without replacing its binding or renewing permissions.\nReview environment settings\nThe readiness check has aged out. Use Ready up to check again; your binding was not revoked.\nSource credential deadline: 1:44:06 PM. About 55 minutes until that deadline. This is separate from gameplay permission; Ready up does not renew it.\nGameplay permission deadline: 1:58:15 PM. About 69 minutes until that deadline. This deadline does not override revocation or controller readiness and is separate from chat binding.\nEnvironment run deadline: 4:14:10 PM. About 205 minutes remaining. This is separate from chat binding and gameplay permission; Ready up does not extend it.\nKeep this binding while recovering the session. Do not replace it just because task presence or game permissions expired.\n￼\nInclude this verified environment run in the new binding:\nrun_30e7bbe7-f334-4947-88cb-2ac85db039b9\nRoom: shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621\nThis associates steering with the run; environment action permission remains separate.\nBinding state: active. Transport: polling. Environment run: run_30e7bbe7-f334-4947-88cb-2ac85db039b9.\nReplace binding\nCheck binding\nRevoke binding\nRefresh harness connection\nBack\nRecheck connection\nExplain\nCopy diagnostics\nOptional Device Check: separate from the agent connection and never counts as chat or catalog proof.\nSkip Device Check\nDisconnect\nAdvanced manual setup\n￼\nBound external AI task · \nready\n￼\nScroll Ask controls left\n￼\nLive Voice\n￼\nObserve\n￼\nOff\n￼\nRoom 1/2\nChoose Ask agent runtime\n￼\n￼\n￼\nScreen\n￼\n￼\n￼\nScroll Ask controls right\nAsk Helix\nRecent agent-submitted prompts — transport status, not answers or task completion.\nAgent-origin session check: this exact task accepted the eight-hour pairing for run_30e7bbe7-f334-4947-88cb-2ac85db039b9. Binding is verified. Ready up found the existing goal needs current player-epoch recovery; no gameplay has been submitted by this check. Read and acknowledge this advisory once, then diagnose recovery while preserving the existing goal and finite player permission.\nLast checked: acknowledged\nAgent-origin verification: the persistence repair package recovered this same accepted task/chat/run pairing. Three explicit MCP Ready up reads passed all ten checks with fresh perception, no repairs, and unchanged goal revision 22 or permission deadlines. This advisory is a delivery test, not a user instruction, gameplay request or final answer. Pick up and acknowledge it once while continuing the remaining CS1-CS4 verification.\nLast checked: acknowledged\nActivity & setup\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼"
+}

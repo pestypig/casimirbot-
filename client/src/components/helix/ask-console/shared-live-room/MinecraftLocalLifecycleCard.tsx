@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { Gamepad2, Loader2 } from "lucide-react";
+import { helixMinecraftLocalLifecycleReceiptSchema, helixMinecraftLoopbackAddressSchema,
+  helixMinecraftLocalServerLifecycleSchema } from "@shared/helix-minecraft-local-lifecycle";
 
 const ENDPOINT =
   "/api/agi/environment-connectors/local/minecraft/fabric-loopback/launch";
@@ -8,6 +10,7 @@ type LifecycleResponse = {
   ok?: boolean;
   error?: string;
   message?: string;
+  server_lifecycle?: unknown;
   receipt?: {
     launcher_action?: string;
     connection_action?: string;
@@ -22,12 +25,19 @@ export type MinecraftLocalLifecycleResult = Readonly<{
 }>;
 
 export const launchMinecraftLocalLifecycle = async (): Promise<MinecraftLocalLifecycleResult> => {
+  const selectionResponse = await fetch(ENDPOINT.replace(/launch$/, "selection"), { credentials: "include", signal: AbortSignal.timeout(10_000) });
+  const selection = await selectionResponse.json().catch(() => null);
+  const address = helixMinecraftLoopbackAddressSchema.safeParse(selection?.address);
+  if (!selectionResponse.ok || selection?.ok !== true || !address.success) {
+    throw new Error(selection?.message ?? "Select a prepared local server and player profile in desktop setup.");
+  }
   const response = await fetch(ENDPOINT, {
     method: "POST",
+    signal: AbortSignal.timeout(280_000),
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      address: "localhost:25565",
+      address: address.data,
       operator_confirmation: true,
     }),
   });
@@ -35,14 +45,20 @@ export const launchMinecraftLocalLifecycle = async (): Promise<MinecraftLocalLif
     | LifecycleResponse
     | null;
   if (!response.ok || body?.ok !== true) {
+    const server = helixMinecraftLocalServerLifecycleSchema.safeParse(body?.server_lifecycle);
+    const partial = server.success
+      ? ` Server ${server.data.status} was observed at ${server.data.observed_at}; client setup did not complete.`
+      : "";
     throw new Error(
-      body?.message ?? body?.error ?? "Minecraft lifecycle request failed.",
+      (body?.message ?? body?.error ?? "Minecraft lifecycle request failed.") + partial,
     );
   }
+  const receipt = helixMinecraftLocalLifecycleReceiptSchema.safeParse(body.receipt);
+  if (!receipt.success) throw new Error("Minecraft returned an incomplete startup receipt. Check setup before retrying.");
   return {
-    launcherAction: body.receipt?.launcher_action ?? "client ready",
-    connectionAction: body.receipt?.connection_action ?? "joined",
-    serverAddress: body.receipt?.server_address ?? "localhost:25565",
+    launcherAction: receipt.data.launcher_action,
+    connectionAction: receipt.data.connection_action,
+    serverAddress: receipt.data.server_address,
   };
 };
 
@@ -59,7 +75,7 @@ export function MinecraftLocalLifecycleCard() {
       const receipt = await launchMinecraftLocalLifecycle();
       setOk(true);
       setMessage(
-        `Connected to ${receipt.serverAddress} (${receipt.launcherAction}, ${receipt.connectionAction}).`,
+        `Client setup completed for ${receipt.serverAddress} (${receipt.launcherAction}, ${receipt.connectionAction}). Waiting for game observation.`,
       );
     } catch (error) {
       setMessage(
@@ -78,10 +94,10 @@ export function MinecraftLocalLifecycleCard() {
         <div>
           <p className="flex items-center gap-1 text-[10px] font-semibold text-cyan-100">
             <Gamepad2 className="h-3 w-3" />
-            Local Minecraft client
+            Local Minecraft server and client
           </p>
           <p className="mt-0.5 text-[9px] text-cyan-100/60">
-            The browser and desktop app call the same loopback-only Fabric lifecycle adapter.
+            Start your saved local server and prepared client. Existing EULA acceptance is required; game permissions stay separate.
           </p>
         </div>
         <button data-helix-interaction-kind="act" data-helix-authority-state="blocked_pending_contract" data-helix-control-id="helix.ask.shared_live_room.minecraft-local-lifecycle-card.void-launch-and-join"
@@ -95,7 +111,7 @@ export function MinecraftLocalLifecycleCard() {
               <Loader2 className="h-3 w-3 animate-spin" /> Starting…
             </span>
           ) : (
-            "Start or join localhost"
+            "Start saved Minecraft setup"
           )}
         </button>
       </div>

@@ -1,0 +1,17 @@
+{
+  "schema": "casimirbot.cs3_linked_trial_freeze.v1",
+  "recorded_at": "2026-09-14T17:17:11.346Z",
+  "packet": "docs/work-packets/eh-g8-cs3-linked-walk-development-v1.md",
+  "trial": "cs3-linked-walk-20260914-02",
+  "same_frozen_parameters_as_trial_1": true,
+  "root_start_unit": 80,
+  "segment_ticks": 200,
+  "maximum_total_units": 950,
+  "maximum_duration_ms": 47500,
+  "maximum_distance_blocks": 180,
+  "actual_fresh_perception_required_before_each_submission": true,
+  "exact_predecessor_required": true,
+  "synthetic_candidate_validation_count": 4,
+  "synthetic_candidates_are_not_live_evidence": true,
+  "no_automatic_action_loop": true
+}

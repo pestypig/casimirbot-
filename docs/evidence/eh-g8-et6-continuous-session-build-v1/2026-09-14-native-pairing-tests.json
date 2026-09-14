@@ -1,0 +1,95 @@
+{
+  "schema": "casimirbot.native_pairing_issuer_tests.v1",
+  "observed_at": "2026-09-14T04:56:58.551Z",
+  "scope": "Deterministic component and isolated browser evidence; not native acceptance",
+  "classification": [
+    "tool admission",
+    "evidence re-entry",
+    "presentation"
+  ],
+  "production_changes": [
+    "Preserve native authentication issuer and validate exact active native delegation for browser pairing authority",
+    "Use the actual destination issuer for native run eligibility",
+    "Retain same-request reconciliation with fixed account/device failures",
+    "Prefer the last healthy loopback address after OS bind probing, with occupied/unavailable-port fallback and fresh service authentication"
+  ],
+  "tests": [
+    {
+      "file": ".tmp/native-pairing-issuer-red-20260914.log",
+      "sha256": "1b48243aba4c5b7de1389818f1ab8dbb8f20075ff6cb5a35209bcad62fa4eb23",
+      "passed": 9,
+      "failed": 2,
+      "meaning": "Pre-repair actual-router native issuer mismatch and native-run namespace boundary"
+    },
+    {
+      "file": ".tmp/native-pairing-issuer-core-20260914.log",
+      "sha256": "1aeee32f61b64f47fa470291ca1f731d45213ce3f1adad362cfb65b76d0e721a",
+      "passed": 54,
+      "failed": 1,
+      "meaning": "25 existing route and 19 principal tests passed; native fixture omitted runtime binding restore, corrected in final focused run"
+    },
+    {
+      "file": ".tmp/native-pairing-issuer-focused-20260914.log",
+      "sha256": "fe995fa78e940c225c9b43021192cc13f09f396e64289c8a18eb6d72b718ee0a",
+      "passed": 53,
+      "failed": 0,
+      "files": 3
+    },
+    {
+      "file": ".tmp/native-pairing-issuer-browser-20260914.log",
+      "sha256": "3e257385979090f99a0ec1f21d0bdf5ae35488c58c3dad59925d34474d691472",
+      "passed": 24,
+      "failed": 0,
+      "actual_handler_cases": 20,
+      "mocked_response_layout_cases": 4,
+      "inputs": [
+        "pointer",
+        "keyboard"
+      ],
+      "native_issuer_real_run_cases": 2
+    },
+    {
+      "file": ".tmp/native-pairing-issuer-discipline-full-20260914.log",
+      "sha256": "2b47a3d471566c429c5184ad9a6359bb5336dc43845bb905f5c4a6906bb50e02",
+      "selected_test_executions_passed": 101,
+      "failed": 0,
+      "server_build_exit_code": 0,
+      "server_build_warnings": 4,
+      "limitations": "Sharded deterministic battery; no live frontier provider qualification. Skips in each invocation are shard exclusions, not a whole-suite coverage claim."
+    },
+    {
+      "file": ".tmp/native-pairing-loopback-tests-20260914.log",
+      "sha256": "7c422724427cf78237ff9ae077d9ea553329fe400c27aef420c33019afb72488",
+      "passed": 35,
+      "failed": 1,
+      "meaning": "New loopback cases passed. Existing environment test expected immediate writes although committed configuration already uses bounded deferred telemetry."
+    },
+    {
+      "file": ".tmp/native-pairing-loopback-tests-fixed-20260914.log",
+      "sha256": "330e78ba4b9349d2e269e35f544cc51367ffbc3694b598973791466f87cce9a2",
+      "passed": 36,
+      "failed": 0,
+      "files": 4,
+      "meaning": "Corrected stale test expectation and asserted existing 2500/15000 ms limits; no production persistence setting changed"
+    },
+    {
+      "file": ".tmp/native-pairing-issuer-docs-audit-final-20260914.log",
+      "sha256": "325c3ebd15651c8b3d94ef1d090f08dbe5103822f6c81c54a25a866f44bbc980",
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Isolated fixtures do not authenticate to production",
+    "pg-mem is not real PostgreSQL concurrency qualification",
+    "Ordinary native same-request reconciliation remains to be observed in the replacement EXE",
+    "Pending review recovery under an occupied old port is not covered by address reuse",
+    "No invitation secret, account credential, hidden reasoning, player authority or gameplay is included",
+    "No Casimir physics/adapter/certificate verification claimed for this application patch"
+  ],
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

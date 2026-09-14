@@ -21,6 +21,20 @@ async function fixture() {
   return {pool,insert,observation,deps};
 }
 describe('retained workflow status',()=>{
+  it.each([
+    ['canceled','manual_override'], ['canceled','request_canceled'],
+    ['timed_out','workflow_timeout'], ['failed','postcondition_failed'],
+    ['failed','precondition_failed'], ['emergency_stopped','emergency_stopped'],
+    ['connector_offline','connector_offline'], ['authority_stale','permission_revoked'],
+    ['authority_stale','authority_stale'],
+  ])('preserves canonical %s lifecycle outcome %s',async(status,outcome)=>{
+    const f=await fixture();
+    await f.pool.query(`UPDATE helix_environment_action_requests SET status=$1`,[status]);
+    const retained={...f.observation as object,outcome} as never;
+    f.deps.readObservation.mockResolvedValueOnce(retained);
+    expect(await readRetainedEnvironmentWorkflowResult(input,f.deps)).toBe(retained);
+    await f.pool.end();
+  });
   it('preserves historical evidence and isolates another participant',async()=>{
     const f=await fixture(); await f.insert('request:2','running','other');
     expect(await readRetainedEnvironmentWorkflowResult(input,f.deps)).toBe(f.observation);

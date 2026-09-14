@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import { temporalSuccessorCandidatesSql, temporalSuccessorStateSql, temporalSuccessorLeaseSql } from "./temporal-successor-query";
-import { temporalDeliveryStatusSql } from "./temporal-delivery-status";
+import { temporalDeliveryStatusSql, temporalStoppedResidentDeliveriesSql } from "./temporal-delivery-status";
 import { closeTemporalEpochGapSql } from "./temporal-epoch-gap";
 import { reactiveCheckpointMeasurementsValid } from "./reactive-checkpoint-measurements";
-import { serializeHelixEnvironmentPlanHashContent, canonicalEnvironmentTimeValue, helixEnvironmentTimeSha256 } from "@shared/helix-environment-time";
+import { serializeHelixEnvironmentPlanHashContent, canonicalEnvironmentTimeValue, helixEnvironmentTimeSha256, helixEnvironmentAffordanceFrontierSchema } from "@shared/helix-environment-time";
 import { retainTemporalAdmission } from "../temporal-plans/temporal-admission-retention";
 import { publishTemporalAdmission } from "./temporal-admission-publication";
 import { readTemporalPublicationClock, measureTemporalProposalReceipt } from "../temporal-plans/temporal-publication-clock";
@@ -3864,6 +3864,24 @@ export const leasePendingEnvironmentTemporalSuccessor = async (input: {
       successor.temporal_plan.identity.producer_epoch !== manifest.producer_epoch_ref ||
       successor.temporal_plan.identity.goal_id !== resident.temporal_plan.identity.goal_id ||
       successor.temporal_plan.identity.goal_revision !== Number(goals.rows[0].current_sequence)) return null;
+  // Publication takes the same goal lock. Recheck the latest authenticated
+  // frontier here, not only at admission, before granting an unexecuted plan.
+  const frontierRows = await db.query<{ frontier_payload: unknown; payload_hash: string;
+    retained_until: Date | string; observed_at: Date | string }>(
+    `SELECT frontier_payload,payload_hash,retained_until,observed_at
+     FROM helix_environment_temporal_frontiers WHERE goal_id=$1
+     ORDER BY frontier_revision DESC LIMIT 1`, [successor.temporal_plan.identity.goal_id]);
+  const frontierRow = frontierRows.rows[0];
+  if (!frontierRow) return null;
+  const frontier = helixEnvironmentAffordanceFrontierSchema.safeParse(parseJson(frontierRow.frontier_payload, null));
+  const frontierCheckedAt = Date.now();
+  if (!frontier.success || helixEnvironmentTimeSha256(frontier.data) !== frontierRow.payload_hash ||
+      !Number.isFinite(Date.parse(iso(frontierRow.retained_until))) ||
+      Date.parse(iso(frontierRow.retained_until)) <= frontierCheckedAt ||
+      !Number.isFinite(Date.parse(iso(frontierRow.observed_at))) ||
+      Date.parse(iso(frontierRow.observed_at)) > frontierCheckedAt ||
+      Object.entries(successor.temporal_plan.identity).some(([key, value]) =>
+        frontier.data.identity[key as keyof typeof frontier.data.identity] !== value)) return null;
   // One-shot lease: an uncertain delivery is not re-leased by this endpoint.
   const now = new Date();
   if (Date.parse(iso(lockedRoot.deadline_at)) <= now.getTime()) return null;
@@ -4208,6 +4226,9 @@ export const submitEnvironmentActionWorkflowEvents = async (input: {
       // updates its delivery row, not a second workflow or synthetic result.
       await db.query(temporalDeliveryStatusSql,
         [event.action_request_id, event.measurements.sequence_id, event.workflow_state]);
+      if (event.controls_released && ["canceled", "emergency_stopped"].includes(event.workflow_state)) {
+        await db.query(temporalStoppedResidentDeliveriesSql, [event.action_request_id, event.workflow_state]);
+      }
     }
     await db.query(
       `UPDATE helix_environment_action_requests
@@ -4281,7 +4302,7 @@ const observationFromRows = (
   });
 };
 
-const terminalRequestStatusForOutcome = (outcome: string): string => {
+export const terminalRequestStatusForOutcome = (outcome: string): string => {
   switch (outcome) {
     case "succeeded":
       return "succeeded";
@@ -4410,6 +4431,18 @@ export const submitEnvironmentActionResult = async (input: {
         : {},
     });
     const canonicalHash = environmentConnectorSha256(canonical);
+    const completedTemporalHistory = recordedWorkflowEvidence.terminalMeasurements.completed_sequence_measurements;
+    if (canonical.outcome === "succeeded" && provenanceValid && recordedWorkflowEvidence.valid &&
+        requestProjection(request).temporal_plan && Array.isArray(completedTemporalHistory)) {
+      // Successful result validation checked every historical plan's retained
+      // identity, chain and completed checkpoints. Settle its delivery row in
+      // this same transaction; do not invent per-plan results or revive a
+      // terminal row. Exact result replay returns before these writes.
+      for (const completed of completedTemporalHistory) {
+        await db.query(temporalDeliveryStatusSql,
+          [request.action_request_id, completed.sequence_id, "succeeded"]);
+      }
+    }
     const resultId = `environment_action_result:${crypto.randomUUID()}`;
     await db.query(
       `INSERT INTO helix_environment_action_results (

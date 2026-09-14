@@ -202,18 +202,29 @@ const readPairingReceipt = async (
   return body;
 };
 
+export type PlayerAuthorityReviewDraft = {
+  capabilityIds: string[];
+  autonomyMode: HelixEnvironmentActionAutonomyMode;
+  manualOverridePolicy: HelixEnvironmentActionManualOverridePolicy;
+  leaseMs: number;
+};
+
 export function SharedLiveRoomPlayerEmbodimentPanel({
   roomId,
   environment,
   selfParticipantId,
   sourceBinding,
   isOwner,
+  initialReviewDraft,
+  onReviewDraftChange,
 }: {
   roomId: string;
   environment: HelixRoomEnvironmentProjection;
   selfParticipantId: string;
   sourceBinding?: HelixRoomSourceBinding;
   isOwner: boolean;
+  initialReviewDraft?: PlayerAuthorityReviewDraft;
+  onReviewDraftChange?: (draft: PlayerAuthorityReviewDraft | null) => void;
 }) {
   const activeChatId = useAgiChatStore((state) => state.activeId);
   const observedReasoningBinding = useBrowserReasoningBindingStore((state) => state.current);
@@ -231,15 +242,22 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
   const [readiness, setReadiness] =
     useState<HelixEnvironmentActionConnectorReadiness | null>(null);
   const [selectedCapabilities, setSelectedCapabilities] = useState<string[]>(
-    [...FULL_GAMEPLAY_CAPABILITY_IDS],
+    [...(initialReviewDraft?.capabilityIds ?? FULL_GAMEPLAY_CAPABILITY_IDS)],
   );
   const [autonomyMode, setAutonomyMode] =
-    useState<HelixEnvironmentActionAutonomyMode>("approved_capabilities");
+    useState<HelixEnvironmentActionAutonomyMode>(initialReviewDraft?.autonomyMode ?? "approved_capabilities");
   const [manualOverridePolicy, setManualOverridePolicy] =
-    useState<HelixEnvironmentActionManualOverridePolicy>("cancel");
-  const [leaseMs, setLeaseMs] = useState(DEFAULT_LEASE_MS);
+    useState<HelixEnvironmentActionManualOverridePolicy>(initialReviewDraft?.manualOverridePolicy ?? "cancel");
+  const [leaseMs, setLeaseMs] = useState(initialReviewDraft?.leaseMs ?? DEFAULT_LEASE_MS);
   const [acknowledged, setAcknowledged] = useState(false);
-  const authorityDraftDirtyRef = useRef(false);
+  const authorityDraftDirtyRef = useRef(Boolean(initialReviewDraft));
+  useEffect(() => {
+    // Only unsaved choices leave this component. Acknowledgement, live authority
+    // and connector material are deliberately absent from the review shape.
+    onReviewDraftChange?.(authorityDraftDirtyRef.current ? {
+      capabilityIds: [...selectedCapabilities], autonomyMode, manualOverridePolicy, leaseMs,
+    } : null);
+  }, [selectedCapabilities, autonomyMode, manualOverridePolicy, leaseMs, authority, onReviewDraftChange]);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [pairingCommand, setPairingCommand] = useState<string | null>(null);
@@ -442,6 +460,7 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
     }
     setAuthority(receipt.authority);
     authorityDraftDirtyRef.current = false;
+    onReviewDraftChange?.(null);
     return receipt.authority;
   };
 
@@ -973,7 +992,10 @@ export function SharedLiveRoomPlayerEmbodimentPanel({
                 value={leaseMs}
                 disabled={busy !== null}
                 className="mt-1 w-full rounded border border-emerald-300/25 bg-slate-950 px-2 py-1 text-[10px] text-emerald-50 disabled:opacity-50"
-                onChange={(event) => setLeaseMs(Number(event.target.value))}
+                onChange={(event) => {
+                  authorityDraftDirtyRef.current = true;
+                  setLeaseMs(Number(event.target.value));
+                }}
               >
                 <option value={60 * 60_000}>1 hour</option>
                 <option value={DEFAULT_LEASE_MS}>2 hours</option>

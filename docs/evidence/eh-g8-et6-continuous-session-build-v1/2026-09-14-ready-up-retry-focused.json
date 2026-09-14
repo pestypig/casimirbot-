@@ -1,0 +1,53 @@
+{
+  "schema": "casimirbot.cs1_ready_up_retry_deterministic_verification.v1",
+  "recorded_at": "2026-09-14T07:56:00Z",
+  "packet": "docs/work-packets/eh-g8-cs-ready-up-read-freshness-v1.md",
+  "classification": "evidence re-entry",
+  "scope": "Isolated component/real-broker composition; no physical movement or integrated acceptance",
+  "red": {
+    "log": ".tmp/ready-up-retry-red2-20260914.log",
+    "failure": "Ready up invocation 2: expected false to be true",
+    "tests_failed": 1,
+    "excluded": 25
+  },
+  "fixture_correction": {
+    "log": ".tmp/ready-up-retry-red-20260914.log",
+    "description": "Initial fixture called the observation reader with an object instead of its string argument; corrected before accepting the red result."
+  },
+  "green": {
+    "log": ".tmp/ready-up-retry-focused-20260914.log",
+    "files": 4,
+    "tests": 98,
+    "passed": 98,
+    "failed": 0,
+    "contracts": [
+      "three identical setup requests 10 seconds apart acquire distinct fresh probes under one preparation turn",
+      "same-read retransmission still replays",
+      "first old probe and wrong prior-turn/player evidence still reject",
+      "no subject refresh or goal replacement on healthy repeats",
+      "existing bootstrap, expired/revoked/changed identity and recovery regressions"
+    ]
+  },
+  "quick": {
+    "log": ".tmp/ready-up-retry-discipline-quick-20260914.log",
+    "passed": true,
+    "scope": "Static scan of full dirty checkout; includes unrelated changes, classification recorded in packet"
+  },
+  "docs_audit": {
+    "log": ".tmp/ready-up-retry-docs-audit-20260914.log",
+    "passed": true
+  },
+  "full_discipline": {
+    "status": "running",
+    "log": ".tmp/ready-up-retry-discipline-full-20260914.log"
+  },
+  "packaged_retest": {
+    "status": "pending"
+  },
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "original_et6_passed": false,
+  "nav1_qualified": false
+}

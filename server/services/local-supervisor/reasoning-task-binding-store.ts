@@ -152,7 +152,10 @@ export class HelixReasoningTaskBindingStore {
       client_session_ref: input.clientSessionRef, provider_thread_ref_hash: digest(input.destination.taskId),
       helix_conversation_id: row.approval.chatId, mission_id: null,
       run_id: row.approval.environment?.runId ?? null, reasoning_role: "principal",
-      continuation_transport: level === "continuation_ready" ? "polling" : level === "checkpoint_publish" ? "monitor_only" : "unavailable",
+      // The destination accepted this finite exact-chat MCP steering grant.
+      // Its read/ack queue is available independently of optional public
+      // checkpoints. This says nothing about idle wake or automatic delivery.
+      continuation_transport: "polling",
       negotiated_observability_level: level, created_by: "signed_in_operator",
       created_at: row.createdAt, expires_at: row.pairingExpiresAt, claimed_at: row.acceptedAt,
       revoked_at: null, provider_thread_content_included: false, hidden_reasoning_included: false,
@@ -214,18 +217,11 @@ export class HelixReasoningTaskBindingStore {
       entry.authenticated_profile_ref === input.profileRef &&
       entry.helix_conversation_id === input.helixConversationId &&
       ["pending_claim", "active"].includes(entry.status));
-    for (const prior of existing) {
-      this.bindings.set(prior.reasoning_binding_id, {
-        ...prior,
-        status: "superseded",
-        revoked_at: this.now().toISOString(),
-      });
-    }
     const createdAt = this.now();
     const claimHandle =
       `reasoning_claim:${this.serviceEpochTag()}:` +
       crypto.randomBytes(24).toString("base64url");
-    const bindingEpoch = ++this.bindingEpoch;
+    const bindingEpoch = this.bindingEpoch + 1;
     const bindingId = `reasoning_binding:${digest([
       this.presence.serviceInstanceRef,
       input.profileRef,
@@ -267,6 +263,16 @@ export class HelixReasoningTaskBindingStore {
       claimHandleHash: digest(claimHandle),
     };
     this.projectBinding(binding);
+    // Validate the complete replacement before changing a healthy binding or
+    // consuming an epoch. Rejected drafts must leave the current chat usable.
+    for (const prior of existing) {
+      this.bindings.set(prior.reasoning_binding_id, {
+        ...prior,
+        status: "superseded",
+        revoked_at: createdAt.toISOString(),
+      });
+    }
+    this.bindingEpoch = bindingEpoch;
     this.bindings.set(bindingId, binding);
     this.claimHandles.set(binding.claimHandleHash, bindingId);
     return { claim_handle: claimHandle, binding: this.projectBinding(binding) };
@@ -305,6 +311,10 @@ export class HelixReasoningTaskBindingStore {
     this.claimHandles.delete(handleHash);
     this.bindings.set(bindingId, updated);
     return this.projectBinding(updated);
+  }
+
+  validateSteeringTarget(input: { profileRef: string; bindingId: string; bindingEpoch: number; clientSessionRef?: string }) {
+    return this.projectBinding(this.requireActiveOwnedBinding(input));
   }
 
   dispatch(input: {
@@ -497,10 +507,17 @@ export class HelixReasoningTaskBindingStore {
       entry.client_session_ref === input.clientSessionRef &&
       entry.conversation_thread_ref === input.clientContinuationRef &&
       Date.parse(entry.observed_at) <= nowMs && Date.parse(entry.heartbeat_expires_at) > nowMs &&
-      entry.thread_observability_bridge?.requested_level === "continuation_ready" &&
-      entry.thread_observability_bridge.supported_levels.includes("continuation_ready"));
+      (this.hasAcceptedPollingGrant(binding) || (
+        entry.thread_observability_bridge?.requested_level === "continuation_ready" &&
+        entry.thread_observability_bridge.supported_levels.includes("continuation_ready"))));
     if (!current) throw new HelixReasoningTaskBindingError("reasoning_binding_target_inactive", 409);
     return this.projectBinding(binding);
+  }
+
+  private hasAcceptedPollingGrant(binding: PrivateBinding): boolean {
+    // Cached pairing metadata cannot supply admission. withAcceptedPairing must
+    // have revalidated the durable grant for this exact synchronous operation.
+    return Boolean(binding.durablePairingId) && this.admittedDurableBindings.has(binding.reasoning_binding_id);
   }
 
   /**
@@ -526,8 +543,9 @@ export class HelixReasoningTaskBindingStore {
       entry.client_session_ref === binding.client_session_ref &&
       digest(entry.conversation_thread_ref) === binding.provider_thread_ref_hash &&
       Date.parse(entry.observed_at) <= nowMs && Date.parse(entry.heartbeat_expires_at) > nowMs &&
-      entry.thread_observability_bridge?.requested_level === "continuation_ready" &&
-      entry.thread_observability_bridge.supported_levels.includes("continuation_ready"));
+      (this.hasAcceptedPollingGrant(binding) || (
+        entry.thread_observability_bridge?.requested_level === "continuation_ready" &&
+        entry.thread_observability_bridge.supported_levels.includes("continuation_ready"))));
     if (!target?.authenticated_mcp_client_ref) {
       throw new HelixReasoningTaskBindingError("reasoning_binding_target_inactive", 409);
     }

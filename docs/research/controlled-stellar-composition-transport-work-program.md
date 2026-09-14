@@ -2,9 +2,9 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G1 — real calibrated solar baseline (blocked at runtime-capacity preflight)**
+Active program gate: **G1 — real calibrated solar baseline (image installed; science preparation and run-capacity checks pending)**
 
-Status date: **August 26, 2026**
+Status date: **September 13, 2026**
 
 This document is the sole current dependency and status roadmap for the solar
 restoration deep-mixing research branch. Dated audits, solver receipts, UI
@@ -20,6 +20,22 @@ The sole active packet is now
 The first G1 attempt is preserved in
 [`controlled-stellar-composition-transport-g1-result-record.md`](./controlled-stellar-composition-transport-g1-result-record.md)
 with terminal decision `BLOCKED_BASELINE_CALIBRATION`; G2 remains blocked.
+The [September 13 installation record](./controlled-stellar-composition-transport-g1-image-install-2026-09-13.md)
+confirms the frozen image is installed and identity-verified. This supersedes
+the installation blocker, not attempt 1's historical result or the science
+gate. Post-install free space is about 22.96 GB; a new science attempt still
+requires explicit run-capacity checks and frozen inputs before execution.
+The [G1 preparation v1 packet](./controlled-stellar-composition-transport-g1-preparation-v1.md)
+records the toolchain inspection and unresolved science-freeze requirements.
+Its newer preflight measured about 17.7 GB free; execution remains disabled.
+The preparation deliverable is complete, but the executable observation/input
+freeze is not. The current [source and input validation work](./controlled-stellar-composition-transport-g1-source-validation-v1.md)
+binds structural inversion data and checks zero-transport input dependencies
+without stellar evolution. The numerical structural table is retained and
+cross-checked, with `BLOCK_SOURCE_BINDING` for unresolved resolution/systematics.
+The 73 inlist assignments pass a static namelist-group check; installed parser
+and microphysics dependency checks await recovery of Docker's recurring
+inference-socket startup failure. G1 and its launch prerequisites remain open.
 The bounded infrastructure response is specified in
 [`controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md`](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md):
 a Google Drive archival connector is the primary recovery path, and a narrow
@@ -163,10 +179,34 @@ failed observational closure.
 
 ## Program gates
 
+### Deferred three-dimensional convection study
+
+The [StarSim convection extension packet](./controlled-stellar-composition-transport-3d-convection-plan.md)
+defines a proposed MESA-background-to-flow-to-transport-to-observables study,
+with Rayleigh as a candidate solver. Its C0 source/interface inventory is an
+allowed parallel planning lane during G1. C1-C5 execution requires an accepted
+G1 baseline and explicit admission here; it does not add a second active gate.
+Validated diagnostics may inform a versioned G2/G3 transport prescription and
+G5 comparison, subject to conservation, convergence, and mapping checks.
+The optional Navier–Stokes benchmark requires source identification and equation
+matching and does not establish stellar, intervention, or NHM2 validity.
+
+The packet also inventories a Sun-first transport laboratory: rotating
+hydrodynamics before a controlled magnetic comparison, measurement operators,
+separate atmospheric/heating domains, and filter-aware momentum-closure tests.
+These are deferred capabilities, not additional requirements to close G1-G6.
+Only source/requirements inventory is admitted now. Imposed, fitted, assimilated,
+and independently predicted quantities must remain distinct. Broader execution
+requires a separately preregistered packet and explicit admission here; neither
+the proposed Solar Transport v1 milestone nor an incompressible benchmark
+promotes the lifetime-extension program or changes its active gate.
+
+### Gate acceptance table
+
 | Gate | State | Required closure evidence | Downstream gate unlocked |
 | --- | --- | --- | --- |
 | G0 — Reduced-order ledger repair and preregistration | **closed: `PASS_REDUCED_ORDER_PREREGISTERED`** | Typed ledgers separate hydrogen-burning reference, gross circulation, net hydrogen delivery, and cumulative accessible fuel; numerical audit and adversarial controller tests pass; future-gate semantic contract is versioned; claim boundary remains diagnostic | G1 |
-| G1 — Real calibrated solar baseline | **active, blocked: `INSUFFICIENT_DISK_FOR_MESA_IMAGE`** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
+| G1 — Real calibrated solar baseline | **active; image installed, science preparation and run-capacity checks pending** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
 | G2 — Conservative transport implementation | blocked by G1 | Species-conservative diffusion/advection implementation; boundary conditions; mass/species/energy closure tests; radiative-interior bridge; resolution and timestep convergence; zero-transport recovery of the G1 baseline | G3 |
 | G3 — Frozen transport-family campaign | blocked by G2 | Preregistered families, parameter bounds, sampling/optimization procedure, compute budget, seeds where applicable, first-failure rules, and retained artifacts for null as well as surviving candidates | G4 |
 | G4 — Evolutionary milestone closure | blocked by G3 | Each candidate evolved through central hydrogen exhaustion, TAMS, core contraction, shell ignition, early subgiant evolution, and a frozen radius threshold; physical `Delta t_TAMS` and `Delta t_R>R_star` outputs replace the hazard proxy | G5 |

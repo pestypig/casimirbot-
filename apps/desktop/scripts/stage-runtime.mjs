@@ -16,8 +16,10 @@ const repoRoot = path.resolve(desktopRoot, "..", "..");
 const runtimeRoot = path.join(desktopRoot, "runtime");
 const minecraftFabricLoopbackLifecycleScript =
   "scripts/helix-minecraft-launch-fabric-loopback.ps1";
+const minecraftFabricServerLifecycleScript = "scripts/helix-minecraft-start-fabric-server.ps1";
 
 const copies = [
+  [minecraftFabricServerLifecycleScript, minecraftFabricServerLifecycleScript],
   ["dist/public", "dist/public"],
   ["configs/ideology-verifiers.json", "configs/ideology-verifiers.json"],
   ["docs/ethos/ideology.json", "docs/ethos/ideology.json"],
@@ -201,6 +203,10 @@ const runtimeManifest = {
     sha256: sha256(await readFile(
       path.join(repoRoot, minecraftFabricLoopbackLifecycleScript),
     )),
+  },
+  minecraftFabricServerLifecycle: {
+    path: minecraftFabricServerLifecycleScript,
+    sha256: sha256(await readFile(path.join(repoRoot, minecraftFabricServerLifecycleScript))),
   },
   allowlist: copies.map(([source]) => source),
   tunnelClient: {

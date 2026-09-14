@@ -1,5 +1,6 @@
 export {
   RoomEnvironmentSubjectError,
+  assertPendingFabricWorkstationSource,
   assignRoomEnvironmentSubject,
   bindOwnRoomEnvironmentSubject,
   isRoomEnvironmentSubjectError,

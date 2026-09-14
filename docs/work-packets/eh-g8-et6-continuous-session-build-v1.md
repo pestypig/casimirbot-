@@ -29,6 +29,17 @@ policy at their recording time; this clarification supersedes only that
 NAV prerequisite. Exact room-driven prompt delivery retains every applicable
 binding, provenance and acknowledgement requirement.
 
+Current recovery work (2026-09-14): the user has supplied finite four-capability
+player authority. The accepted exact task/chat/run pairing is retained; human
+gameplay consent is no longer the pending boundary described by older evidence.
+The [repeated-read repair](eh-g8-cs-ready-up-read-freshness-v1.md) has three
+successful delayed packaged MCP Ready up requests with unchanged goal and
+authority. Subsequent idle player credential expiry exposed a missing goal
+recovery transition after same-authority epoch rotation. Follow the
+[idle epoch recovery packet](eh-g8-cs-idle-epoch-recovery-v1.md) for that first
+reproduced boundary. Its component and packaged results remain separately
+recorded; no full CS stage, original ET6 exit or NAV1 qualification is closed.
+
 On 2026-09-07 the user requested replacing repeated live acceptance attempts
 with a build-first approach. Preserve all previous positive and negative
 evidence. Do not erase the goal's missing requirements or present this packet

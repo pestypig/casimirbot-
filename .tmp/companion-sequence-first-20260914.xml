@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" tests="44" skipped="0" failures="0" errors="0" timestamp="2026-09-14T11:19:46.250Z" hostname="LAPTOP-FPCDI341" time="0.851">
+  <properties/>
+  <testcase name="successorAcceptanceIsNotRepeatedByImmediateOrReentrantCancellation()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.324"/>
+  <testcase name="acceptsTheSchemaAdmittedTrackingActionInsideASequence()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.01"/>
+  <testcase name="scheduledCompilerWalksSeparateLaunchWaitFromThreeMovingHandoffs()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.112"/>
+  <testcase name="successfulStabilizationIsNotOriginalWorkflowSuccess()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="successorCannotStartAtAnEarlyOrLateBoundaryOrAfterSettlement()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.037"/>
+  <testcase name="uncommandedInventoryGainStopsBeforeMovementWithZeroInventoryBudget()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.007"/>
+  <testcase name="continuousServerCompiledChainHasNoReleasedTickAcrossThreeHandoffs()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.044"/>
+  <testcase name="productionCompiledWalkSettlesGraphWithoutAnExtraReleasedTick()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.027"/>
+  <testcase name="reusesTheProductionControllerForEmbeddedActions()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="compilerDerivedWalksCrossThreeResidentBoundariesWithoutAReleasedTick()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.016"/>
+  <testcase name="controllerUsesObservedPlanClockInsteadOfRestartingDeadlineOnDelivery()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.008"/>
+  <testcase name="repeatedCumulativeChildMeasurementsAreCountedOnceThroughSettlement()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.003"/>
+  <testcase name="inputToTypedWorkflowDoesNotGloballyReleaseTheRunningParent()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.011"/>
+  <testcase name="compilerDerivedWalkRejectsHandoffWhenDeliveryConsumesOneSourceTick()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="branchFailureRemainsATypedTerminalInsteadOfInventingARepair()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.002"/>
+  <testcase name="inputSegmentRefusesUnsafeLandingWithoutClaimingMotion()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.001"/>
+  <testcase name="unsuccessfulWalkNeverTakesTheSameTickSuccessEdge()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.027"/>
+  <testcase name="parentCancellationWinsTheQueuedHandoffTick()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.006"/>
+  <testcase name="threeResidentHandoffsPreserveMotionAndPlanQualifiedEvidence()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="passesSequenceMutationScopeToADynamicPlacementWorkflow()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.003"/>
+  <testcase name="measuredOverrunStopsBeforeTheNextNodeAndPreservesTheObservedCount()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.006"/>
+  <testcase name="adjacentSegmentRechecksChangedSafetyBeforeApplyingInput()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.001"/>
+  <testcase name="controllerEntersAdmittedStabilizationWithoutExtendingDeadline()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.004"/>
+  <testcase name="outerControllerEmergencyStopReleasesSequenceControls()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.004"/>
+  <testcase name="delayedTickPastHorizonReportsHardStopWithoutEnteringStabilization()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.004"/>
+  <testcase name="zeroInputAndZeroLookDeltaDoNotClaimPlayerMotion()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.004"/>
+  <testcase name="handoffToTypedActionReleasesInheritedControlsWithoutGlobalDisarm()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.003"/>
+  <testcase name="successorUsesItsSourceClockRatherThanResettingAtHandoff()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.002"/>
+  <testcase name="successfulWalkAdvancesToNextAdmittedWalkWithinTheSameTick()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.002"/>
+  <testcase name="removesNullOptionalFieldsBeforeStartingAnEmbeddedAction()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.007"/>
+  <testcase name="actionStartDeadlineIsInclusiveAndPreventsLateEffects()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.002"/>
+  <testcase name="adjacentAdmittedSegmentsHaveNoReleaseTickAndTerminalStillReleases()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.002"/>
+  <testcase name="executesTickAddressedInputThenVerifiesCheckpoint()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="temporalControllerCarriesThreeAcceptedWindowsAcrossTheNativeBoundary()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.01"/>
+  <testcase name="recordsConditionChangesAsCompactEventsInsteadOfPerTickNoise()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.008"/>
+  <testcase name="controllerWindowStopsBeforeNextInputAndCannotBeReplaced()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.004"/>
+  <testcase name="adjacentSegmentWaitsForItsOwnTickWithMovementReleased()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.003"/>
+  <testcase name="outerControllerManualOverrideCancelsSequenceAndReleasesControls()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.007"/>
+  <testcase name="walkBoundaryRejectsUnfinishedMotionAndManualTakeover()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="stabilizationPreservesPerformedEvidenceAndCannotReplayOrRestart()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.003"/>
+  <testcase name="returnsTheFirstEmbeddedFailureDiagnosisForCodexRepair()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.005"/>
+  <testcase name="manualAndEmergencyStopWinBeforeAndDuringStabilization()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.009"/>
+  <testcase name="rejectsCyclesBeforeAnyControlIsAsserted()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.006"/>
+  <testcase name="reservedWindowCannotOutrunDeadlineLateTickOrManualTakeover()" classname="com.casimirbot.helixplayer.fabric.FluidSequenceEngineTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

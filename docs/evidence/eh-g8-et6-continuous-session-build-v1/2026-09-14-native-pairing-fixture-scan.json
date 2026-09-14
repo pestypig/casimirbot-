@@ -1,0 +1,43 @@
+{
+  "schema": "casimirbot.onboarding_package_fixture_scan.v1",
+  "observed_at": "2026-09-14T05:00:23.683Z",
+  "exe_sha256": "2f8cbb3643a1bab8a03ed58b83f7f1f3fa842743d3d04fe1eb7b43858ea07489",
+  "scanned_text_files": 827,
+  "fixture_markers": [
+    "minecraft_launcher_native_observation_fixture.v1",
+    "fixture-selected-profile",
+    "minecraft_launcher_profile_fixture.v1",
+    "fixture_private_observation_failure",
+    "fixture-private-property",
+    "minecraft_server_lifecycle_fixture.v1",
+    "fixture_lost_start_reply",
+    "inert fixture; never executed",
+    "fixture_mutex_ready",
+    "minecraft-pending-bootstrap-fixture",
+    "pending-bootstrap-owner",
+    "fixture-browser-session",
+    "fixture_human_route_required",
+    "fixture_provider_denied",
+    "ephemeralPairingVault",
+    "onboarding-real-handlers-",
+    "STEERING_PROCESS_FIXTURE_KEY",
+    "FIXTURE_RESULT:",
+    "steering_process_fixture_failed",
+    "CASIMIR_ONBOARDING_POSTGRES_TEST_URL",
+    "onboarding_fixture",
+    "fixture-human-consent",
+    "fixture-native-human-approved-request",
+    "fixture-native-owner"
+  ],
+  "fixture_path_hits": [],
+  "fixture_content_hits": [],
+  "production_positive_controls": {
+    "helix_reasoning_destination_register": true,
+    "helix_reasoning_pairing_accept": true,
+    "helix_reasoning_pairing_recover": true,
+    "steering_revision_invalid": true,
+    "pairing_request_cancelled": true,
+    "helix.pairing_request_cancellation.v1": true
+  },
+  "scope": "Known fixture exclusion only; not authentication bypass proof"
+}

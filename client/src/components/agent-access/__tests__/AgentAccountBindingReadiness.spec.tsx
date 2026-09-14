@@ -2,6 +2,7 @@
 
 import React from "react";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -49,12 +50,145 @@ const bindingsBody = (
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   delete window.casimirDesktop;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("AgentAccountBindingReadiness", () => {
+  it.each(["request", "body"])("O4 recovery: hung status %s releases refresh and ignores late success", async (stage) => {
+    vi.useFakeTimers();
+    let release!: () => void;
+    const pending = new Promise<any>(resolve => {
+      release = () => resolve(stage === "request" ? response(bindingsBody()) : bindingsBody());
+    });
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => stage === "request" ? pending : Promise.resolve({ ok: true, status: 200, json: () => pending }))
+      .mockResolvedValueOnce(response(bindingsBody({ oauth_ready: false, bindings: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentAccountBindingReadiness />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(14_999); });
+    expect(screen.getByRole("button", { name: "Refresh binding status" })).toBeDisabled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.getByText("Binding readiness unavailable")).toBeInTheDocument();
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Refresh binding status" })); });
+    expect(screen.getByText("No active agent binding")).toBeInTheDocument();
+    await act(async () => { release(); });
+    expect(screen.getByText("No active agent binding")).toBeInTheDocument();
+    expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(call => call[1].method === "GET")).toBe(true);
+  });
+  it("O4 identity: an aborted status body cannot overwrite the newer binding projection", async () => {
+    let release!: () => void;
+    let completion!: (value: unknown) => void;
+    const oldBody = new Promise(resolve => { release = () => resolve(bindingsBody()); });
+    const json = vi.fn(() => oldBody);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json })
+      .mockResolvedValueOnce(response(bindingsBody({ oauth_ready: false, bindings: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    window.casimirDesktop = {
+      onAuth0AccountLinkCompletion: (listener: (value: unknown) => void) => {
+        completion = listener;
+        return () => {};
+      },
+    } as any;
+    render(<AgentAccountBindingReadiness />);
+    await waitFor(() => expect(json).toHaveBeenCalledTimes(1));
+    await act(async () => { completion({
+      schema: "casimir_desktop_auth0_account_link_completion/1", ok: true,
+      bearer_included: false, subject_included: false,
+    }); });
+    expect(await screen.findByText("No active agent binding")).toBeInTheDocument();
+    await act(async () => { release(); });
+    expect(screen.getByText("No active agent binding")).toBeInTheDocument();
+    expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(call => call[1].method === "GET")).toBe(true);
+  });
+  it.each(["request", "body"])("O4 recovery: hung start %s times out and late receipt never opens a browser", async (stage) => {
+    const receipt = {
+      schema: "casimir_desktop_auth0_account_link_start/1", ok: true,
+      authorization_url: "https://fixture.invalid/authorize",
+      expires_at: new Date(Date.now() + 600_000).toISOString(),
+      provider: "auth0", pkce: "S256", client_secret_used: false,
+      bearer_included: false, subject_included: false,
+    };
+    let release!: () => void;
+    const pending = new Promise<any>(resolve => {
+      release = () => resolve(stage === "request" ? response(receipt) : receipt);
+    });
+    let startSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn(async (_url, options) => {
+      if (options?.method !== "POST") return response(bindingsBody({ oauth_ready: false, bindings: [] }));
+      startSignal = options.signal;
+      return stage === "request" ? pending : { ok: true, json: () => pending };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const open = vi.fn(async () => ({ opened: true }));
+    window.casimirDesktop = { openAuth0AccountLink: open } as any;
+    render(<AgentAccountBindingReadiness />);
+    const start = await screen.findByRole("button", { name: "Link Auth0" });
+    vi.useFakeTimers();
+    await act(async () => { fireEvent.click(start); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(screen.getByRole("alert")).toHaveTextContent("reached its deadline");
+    expect(startSignal?.aborted).toBe(true);
+    await act(async () => { release(); });
+    expect(screen.getByRole("button", { name: "Link Auth0" })).not.toBeDisabled();
+    expect(open).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+    expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
+  });
+  it.each(["resolve", "reject"])("O4 recovery: a hung native open expires and late %s cannot replace the deadline", async (settlement) => {
+    let settleOpen!: () => void;
+    const open = vi.fn(() => new Promise<{ opened: boolean }>((resolve, reject) => {
+      settleOpen = () => settlement === "resolve" ? resolve({ opened: true }) : reject(new Error("late native failure"));
+    }));
+    const fetchMock = vi.fn(async (_url, options) => response(options?.method === "POST" ? {
+      schema: "casimir_desktop_auth0_account_link_start/1", ok: true,
+      authorization_url: "https://tenant.auth0.com/authorize",
+      expires_at: new Date(Date.now() - 1).toISOString(),
+      provider: "auth0", pkce: "S256", client_secret_used: false,
+      bearer_included: false, subject_included: false,
+    } : bindingsBody({ oauth_ready: false, bindings: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    window.casimirDesktop = { openAuth0AccountLink: open } as any;
+    render(<AgentAccountBindingReadiness />);
+    fireEvent.click(await screen.findByRole("button", { name: "Link Auth0" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("reached its deadline");
+    await act(async () => { settleOpen(); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Link Auth0" })).not.toBeDisabled());
+    expect(screen.queryByRole("button", { name: "Stop waiting" })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("reached its deadline");
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === "POST")).toHaveLength(1);
+    expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
+  });
+  it("releases an elapsed callback wait without another OAuth write", async () => {
+    const fetchMock = vi.fn(async (_url, options) => response(options?.method === "POST" ? {
+      schema: "casimir_desktop_auth0_account_link_start/1", ok: true,
+      authorization_url: "https://tenant.auth0.com/authorize",
+      expires_at: new Date(Date.now() - 1).toISOString(),
+      provider: "auth0", pkce: "S256", client_secret_used: false,
+      bearer_included: false, subject_included: false,
+    } : bindingsBody({ oauth_ready: false, bindings: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    const open = vi.fn(async () => ({ opened: true }));
+    window.casimirDesktop = { openAuth0AccountLink: open } as any;
+    render(<AgentAccountBindingReadiness />);
+    fireEvent.click(await screen.findByRole("button", { name: "Link Auth0" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("reached its deadline");
+    expect(await screen.findByRole("button", { name: "Link Auth0" })).not.toBeDisabled();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === "POST")).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === "GET")).toHaveLength(2);
+    expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
+  });
   it("renders only sanitized provider, issuer, status, and tenant references", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(bindingsBody()));
     vi.stubGlobal("fetch", fetchMock);
@@ -238,7 +372,7 @@ describe("AgentAccountBindingReadiness", () => {
           schema: "casimir_desktop_auth0_account_link_start/1",
           ok: true,
           authorization_url: authorizationUrl,
-          expires_at: "2026-08-11T20:10:00.000Z",
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
           provider: "auth0",
           pkce: "S256",
           client_secret_used: false,
@@ -246,6 +380,7 @@ describe("AgentAccountBindingReadiness", () => {
           subject_included: false,
         }),
       )
+      .mockResolvedValueOnce(response(bindingsBody({ oauth_ready: false, bindings: [] })))
       .mockResolvedValueOnce(response(bindingsBody()));
     vi.stubGlobal("fetch", fetchMock);
     const openAuth0AccountLink = vi.fn(async () => ({ opened: true }));
@@ -277,6 +412,13 @@ describe("AgentAccountBindingReadiness", () => {
         credentials: "same-origin",
       }),
     ]);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Stop waiting" }));
+    expect(await screen.findByRole("button", { name: "Link Auth0" })).not.toBeDisabled();
+    expect(openAuth0AccountLink).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === "POST")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("does not cancel an authorization already submitted");
+    expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
 
     completion?.({
       schema: "casimir_desktop_auth0_account_link_completion/1",
@@ -353,3 +495,4 @@ describe("parseAgentAccountBindingReadiness", () => {
     ).toBeNull();
   });
 });
+

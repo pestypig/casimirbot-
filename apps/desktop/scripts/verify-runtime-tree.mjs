@@ -13,52 +13,36 @@ const desktopRoot = path.resolve(
   "..",
 );
 const repoRoot = path.resolve(desktopRoot, "..", "..");
+const packageArgument = process.argv.slice(2);
+if (packageArgument.length && (packageArgument.length !== 2 || packageArgument[0] !== "--package-dir")) {
+  throw new Error("Usage: verify-runtime-tree.mjs [--package-dir <desktop build/win-unpacked>]");
+}
+const packageRoot = path.resolve(desktopRoot, packageArgument[1] ?? "release/win-unpacked");
+const packageRelative = path.relative(desktopRoot, packageRoot);
+if (!packageRelative || packageRelative.startsWith("..") || path.isAbsolute(packageRelative) || path.basename(packageRoot) !== "win-unpacked") {
+  throw new Error("Package must be an explicit win-unpacked build inside apps/desktop");
+}
+const packedRuntimeRoot = path.join(packageRoot, "resources", "runtime");
 const minecraftFabricLoopbackLifecycleScript =
   "scripts/helix-minecraft-launch-fabric-loopback.ps1";
+const minecraftFabricServerLifecycleScript = "scripts/helix-minecraft-start-fabric-server.ps1";
 const rendererRoots = {
   built: path.join(repoRoot, "dist", "public"),
   staged: path.join(desktopRoot, "runtime", "dist", "public"),
-  packed: path.join(
-    desktopRoot,
-    "release",
-    "win-unpacked",
-    "resources",
-    "runtime",
-    "dist",
-    "public",
-  ),
+  packed: path.join(packedRuntimeRoot, "dist", "public"),
 };
 const marketplaceRoots = {
   staged: path.join(desktopRoot, "runtime", "codex-marketplace"),
-  packed: path.join(
-    desktopRoot,
-    "release",
-    "win-unpacked",
-    "resources",
-    "runtime",
-    "codex-marketplace",
-  ),
+  packed: path.join(packedRuntimeRoot, "codex-marketplace"),
 };
 const tunnelPayloadRoots = {
   staged: path.join(desktopRoot, "runtime"),
-  packed: path.join(
-    desktopRoot,
-    "release",
-    "win-unpacked",
-    "resources",
-    "runtime",
-  ),
+  packed: packedRuntimeRoot,
 };
 const minecraftLifecycleRoots = {
   source: repoRoot,
   staged: path.join(desktopRoot, "runtime"),
-  packed: path.join(
-    desktopRoot,
-    "release",
-    "win-unpacked",
-    "resources",
-    "runtime",
-  ),
+  packed: packedRuntimeRoot,
 };
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -89,11 +73,7 @@ const stagedManifestPath = path.join(
   "runtime-manifest.json",
 );
 const packedManifestPath = path.join(
-  desktopRoot,
-  "release",
-  "win-unpacked",
-  "resources",
-  "runtime",
+  packedRuntimeRoot,
   "runtime-manifest.json",
 );
 const stagedManifestBytes = await readFile(stagedManifestPath);
@@ -103,13 +83,7 @@ assertNoRequiredCodexRuntimePackage(manifest.requiredRuntimePackages);
 const providerNeutralRuntimeReceipts = Object.fromEntries(
   await Promise.all([
     ["staged", path.join(desktopRoot, "runtime")],
-    ["packed", path.join(
-      desktopRoot,
-      "release",
-      "win-unpacked",
-      "resources",
-      "runtime",
-    )],
+    ["packed", packedRuntimeRoot],
   ].map(async ([label, root]) => [
     label,
     await assertProviderNeutralRuntimeTree(root),
@@ -160,6 +134,15 @@ if (
   throw new Error(
     `Minecraft Fabric loopback lifecycle mismatch: ${JSON.stringify(minecraftLifecycleReceipts)}`,
   );
+}
+const minecraftServerLifecycleReceipts = Object.fromEntries(await Promise.all(
+  Object.entries(minecraftLifecycleRoots).map(async ([label, root]) => [label,
+    sha256(await readFile(path.join(root, minecraftFabricServerLifecycleScript)))]),
+));
+if (manifest.minecraftFabricServerLifecycle?.path !== minecraftFabricServerLifecycleScript ||
+    !/^[a-f0-9]{64}$/u.test(manifest.minecraftFabricServerLifecycle?.sha256 ?? "") ||
+    Object.values(minecraftServerLifecycleReceipts).some(digest => digest !== manifest.minecraftFabricServerLifecycle.sha256)) {
+  throw new Error(`Minecraft saved server lifecycle mismatch: ${JSON.stringify(minecraftServerLifecycleReceipts)}`);
 }
 const receipts = Object.fromEntries(
   await Promise.all(

@@ -29,7 +29,7 @@ const isTrustedAudioMediaRequest = (input: {
 };
 
 /**
- * The native host exposes only audio capture for its exact private renderer
+ * The native host exposes audio capture and sanitized clipboard writes for its exact private renderer
  * origin. All other browser/device permissions and renderer downloads remain
  * denied. Signed application updates use electron-updater in the main process.
  */
@@ -37,8 +37,21 @@ export function installDesktopSessionSecurity(
   targetSession: Session,
   options: DesktopSessionSecurityOptions = {},
 ): void {
+  const allowsClipboardWrite = (
+    permission: string,
+    webContentsUrl: string,
+    requestingUrl: string,
+  ): boolean => {
+    const origin = options.getTrustedRendererOrigin?.();
+    return Boolean(
+      permission === "clipboard-sanitized-write" && origin &&
+      matchesExactOrigin(webContentsUrl, origin) &&
+      matchesExactOrigin(requestingUrl, origin)
+    );
+  };
   targetSession.setPermissionCheckHandler(
     (webContents, permission, requestingOrigin, details) =>
+      allowsClipboardWrite(permission, webContents?.getURL() ?? "", requestingOrigin) ||
       permission === "media" &&
       isTrustedAudioMediaRequest({
         webContentsUrl: webContents?.getURL() ?? "",
@@ -49,6 +62,7 @@ export function installDesktopSessionSecurity(
   );
   targetSession.setPermissionRequestHandler(
     (webContents, permission, callback, details) => callback(
+      allowsClipboardWrite(permission, webContents?.getURL() ?? "", details?.requestingUrl ?? "") ||
       permission === "media" &&
       isTrustedAudioMediaRequest({
         webContentsUrl: webContents?.getURL() ?? "",

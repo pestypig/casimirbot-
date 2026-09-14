@@ -5,9 +5,13 @@ import { promisify } from "node:util";
 import {
   helixMinecraftLocalLifecycleReceiptSchema,
   helixMinecraftLocalLifecycleRequestSchema,
+  helixMinecraftLocalServerLifecycleSchema,
   type HelixMinecraftLocalLifecycleReceipt,
   type HelixMinecraftLocalLifecycleRequest,
+  type HelixMinecraftLocalServerLifecycle,
 } from "@shared/helix-minecraft-local-lifecycle";
+import { resolveProfileOwnedMinecraftLifecycleSelection } from "../pairing/local-minecraft-run-profile-store";
+import { startSavedMinecraftFabricServer, MinecraftLocalServerLifecycleError } from "./minecraft-local-server-lifecycle";
 
 const execFileAsync = promisify(execFile);
 const SCRIPT_RELATIVE_PATH = path.join(
@@ -18,19 +22,25 @@ const MAX_OUTPUT_BYTES = 64 * 1024;
 const EXECUTION_TIMEOUT_MS = 190_000;
 
 export class MinecraftLocalLifecycleError extends Error {
+  public readonly serverObservation: HelixMinecraftLocalServerLifecycle | null;
   constructor(
     public readonly code: string,
     public readonly statusCode: number,
     message = code,
+    serverObservation: HelixMinecraftLocalServerLifecycle | null = null,
   ) {
     super(message);
     this.name = "MinecraftLocalLifecycleError";
+    const parsed = helixMinecraftLocalServerLifecycleSchema.safeParse(serverObservation);
+    this.serverObservation = parsed.success ? parsed.data : null;
   }
 }
 
 export type MinecraftLocalLifecycleRunner = (input: {
   address: string;
   restartClient: boolean;
+  ownerProfileId?: string;
+  allowServerStartup?: boolean;
   signal?: AbortSignal;
 }) => Promise<HelixMinecraftLocalLifecycleReceipt>;
 
@@ -120,10 +130,30 @@ const defaultRunner: MinecraftLocalLifecycleRunner = async (input) => {
       503,
     );
   }
+  if (!input.ownerProfileId) throw new MinecraftLocalLifecycleError("minecraft_local_lifecycle_profile_required", 403);
+  const selection = await resolveProfileOwnedMinecraftLifecycleSelection({
+    ownerProfileId: input.ownerProfileId, appDataPath: process.env.APPDATA,
+  });
+  if (!selection) throw new MinecraftLocalLifecycleError("minecraft_saved_server_and_player_selection_required", 409);
+  let serverObservation: HelixMinecraftLocalServerLifecycle | null = null;
+  try {
+    if (input.allowServerStartup) {
+      serverObservation = await startSavedMinecraftFabricServer({
+        runDirectory: selection.runDirectory, address: input.address, signal: input.signal,
+      });
+    }
+  } catch (error) {
+    if (error instanceof MinecraftLocalServerLifecycleError) throw new MinecraftLocalLifecycleError(
+      error.code, 409, error.code, error.observation);
+    throw new MinecraftLocalLifecycleError("minecraft_server_lifecycle_unavailable", 503);
+  }
   try {
     const scriptArguments = [
       "-NoLogo",
       "-NoProfile",
+      // UI Automation reads run on a windowless MTA worker, independently of
+      // the native renderer's UI thread.
+      "-Mta",
       "-NonInteractive",
       "-ExecutionPolicy",
       "Bypass",
@@ -131,6 +161,8 @@ const defaultRunner: MinecraftLocalLifecycleRunner = async (input) => {
       scriptPath,
       "-Address",
       input.address,
+      "-PlayerGameDirectory",
+      selection.playerGameDirectory,
     ];
     if (input.restartClient) scriptArguments.push("-RestartClient");
     const result = await execFileAsync(
@@ -145,9 +177,11 @@ const defaultRunner: MinecraftLocalLifecycleRunner = async (input) => {
         encoding: "utf8",
       },
     );
-    return parseMinecraftLocalLifecycleReceipt(result.stdout);
+    return { ...parseMinecraftLocalLifecycleReceipt(result.stdout),
+      ...(serverObservation ? { server_lifecycle: serverObservation } : {}) };
   } catch (error) {
-    throw normalizeFailure(error);
+    const normalized = normalizeFailure(error);
+    throw new MinecraftLocalLifecycleError(normalized.code, normalized.statusCode, normalized.code, serverObservation);
   }
 };
 
@@ -155,6 +189,8 @@ let activeExecution: Promise<HelixMinecraftLocalLifecycleReceipt> | null = null;
 
 export const executeMinecraftFabricLoopbackLifecycle = async (input: {
   request?: Partial<HelixMinecraftLocalLifecycleRequest>;
+  ownerProfileId?: string;
+  allowServerStartup?: boolean;
   runner?: MinecraftLocalLifecycleRunner;
   signal?: AbortSignal;
 } = {}): Promise<HelixMinecraftLocalLifecycleReceipt> => {
@@ -176,6 +212,8 @@ export const executeMinecraftFabricLoopbackLifecycle = async (input: {
   const execution = (input.runner ?? defaultRunner)({
     address: parsed.data.address,
     restartClient: parsed.data.restart_client,
+    ...(input.ownerProfileId ? { ownerProfileId: input.ownerProfileId } : {}),
+    ...(input.allowServerStartup !== undefined ? { allowServerStartup: input.allowServerStartup } : {}),
     signal: input.signal,
   });
   activeExecution = execution;

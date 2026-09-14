@@ -1,0 +1,1763 @@
+{
+  "schema": "casimirbot.cs1_ready_up_retry_native_rehearsal.v1",
+  "recorded_at": "2026-09-14T08:41:00Z",
+  "scope": "Ordinary packaged development rehearsal; original ET6 and full CS1-CS4 remain unqualified",
+  "package": {
+    "directory": "apps/desktop/release-ready-up-retry-20260914/win-unpacked",
+    "exe_sha256": "b861875c67d943198bc2437fa5f690a01b47a64727bc06b1838a2fe544fc4c55",
+    "service_sha256": "bdbe8de6fbf1f2f1b39ea75d7856b163db08e0ef59343cf8147c1548bc034699",
+    "main_sha256": "53921b6aa3f6f3099a7edcc207fc0255f28cbf394c7fbdaa3781c91697ec8e08",
+    "runtime_files_compared": 647,
+    "client_files_compared": 636,
+    "fixture_text_files_scanned": 828
+  },
+  "launch": {
+    "origin": "http://127.0.0.1:51996",
+    "main_pid": 22964,
+    "service_pid": 2972,
+    "main_started_at": "2026-09-14T08:32:40.447Z",
+    "ready_at": "2026-09-14T08:32:52.249Z",
+    "window_id": 4654930,
+    "old_main_pid": 17292,
+    "old_service_pid": 23008,
+    "old_pids_exited": true,
+    "game_client_pid": 8812,
+    "game_server_pid": 27252,
+    "game_processes_unchanged": true
+  },
+  "transport_request": {
+    "ok": true,
+    "request": {
+      "schema": "helix.desktop_tunnel_transition.v1",
+      "transition_request_ref": "desktop_tunnel_request:df48ef75-de6f-4f22-8e82-05b51bf9cf18",
+      "service_instance_ref": "service_instance:a41b616667772cf98c5536c874321685",
+      "client_session_ref": "supervisor_client:ec379ec3f4c45189952c1a49eaf4927c",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_task_summary": "Restore this same task's Full Harness transport after the verified Ready up repair package restart. Reuse saved device trust; do not renew chat pairing or gameplay authority.",
+      "declared_task_is_verified": false,
+      "requested_scope": "full_helix_agent",
+      "requested_lease_seconds": 300,
+      "status": "delegated",
+      "delegation_ref": "desktop_tunnel_delegation:7da8d93b-b650-4915-8c86-df4eea83c2e0",
+      "delegation_expires_at": "2026-09-14T08:38:28.230Z",
+      "created_at": "2026-09-14T08:33:28.212Z",
+      "updated_at": "2026-09-14T08:33:28.230Z",
+      "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+      "independent_external_oauth_client_bound": false,
+      "authority_limited_to_tunnel_transport": true,
+      "environment_authority_granted": false,
+      "trading_authority_granted": false,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "content_role": "desktop_tunnel_transition_request_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "receipt": {
+      "schema": "helix.desktop_tunnel_transition_receipt.v1",
+      "receipt_ref": "desktop_tunnel_receipt:2554294b-bff5-4167-8257-2cd17b00783b",
+      "sequence": 2,
+      "transition_request_ref": "desktop_tunnel_request:df48ef75-de6f-4f22-8e82-05b51bf9cf18",
+      "delegation_ref": "desktop_tunnel_delegation:7da8d93b-b650-4915-8c86-df4eea83c2e0",
+      "service_instance_ref": "service_instance:a41b616667772cf98c5536c874321685",
+      "client_session_ref": "supervisor_client:ec379ec3f4c45189952c1a49eaf4927c",
+      "event_type": "delegated",
+      "target_scope": "full_helix_agent",
+      "reason_code": "developer_delegation_granted",
+      "observed_at": "2026-09-14T08:33:28.230Z",
+      "previous_receipt_hash": "4fdf33b4b6c802191a4065f374a42572c9a6aad62f4039127cb1b558b5ce3e61",
+      "receipt_hash": "03b9d49b9f97dc6612f6bf6bc72b8a466bfe2b95cbda0065d988e4c1df25656a",
+      "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+      "independent_external_oauth_client_bound": false,
+      "immutable_event": true,
+      "authority_limited_to_tunnel_transport": true,
+      "environment_authority_granted": false,
+      "trading_authority_granted": false,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "content_role": "desktop_tunnel_transition_receipt_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "existing_request_reused": false,
+    "trusted_device_delegation_applied": true,
+    "tool_list_changed_requested": false,
+    "native_attention_requested": true,
+    "native_attention_presentation_only": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false,
+    "stable_scope_routing": true,
+    "shared_live_room_catalog_pre_advertised": true,
+    "tool_list_changed_supported": true,
+    "authority_limited_to_tunnel_transport": true,
+    "environment_authority_granted": false,
+    "trading_authority_granted": false,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "transport_execute": {
+    "ok": true,
+    "accepted": true,
+    "receipt": {
+      "schema": "helix.desktop_tunnel_transition_receipt.v1",
+      "receipt_ref": "desktop_tunnel_receipt:02969856-47af-4e93-b2b2-f2cadf5581b0",
+      "sequence": 3,
+      "transition_request_ref": "desktop_tunnel_request:df48ef75-de6f-4f22-8e82-05b51bf9cf18",
+      "delegation_ref": "desktop_tunnel_delegation:7da8d93b-b650-4915-8c86-df4eea83c2e0",
+      "service_instance_ref": "service_instance:a41b616667772cf98c5536c874321685",
+      "client_session_ref": "supervisor_client:ec379ec3f4c45189952c1a49eaf4927c",
+      "event_type": "transition_accepted",
+      "target_scope": "full_helix_agent",
+      "reason_code": "native_transition_pending",
+      "observed_at": "2026-09-14T08:33:40.429Z",
+      "previous_receipt_hash": "03b9d49b9f97dc6612f6bf6bc72b8a466bfe2b95cbda0065d988e4c1df25656a",
+      "receipt_hash": "e76922a080a34082bc73984bb60e9981eb44566a5dc077040fc66190942d36bc",
+      "client_identity_assurance": "native_tunnel_client_plus_server_derived_continuation",
+      "independent_external_oauth_client_bound": false,
+      "immutable_event": true,
+      "authority_limited_to_tunnel_transport": true,
+      "environment_authority_granted": false,
+      "trading_authority_granted": false,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "content_role": "desktop_tunnel_transition_receipt_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "native_receipt_ref": "native_transition_receipt:z74ezEm_pUNFAvBYoGNYmEVi",
+    "idempotency_replayed": false,
+    "native_transition_resubmitted": true,
+    "tool_list_changed_requested": true,
+    "reconnect_required": false,
+    "catalog_refresh_required": false,
+    "stable_scope_routing": true,
+    "shared_live_room_catalog_pre_advertised": true,
+    "tool_list_changed_supported": true,
+    "authority_limited_to_tunnel_transport": true,
+    "environment_authority_granted": false,
+    "trading_authority_granted": false,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "presence": {
+    "ok": true,
+    "presence": {
+      "schema": "helix.local_supervisor_coordination.v1",
+      "service_instance_ref": "service_instance:a41b616667772cf98c5536c874321685",
+      "client_session_ref": "supervisor_client:ec379ec3f4c45189952c1a49eaf4927c",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_objective_summary": "Recover the existing accepted pairing and consented environment goal after the verified package restart, then prove repeated fresh Ready up calls.",
+      "declared_objective_is_verified": false,
+      "lifecycle_basis": "authenticated_client_heartbeat",
+      "lifecycle_state": "active",
+      "thread_observability_bridge": {
+        "supported_levels": [
+          "tool_activity_only"
+        ],
+        "requested_level": "tool_activity_only",
+        "checkpoint_publication": null,
+        "declaration_basis": "authenticated_client_declaration",
+        "provider_thread_content_included": false,
+        "hidden_reasoning_included": false,
+        "answer_authority": false,
+        "terminal_eligible": false
+      },
+      "resource_claims": [
+        {
+          "resource_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "claim_class": "read",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:room_membership:28103bb46faf853c29dbecc47ac9ba39",
+          "collision_authority": false
+        },
+        {
+          "resource_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+          "claim_class": "retained_runtime",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:retained_agent_run:60dc3dd56965c761cc62cb343b9ff723",
+          "collision_authority": true
+        }
+      ],
+      "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "environment_ref": null,
+      "run_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+      "verified_room_identity": {
+        "basis": "server_verified",
+        "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "participant_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "verification_ref": "supervisor_verification:room_membership:28103bb46faf853c29dbecc47ac9ba39"
+      },
+      "verified_connector_identity": null,
+      "verified_retained_runtime_identity": {
+        "basis": "server_verified",
+        "run_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "run_version": 1,
+        "run_room_binding_ref": "agent_room_binding:406e167a-a302-4095-9cea-fe6ab0cbeaf6",
+        "run_room_binding_version": 1,
+        "verification_ref": "supervisor_verification:retained_agent_run:60dc3dd56965c761cc62cb343b9ff723"
+      },
+      "verified_execution_lease_identity": null,
+      "blocker_summary": null,
+      "observed_at": "2026-09-14T08:33:58.142Z",
+      "heartbeat_expires_at": "2026-09-14T08:36:58.142Z",
+      "active": true,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "native_account_identity_included": false,
+      "content_role": "supervisor_presence_advisory",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "identity_basis": {
+      "authenticated_profile": "server_verified",
+      "authenticated_mcp_client": "server_verified",
+      "conversation_thread": "client_declared",
+      "client_session": "server_derived"
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "pairing_recovery": {
+    "ok": true,
+    "pairing": {
+      "schema": "helix.pairing_status.v1",
+      "id": "pairing:75ce6e76-0bc3-44f7-8578-999779152e96",
+      "revision": 2,
+      "destinationDigest": "690f1f336017b2f435e380af52e9d9a4cef247de10ee12aa4e127829db8dca98",
+      "chatId": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "environment": {
+        "roomId": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "runId": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb"
+      },
+      "state": "accepted",
+      "createdAt": "2026-09-14T05:04:02.798Z",
+      "invitationExpiresAt": "2026-09-14T05:19:02.798Z",
+      "pairingExpiresAt": "2026-09-14T13:04:02.798Z",
+      "acceptedAt": "2026-09-14T05:04:42.731Z",
+      "revokedAt": null,
+      "executionAuthority": false,
+      "answerAuthority": false
+    },
+    "binding": {
+      "schema": "helix.reasoning_task_binding.v1",
+      "reasoning_binding_id": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+      "pairing_id": "pairing:75ce6e76-0bc3-44f7-8578-999779152e96",
+      "binding_epoch": 1,
+      "status": "active",
+      "service_instance_ref": "service_instance:a41b616667772cf98c5536c874321685",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "client_session_ref": "supervisor_client:ec379ec3f4c45189952c1a49eaf4927c",
+      "provider_thread_ref_hash": "cdd431671a857f216c0cca08b0300683dc50d253d1e6e727083e0b7b99320e3c",
+      "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "mission_id": null,
+      "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+      "reasoning_role": "principal",
+      "continuation_transport": "polling",
+      "negotiated_observability_level": "tool_activity_only",
+      "created_by": "signed_in_operator",
+      "created_at": "2026-09-14T05:04:02.798Z",
+      "expires_at": "2026-09-14T13:04:02.798Z",
+      "claimed_at": "2026-09-14T05:04:42.731Z",
+      "revoked_at": null,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "execution_authority": false,
+      "evidence_authority": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "runtime_binding_active": true,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "source_before": {
+    "api_version": "v1",
+    "ok": true,
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false,
+    "schema": "helix.shared_live_room.source_list_receipt.v1",
+    "operation": "room.source.list",
+    "content_role": "source_binding_observation_not_assistant_answer",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "bindings": [
+      {
+        "schema": "helix.room_source_binding.v1",
+        "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "domain_adapter": "minecraft.fabric_mod.v1",
+        "source_label": "Continuous session Fabric rehearsal",
+        "scopes": [
+          "world_events:write",
+          "manifest:write",
+          "heartbeat:write",
+          "probe_requests:read",
+          "probe_results:write"
+        ],
+        "status": "expired",
+        "public_ingress_base_url": "http://127.0.0.1:51996/api/room-ingress/v1/bindings/room_source_binding%3A96064865-879e-4c39-b7c7-35b7abe9536c",
+        "created_at": "2026-09-14T00:07:56.858Z",
+        "updated_at": "2026-09-14T07:41:00.924Z",
+        "expires_at": null,
+        "revoked_at": null,
+        "last_used_at": "2026-09-14T07:41:00.911Z",
+        "request_count": 2048,
+        "execution_policy": {
+          "may_execute_live_actions": false,
+          "may_perform_read_only_probes": true
+        },
+        "content_role": "source_binding_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ]
+  },
+  "source_handoff": {
+    "operation": "environment.source_pair.local_handoff",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+    "pairing": {
+      "schema": "helix.connector_pairing.v1",
+      "pairing_id": "connector_pairing:1ff444df-380a-4bff-9517-04732145452f",
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+      "purpose": "rotate",
+      "domain_adapter": "minecraft.fabric_mod.v1",
+      "world_id": "minecraft:minehut:8fc80440-6fe",
+      "source_label": "Continuous session Fabric rehearsal",
+      "command_credential_requested": false,
+      "action_credential_requested": false,
+      "action_authority_id": null,
+      "status": "pending",
+      "expires_at": "2026-09-14T08:44:29.384Z",
+      "redeemed_at": null,
+      "revoked_at": null,
+      "created_at": "2026-09-14T08:34:29.384Z",
+      "updated_at": "2026-09-14T08:34:29.384Z",
+      "code_included": false,
+      "credential_included": false,
+      "content_role": "connector_pairing_control_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "handoff_status": "server_pairing_inbox_staged",
+    "credential_included": false,
+    "pairing_code_included": false,
+    "command_authority_granted": false,
+    "player_embodiment_granted": false,
+    "content_role": "environment_source_pairing_handoff_receipt_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "source_after": {
+    "api_version": "v1",
+    "ok": true,
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false,
+    "schema": "helix.shared_live_room.source_list_receipt.v1",
+    "operation": "room.source.list",
+    "content_role": "source_binding_observation_not_assistant_answer",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "bindings": [
+      {
+        "schema": "helix.room_source_binding.v1",
+        "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "domain_adapter": "minecraft.fabric_mod.v1",
+        "source_label": "Continuous session Fabric rehearsal",
+        "scopes": [
+          "world_events:write",
+          "manifest:write",
+          "heartbeat:write",
+          "probe_requests:read",
+          "probe_results:write"
+        ],
+        "status": "active",
+        "public_ingress_base_url": "http://127.0.0.1:51996/api/room-ingress/v1/bindings/room_source_binding%3A96064865-879e-4c39-b7c7-35b7abe9536c",
+        "created_at": "2026-09-14T00:07:56.858Z",
+        "updated_at": "2026-09-14T08:34:30.436Z",
+        "expires_at": "2026-09-14T10:34:30.135Z",
+        "revoked_at": null,
+        "last_used_at": "2026-09-14T08:34:30.420Z",
+        "request_count": 2049,
+        "execution_policy": {
+          "may_execute_live_actions": false,
+          "may_perform_read_only_probes": true
+        },
+        "content_role": "source_binding_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ]
+  },
+  "authority_and_controller_before_checks": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 1,
+        "issued_at": "2026-09-14T07:35:00.977Z",
+        "expires_at": "2026-09-14T15:35:00.911Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "state": "ready",
+        "ready_for_actions": true,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-14T07:36:34.232Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": true,
+        "heartbeat_received_at": "2026-09-14T08:34:47.259Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "ready_up_request": {
+    "client_continuation_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+    "reasoning_binding_id": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+    "binding_epoch": 1,
+    "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+    "mission_id": null,
+    "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+    "request_id": "cs1-consented-20260914-ready-bootstrap-01",
+    "goal_bootstrap": {
+      "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+      "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+      "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+      "objective": {
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "goal_kind": "custom_survival",
+        "mechanics_collection_ref": null,
+        "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ]
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "dependency_milestone_ids": [
+              "cs-course-readiness"
+            ],
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ]
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "dependency_milestone_ids": [
+              "cs-three-linked-successors"
+            ],
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "three_delayed_ready_up": [
+    {
+      "ok": true,
+      "receipt": {
+        "schema": "helix.environment_session_ready_up.v1",
+        "selection": {
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+        },
+        "readiness": {
+          "schema": "helix.environment_session_readiness.v1",
+          "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+          "observed_at_ms": 1789374908893,
+          "ready": true,
+          "valid_until_ms": 1789374911582,
+          "checks": [
+            {
+              "layer": "profile",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "service",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "service_instance:a41b616667772cf98c5536c874321685",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "client",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "binding",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "source",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": 1789382070135,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "subject",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "authority",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": 1789400100911,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "controller",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": 1789374936302,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "goal",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "perception",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_probe_evidence:a26bad9cdb8347e157243fef95b514c6e7981f6d",
+              "observed_at_ms": 1789374906582,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            }
+          ],
+          "blockers": [],
+          "next_check": null,
+          "content_role": "environment_session_readiness_observation",
+          "execution_authority": false,
+          "answer_authority": false,
+          "assistant_answer": false,
+          "terminal_eligible": false
+        },
+        "repairs": [
+          {
+            "layer": "subject",
+            "changed": true,
+            "reason_code": "subject_epoch_checked"
+          }
+        ],
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "session_deadlines": {
+          "run_expires_at_ms": 1789387687647
+        }
+      },
+      "requested_by": "authenticated_mcp_task",
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    {
+      "ok": true,
+      "receipt": {
+        "schema": "helix.environment_session_ready_up.v1",
+        "selection": {
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+        },
+        "readiness": {
+          "schema": "helix.environment_session_readiness.v1",
+          "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+          "observed_at_ms": 1789374942727,
+          "ready": true,
+          "valid_until_ms": 1789374946864,
+          "checks": [
+            {
+              "layer": "profile",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "service",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "service_instance:a41b616667772cf98c5536c874321685",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "client",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "binding",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "source",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": 1789382070135,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "subject",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "authority",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": 1789400100911,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "controller",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": 1789374971260,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "goal",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "perception",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_probe_evidence:7c32eeaf7e4bf603db92abbbc20c5c7dbf401d25",
+              "observed_at_ms": 1789374941864,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            }
+          ],
+          "blockers": [],
+          "next_check": null,
+          "content_role": "environment_session_readiness_observation",
+          "execution_authority": false,
+          "answer_authority": false,
+          "assistant_answer": false,
+          "terminal_eligible": false
+        },
+        "repairs": [],
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "session_deadlines": {
+          "run_expires_at_ms": 1789387687647
+        }
+      },
+      "requested_by": "authenticated_mcp_task",
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    {
+      "ok": true,
+      "receipt": {
+        "schema": "helix.environment_session_ready_up.v1",
+        "selection": {
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+        },
+        "readiness": {
+          "schema": "helix.environment_session_readiness.v1",
+          "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+          "observed_at_ms": 1789374979504,
+          "ready": true,
+          "valid_until_ms": 1789374982715,
+          "checks": [
+            {
+              "layer": "profile",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "service",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "service_instance:a41b616667772cf98c5536c874321685",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "client",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "binding",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "source",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": 1789382070135,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "subject",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "authority",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": 1789400100911,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "controller",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": 1789375007307,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "goal",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            },
+            {
+              "layer": "perception",
+              "state": "verified",
+              "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+              "evidence_ref": "environment_probe_evidence:b538bf69f4bdc54d0f135a47cff02eb927138d94",
+              "observed_at_ms": 1789374977715,
+              "expires_at_ms": null,
+              "reason_codes": [],
+              "human_approval_required": false
+            }
+          ],
+          "blockers": [],
+          "next_check": null,
+          "content_role": "environment_session_readiness_observation",
+          "execution_authority": false,
+          "answer_authority": false,
+          "assistant_answer": false,
+          "terminal_eligible": false
+        },
+        "repairs": [],
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "session_deadlines": {
+          "run_expires_at_ms": 1789387687647
+        }
+      },
+      "requested_by": "authenticated_mcp_task",
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    }
+  ],
+  "goal_before": {
+    "operation": "com.casimirbot.environment.durable_goal.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "goal": {
+      "schema": "helix.environment_durable_goal_projection.v1",
+      "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+      "revision": 1,
+      "latest_event_hash": "sha256:a54c5b88e6174f365a3fceff04b85ccf47312aee4432c49264303a0683df8390",
+      "status": "active",
+      "objective": {
+        "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+        "goal_kind": "custom_survival",
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "mechanics_collection_ref": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ]
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "dependency_milestone_ids": [
+              "cs-course-readiness"
+            ],
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ]
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "dependency_milestone_ids": [
+              "cs-three-linked-successors"
+            ],
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ]
+          }
+        ]
+      },
+      "identity": {
+        "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+        "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "producer_epoch_ref": "environment_action_epoch:7e913665-cff1-485f-8087-02c5ba04c3ff",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "authority_policy_version": 1,
+        "authority_expires_at": "2026-09-14T15:35:00.911Z",
+        "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "turn_id": "environment_session_goal:d0872eb24dea4e58fd19fa41d103ccf8845803585d6d658d3f5f55f6a0196a1d"
+      },
+      "active_milestone_id": null,
+      "milestones": [
+        {
+          "milestone_id": "cs-course-readiness",
+          "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-fresh-safe-course"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-three-linked-successors",
+          "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-linked-motion-trace"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-interruption-recovery",
+          "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-interruption-recovery-trace"
+          ],
+          "completed_postcondition_ids": []
+        }
+      ],
+      "recent_attempts": [],
+      "attempt_count": 0,
+      "latest_checkpoint": null,
+      "recovery": {
+        "required": false,
+        "reason": null,
+        "rebound_event_id": null
+      },
+      "consumed_semantic_wake_refs": [],
+      "event_refs": [
+        "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302"
+      ],
+      "content_role": "environment_durable_goal_projection_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "content_role": "environment_durable_goal_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "goal_after_three": {
+    "operation": "com.casimirbot.environment.durable_goal.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "goal": {
+      "schema": "helix.environment_durable_goal_projection.v1",
+      "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+      "revision": 1,
+      "latest_event_hash": "sha256:a54c5b88e6174f365a3fceff04b85ccf47312aee4432c49264303a0683df8390",
+      "status": "active",
+      "objective": {
+        "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+        "goal_kind": "custom_survival",
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "mechanics_collection_ref": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ]
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "dependency_milestone_ids": [
+              "cs-course-readiness"
+            ],
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ]
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "dependency_milestone_ids": [
+              "cs-three-linked-successors"
+            ],
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ]
+          }
+        ]
+      },
+      "identity": {
+        "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+        "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "producer_epoch_ref": "environment_action_epoch:7e913665-cff1-485f-8087-02c5ba04c3ff",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "authority_policy_version": 1,
+        "authority_expires_at": "2026-09-14T15:35:00.911Z",
+        "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "turn_id": "environment_session_goal:d0872eb24dea4e58fd19fa41d103ccf8845803585d6d658d3f5f55f6a0196a1d"
+      },
+      "active_milestone_id": null,
+      "milestones": [
+        {
+          "milestone_id": "cs-course-readiness",
+          "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-fresh-safe-course"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-three-linked-successors",
+          "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-linked-motion-trace"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-interruption-recovery",
+          "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-interruption-recovery-trace"
+          ],
+          "completed_postcondition_ids": []
+        }
+      ],
+      "recent_attempts": [],
+      "attempt_count": 0,
+      "latest_checkpoint": null,
+      "recovery": {
+        "required": false,
+        "reason": null,
+        "rebound_event_id": null
+      },
+      "consumed_semantic_wake_refs": [],
+      "event_refs": [
+        "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302"
+      ],
+      "content_role": "environment_durable_goal_projection_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "content_role": "environment_durable_goal_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "native_expired_controller": {
+    "basis": "Native computer-use screenshot and accessibility inspection",
+    "window_id": 4654930,
+    "observed_status": "Session still needs attention: controller, perception. No new permissions were granted.",
+    "controller_guidance": "The player controller is not ready. Check its connection and manual-control state in Player Embodiment; this does not by itself mean another permission is needed.",
+    "source_deadline_utc": "2026-09-14T10:34:30.135Z",
+    "authority_deadline_utc": "2026-09-14T15:35:00.911Z",
+    "run_deadline_utc": "2026-09-14T12:08:07.647Z",
+    "ready_up_click_completed": true,
+    "first_offscreen_click_error": "coordinate input geometry is unavailable; reobserved, scrolled and clicked visible control"
+  },
+  "expired_controller_read": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 1,
+        "issued_at": "2026-09-14T07:35:00.977Z",
+        "expires_at": "2026-09-14T15:35:00.911Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "state": "stale",
+        "ready_for_actions": false,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-14T07:36:34.232Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": false,
+        "heartbeat_received_at": "2026-09-14T08:36:32.317Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "player_handoff": {
+    "operation": "environment.player_pair.local_handoff",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+    "pairing": {
+      "schema": "helix.connector_pairing.v1",
+      "pairing_id": "connector_pairing:a223b5d7-971e-48c3-a8ba-7d422bf77bd3",
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+      "purpose": "rotate",
+      "domain_adapter": "minecraft.fabric_mod.v1",
+      "world_id": "minecraft:minehut:8fc80440-6fe",
+      "source_label": "Continuous session Fabric rehearsal",
+      "command_credential_requested": false,
+      "action_credential_requested": true,
+      "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+      "status": "pending",
+      "expires_at": "2026-09-14T08:49:05.857Z",
+      "redeemed_at": null,
+      "revoked_at": null,
+      "created_at": "2026-09-14T08:39:05.857Z",
+      "updated_at": "2026-09-14T08:39:05.857Z",
+      "code_included": false,
+      "credential_included": false,
+      "content_role": "connector_pairing_control_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "handoff_status": "player_pairing_inbox_staged",
+    "credential_included": false,
+    "pairing_code_included": false,
+    "content_role": "environment_player_pairing_handoff_receipt_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "player_after": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 1,
+        "issued_at": "2026-09-14T07:35:00.977Z",
+        "expires_at": "2026-09-14T15:35:00.911Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "state": "ready",
+        "ready_for_actions": true,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-14T08:39:08.194Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": true,
+        "heartbeat_received_at": "2026-09-14T08:39:36.125Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "native_after_player_recovery": {
+    "basis": "Native screenshot/accessibility after clicking Ready up",
+    "text": "Session still needs attention: goal, perception. No new permissions were granted.",
+    "detail": "Environment goal: partial outcome uncertain; check current state."
+  },
+  "goal_after_native_recovery": {
+    "operation": "com.casimirbot.environment.durable_goal.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "goal": {
+      "schema": "helix.environment_durable_goal_projection.v1",
+      "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+      "revision": 1,
+      "latest_event_hash": "sha256:a54c5b88e6174f365a3fceff04b85ccf47312aee4432c49264303a0683df8390",
+      "status": "active",
+      "objective": {
+        "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+        "goal_kind": "custom_survival",
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "mechanics_collection_ref": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ]
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "dependency_milestone_ids": [
+              "cs-course-readiness"
+            ],
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ]
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "dependency_milestone_ids": [
+              "cs-three-linked-successors"
+            ],
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ]
+          }
+        ]
+      },
+      "identity": {
+        "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+        "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "producer_epoch_ref": "environment_action_epoch:7e913665-cff1-485f-8087-02c5ba04c3ff",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "authority_policy_version": 1,
+        "authority_expires_at": "2026-09-14T15:35:00.911Z",
+        "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "turn_id": "environment_session_goal:d0872eb24dea4e58fd19fa41d103ccf8845803585d6d658d3f5f55f6a0196a1d"
+      },
+      "active_milestone_id": null,
+      "milestones": [
+        {
+          "milestone_id": "cs-course-readiness",
+          "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-fresh-safe-course"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-three-linked-successors",
+          "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-linked-motion-trace"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-interruption-recovery",
+          "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-interruption-recovery-trace"
+          ],
+          "completed_postcondition_ids": []
+        }
+      ],
+      "recent_attempts": [],
+      "attempt_count": 0,
+      "latest_checkpoint": null,
+      "recovery": {
+        "required": false,
+        "reason": null,
+        "rebound_event_id": null
+      },
+      "consumed_semantic_wake_refs": [],
+      "event_refs": [
+        "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302"
+      ],
+      "content_role": "environment_durable_goal_projection_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "content_role": "environment_durable_goal_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "mcp_after_player_recovery": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+        "observed_at_ms": 1789375240925,
+        "ready": false,
+        "valid_until_ms": null,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "service_instance:a41b616667772cf98c5536c874321685",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "reasoning_binding:a583fe109e380f8e58e105a977482b97",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": 1789382070135,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": 1789375270079,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "blocked",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "session_check:goal",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "blocked",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "session_check:perception",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [
+          {
+            "layer": "goal",
+            "state": "blocked",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "session_check:goal",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "blocked",
+            "context_ref": "sha256:e04a182ab805c82f3022532fc1d3a091b7df1771c0b5bb1a23eba88f30be97f1",
+            "evidence_ref": "session_check:perception",
+            "observed_at_ms": 1789375240083,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          }
+        ],
+        "next_check": "goal",
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [
+        {
+          "layer": "goal",
+          "changed": null,
+          "reason_code": "durable_goal_authority_stale"
+        }
+      ],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789387687647
+      }
+    },
+    "requested_by": "authenticated_mcp_task",
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "findings": [
+    "Original repeat-cache defect repaired: three delayed identical requests returned ready with distinct perception evidence and the same context.",
+    "First request refreshed only the stale observation epoch on the existing subject binding; next two returned no repairs.",
+    "Goal remained revision 1 with identical event hash and no attempts through all three successful calls.",
+    "Existing accepted pairing survived native restart without new human consent; one bounded saved-trust transport transition restored Full Harness.",
+    "Only expired source and player credentials were recovered through supported opaque MCP handoffs; authority ID, policy, capability set and deadline stayed unchanged.",
+    "New blocker: after player credential recovery changes its action producer epoch, the active goal has no recovery_required event. Native and MCP agree on goal/perception blocking; MCP reports durable_goal_authority_stale."
+  ],
+  "gameplay_workflows_submitted": 0,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "credential_included": false,
+  "hidden_reasoning_included": false
+}

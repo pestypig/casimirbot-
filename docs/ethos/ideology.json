@@ -627,7 +627,7 @@
       "slug": "identity-view-and-non-attachment",
       "title": "Identity View and Non-Attachment",
       "excerpt": "Treat identity language as a provisional lens, not a fixed verdict.",
-      "bodyMD": "Identity view becomes useful when it is restated as observations, choices, and practice conditions. Non-attachment does not erase selfhood; it prevents a stale self-story from becoming final authority.\n\nAnti-pattern: turning essence language into a permanent verdict about a person.\n\nMinimal artifact: Identity-to-Observation Note, separating current evidence, inherited story, and chosen practice.",
+      "bodyMD": "Identity view becomes useful when it is restated as observations, choices, and practice conditions. Non-attachment does not erase selfhood; it prevents a stale self-story from becoming final authority.\n\nA person may possess integrity while becoming attached to a particular demonstration of it. Changing a method need not abandon a principle, and no single sacrifice establishes a person's worth. Review this possibility without presuming attachment from courage, refusal, or defeat alone; see [[node:values-over-images]].\n\nAnti-pattern: turning essence language into a permanent verdict about a person.\n\nMinimal artifact: Identity-to-Observation Note, separating current evidence, inherited story, and chosen practice.",
       "tags": [
         "first_principle",
         "inner_practice",
@@ -6458,7 +6458,7 @@
       "slug": "dream-integrity",
       "title": "Dream Integrity",
       "excerpt": "Protect aspirations from insecurity or oppression; the vow is not indulgence.",
-      "bodyMD": "Dreams are not luxuries; they are bearings. We protect them because they keep the craft aligned with the vow.\n\nWhen insecurity or pressure demands you shrink, name the demand and refuse the trade. Safety bought by abandoning purpose is false safety.\n\nPractice:\n- Keep the aspiration visible.\n- Name what cannot be traded away.\n- Take the next step that keeps the vow intact and verify it.",
+      "bodyMD": "Dreams are not luxuries; they are bearings. We protect them because they keep the craft aligned with the vow.\n\nWhen insecurity or pressure demands you shrink, name the demand and examine what the trade would actually concede. Preserving purpose does not require preserving every method, role, or demonstration of it. Survival, surrender, retirement, or withdrawal does not by itself abandon conscience or endorse the order that prevailed; evaluate actual terms, protective purpose, affected people, and remaining obligations. A life has worth without proving its usefulness or its convictions through sacrifice.\n\nPractice:\n- Keep the aspiration visible and distinguish it from its current method.\n- Name what cannot be traded away, and check whether a proposed alternative actually trades it away.\n- Compare continuing and changing course through the Principle and Method Review in [[node:values-over-images]], including risks, feasible alternatives, and review triggers.",
       "tags": [
         "dreams",
         "integrity",
@@ -6922,7 +6922,7 @@
       "slug": "values-over-images",
       "title": "Values Over Images",
       "excerpt": "Enduring values anchor the vow while images adapt to the moment.",
-      "bodyMD": "Well-defined ideology lasts because it conserves what stays true across cycles: compassion, truth, and the constraints we refuse to trade away. Images, status, and short-term gains shift fast, so they cannot be the root.\n\nSelf-first here means self-aligned: a steady center that lets the outer image adapt without collapse. When the anchor is internal, you can change presentation without losing the vow.\n\nIn the systems loop, constraints are the values; outputs are the images; verification is the self-check that keeps the core intact.\n\nThe swan is our emblem of this balance: grace without drift, selectivity without cruelty.\n\nSee [[node:worldview-integrity]] and [[node:integrity-protocols]].",
+      "bodyMD": "Well-defined ideology lasts because it conserves what stays true across cycles: compassion, truth, and the constraints we refuse to trade away. Images, status, and short-term gains shift fast, so they cannot be the root.\n\nSelf-first here means self-aligned: a steady center that lets the outer image adapt without collapse. When the anchor is internal, you can change presentation without losing the vow.\n\nA person may possess integrity while becoming attached to a particular demonstration of it. When circumstances change, distinguish the principle from its current method, examine who bears the costs of continuing, and consider whether another course could preserve conscience and responsibility. Defeat does not invalidate a principle, and survival does not establish consent to the order that prevailed. Admiration for a person's qualities does not confer political authority, and respect from above does not establish equality. A person does not have to die to prove that their convictions were real.\n\nProcedural rule: use a Principle and Method Review as an inquiry, not a diagnosis or a predetermined instruction to persist or surrender.\n1. Name the principle and why this method is thought necessary. Separate the value, its demonstration, personal identity, and institutional role.\n2. Establish the actual terms of each alternative. Surrender, survival, retirement, service, and endorsement are different acts; do not assume what any settlement requires.\n3. Compare the remaining protective purpose and credible testimonial value of continuing with the risks and opportunities of changing course. Symbolic witness can matter, but must not exempt avoidable harm from scrutiny.\n4. Identify cost bearers, consent, feasible exit, and dependencies. Preserve the responsibility of aggressors and other actors rather than assigning all harm to the person who refuses.\n5. Consider alternatives that preserve conscience, care, and remaining duties, including advocacy, care for dependents, knowledge transfer, or later reform where feasible. Name evidence and review triggers that could change the choice. Life's worth is not conditional on being useful.\n\nKeep separate decisions and their evidence separate: surviving an earlier defeat does not prove later surrender is safe, and rejecting one settlement does not establish an inability to survive defeat. The principle itself also remains open to ethical examination; this review must not preserve a harmful commitment merely because it is sincerely held.\n\nMinimal artifact: Principle and Method Review with principle, proposed necessity, alternative terms, protective or testimonial value, cost bearers and other actors' responsibility, continuing duties, feasible alternatives, uncertainty, and revision triggers.\n\nIn the systems loop, constraints are the values; outputs are the images; verification is the self-check that keeps the core intact.\n\nThe swan is our emblem of this balance: grace without drift, selectivity without cruelty.\n\nSee [[node:worldview-integrity]], [[node:integrity-protocols]], [[node:identity-view-and-non-attachment]], [[node:non-harm-and-compassionate-constraint]], [[node:autonomy-proven-equality]], [[node:adherence-legitimacy-separation]], [[node:leadership-as-capacity-transfer]], [[node:goalpost-integrity]], [[node:spiritual-friendship-mirror]], and [[node:cost-to-power-conversion-ledger]].",
       "tags": [
         "values",
         "image",
@@ -6933,6 +6933,11 @@
       ],
       "aliases": [
         "values over images",
+        "principle and method review",
+        "integrity without sacrificial proof",
+        "survival without inward capitulation",
+        "conscience after defeat",
+        "principle method distinction",
         "idol worship",
         "celebrity mirror",
         "inspiration not imitation",
@@ -6963,6 +6968,38 @@
         {
           "rel": "see-also",
           "to": "vanity-hazard"
+        },
+        {
+          "rel": "see-also",
+          "to": "identity-view-and-non-attachment"
+        },
+        {
+          "rel": "see-also",
+          "to": "non-harm-and-compassionate-constraint"
+        },
+        {
+          "rel": "see-also",
+          "to": "autonomy-proven-equality"
+        },
+        {
+          "rel": "see-also",
+          "to": "adherence-legitimacy-separation"
+        },
+        {
+          "rel": "see-also",
+          "to": "leadership-as-capacity-transfer"
+        },
+        {
+          "rel": "see-also",
+          "to": "goalpost-integrity"
+        },
+        {
+          "rel": "see-also",
+          "to": "spiritual-friendship-mirror"
+        },
+        {
+          "rel": "see-also",
+          "to": "cost-to-power-conversion-ledger"
         }
       ],
       "references": [
@@ -6982,6 +7019,12 @@
         }
       ],
       "summary": "Enduring values anchor the vow while images adapt to the moment.",
+      "proceduralLanguage": {
+        "pattern": "A principle is tied to a costly method or a supposedly necessary demonstration of integrity.",
+        "move": "Distinguish principle from method; compare actual alternatives, protective or testimonial value, costs, agency, other actors' responsibility, and remaining duties.",
+        "missingCheck": "What evidence would show that continuing or changing course better preserves conscience and responsibility under the actual terms?",
+        "antiPattern": "Treating sacrifice as proof of integrity, survival as consent, defeat as disproof, or admiration as political authorization."
+      },
       "nodeType": "concept",
       "inputs": [],
       "outputs": [],

@@ -1,0 +1,10 @@
+{
+  "observed_at": "2026-09-14T09:56:50.9644191Z",
+  "target": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-review-recovery-20260914",
+  "operation": "SendToRecycleBin",
+  "target_absent": true,
+  "retained_current_sha256": "1b8c1aeb487f07ff99172e2a855047a287c7216983a621a6d72868fb962f25ba",
+  "retained_rollback_sha256": "b861875c67d943198bc2437fa5f690a01b47a64727bc06b1838a2fe544fc4c55",
+  "permanent_delete": false,
+  "bin_emptied": false
+}

@@ -36,6 +36,7 @@ const tunnelState = (ready: boolean): DesktopMcpTunnelState => ({
 const fixture = (input?: {
   startResults?: boolean[];
   account?: { sessionId: string; accountType: "developer" | "user" } | null;
+  resolveAccount?: () => Promise<{ sessionId: string; accountType: "developer" | "user" }>;
 }) => {
   let current = tunnelState(false);
   const scheduled: Array<() => void> = [];
@@ -66,12 +67,12 @@ const fixture = (input?: {
       return {} as NodeJS.Timeout;
     },
     cancelSchedule: () => undefined,
-    resolveAccount: async () => input?.account === null
+    resolveAccount: input?.resolveAccount ?? (async () => input?.account === null
       ? Promise.reject(new Error("signed_out"))
       : input?.account ?? {
           sessionId: "account_session:owner",
           accountType: "developer",
-        },
+        }),
   });
   const runNext = async () => {
     const callback = scheduled.shift();
@@ -139,10 +140,12 @@ describe("desktop MCP tunnel recovery supervisor", () => {
     expect(value.scheduled).toHaveLength(0);
   });
 
-  it("fails closed without starting when the account changed or lost developer authority", async () => {
-    const value = fixture({
-      account: { sessionId: "account_session:other", accountType: "developer" },
-    });
+  it.each([
+    { account: null, reason: "account_unavailable" },
+    { account: { sessionId: "account_session:owner", accountType: "user" as const }, reason: "developer_required" },
+    { account: { sessionId: "account_session:other", accountType: "developer" as const }, reason: "account_session_changed" },
+  ])("fails closed without restarting for $reason", async ({ account, reason }) => {
+    const value = fixture({ account });
     value.supervisor.trigger({
       accountSessionId: "account_session:owner",
       reason: "process_exit",
@@ -151,9 +154,11 @@ describe("desktop MCP tunnel recovery supervisor", () => {
     expect(value.controller.start).not.toHaveBeenCalled();
     expect(value.projections.at(-1)).toMatchObject({
       phase: "exhausted",
-      lastReason: "account_session_changed",
+      lastReason: reason,
       manualInterventionRequired: true,
     });
+    expect(value.scheduled).toHaveLength(0);
+    expect(value.controller.stop).not.toHaveBeenCalled();
   });
 
   it("cancels a pending retry on operator stop without creating another loop", () => {
@@ -171,4 +176,30 @@ describe("desktop MCP tunnel recovery supervisor", () => {
       lastReason: "operator_stop",
     });
   });
+
+  it.each(["operator_stop", "credentials_cleared", "credentials_reconfigured", "scope_transition"] as const)(
+    "does not restart from a late account result after %s",
+    async (reason) => {
+      let resolveAccount!: (value: { sessionId: string; accountType: "developer" }) => void;
+      const pendingAccount = new Promise<{ sessionId: string; accountType: "developer" }>(resolve => {
+        resolveAccount = resolve;
+      });
+      const readAccount = vi.fn(() => pendingAccount);
+      const value = fixture({ resolveAccount: readAccount });
+      value.supervisor.trigger({ accountSessionId: "account_session:owner", reason: "health_failed" });
+      value.scheduled.shift()?.();
+      expect(readAccount).toHaveBeenCalledOnce();
+      expect(value.projections.at(-1)?.phase).toBe("revalidating");
+      value.supervisor.cancel(reason);
+      const projectionsAfterCancel = value.projections.length;
+      resolveAccount({ sessionId: "account_session:owner", accountType: "developer" });
+      await pendingAccount;
+      await Promise.resolve();
+      expect(value.controller.start).not.toHaveBeenCalled();
+      expect(value.controller.stop).not.toHaveBeenCalled();
+      expect(value.scheduled).toHaveLength(0);
+      expect(value.projections).toHaveLength(projectionsAfterCancel);
+      expect(value.projections.at(-1)).toMatchObject({ phase: "idle", lastReason: reason });
+    },
+  );
 });

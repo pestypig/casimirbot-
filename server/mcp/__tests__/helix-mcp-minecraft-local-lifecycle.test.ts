@@ -203,6 +203,8 @@ describe("Helix MCP local Minecraft lifecycle", () => {
       expect(connection.launch).toHaveBeenCalledOnce();
       expect(connection.launch).toHaveBeenCalledWith({
         request: { address: "localhost:25565", restart_client: false },
+        ownerProfileId: principal().accountProfileId,
+        allowServerStartup: false,
       });
     } finally {
       await connection.client.close();
@@ -366,6 +368,8 @@ describe("Helix MCP local Minecraft lifecycle", () => {
       expect(result.isError).not.toBe(true);
       expect(connection.launch).toHaveBeenCalledWith({
         request: { address: "localhost:25565", restart_client: true },
+        ownerProfileId: principal().accountProfileId,
+        allowServerStartup: false,
       });
       expect(result.structuredContent).toMatchObject({
         authority_widened: false,

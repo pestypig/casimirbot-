@@ -4,6 +4,7 @@ import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { buildHelixAgentClientReadiness } from "../../../shared/helix-agent-client-readiness";
 import { helixAgentConnectionStatusSchema } from "../../../shared/helix-agent-client-profile";
+import { DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION } from "../../../shared/desktop-mcp-tunnel";
 
 let server: Server;
 let origin: string;
@@ -33,8 +34,137 @@ test.afterAll(async () => {
 });
 
 for (const input of ["pointer", "keyboard"] as const) {
+  test(`O4 failed trust status recovers through ${input} with zero consent writes`, async ({ page }) => {
+    await page.setViewportSize({ width: input === "pointer" ? 375 : 1280, height: 640 });
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "casimirDesktop", { value: { getRuntimeSnapshot: async () => null } });
+    });
+    let reads = 0;
+    const writes: string[] = [];
+    await page.route("**/*", async route => {
+      const url = new URL(route.request().url());
+      if (url.origin !== origin) return route.abort("blockedbyclient");
+      if (!url.pathname.startsWith("/api/")) return route.continue();
+      if (route.request().method() !== "GET") writes.push(url.pathname);
+      if (url.pathname === "/api/desktop/mcp-tunnel-transition/full-harness-trust") {
+        if (++reads === 1) return route.fulfill({ status: 503, json: { message: "fixture-private-read-failure" } });
+        return route.fulfill({ json: { trust: {
+          schema: "helix.installed_device_full_harness_trust.v1", trusted: false,
+          device_ref: "device:sha256:fixture", policy_revision: 0,
+          authority_limited_to_tunnel_transport: true, environment_authority_granted: false,
+          trading_authority_granted: false, answer_authority: false, terminal_eligible: false,
+        } } });
+      }
+      return route.fulfill({ status: 401, json: { error: "fixture_session_required" } });
+    });
+    await page.goto(origin);
+    const trust = page.getByRole("button", { name: "Trust this device for Full Harness", exact: true });
+    const recheck = page.getByRole("button", { name: "Recheck device trust", exact: true });
+    await expect(trust).toBeDisabled();
+    await expect(page.getByText("fixture-private-read-failure")).toHaveCount(0);
+    if (input === "pointer") await recheck.click();
+    else { await recheck.focus(); await page.keyboard.press("Enter"); }
+    await expect(trust).toBeEnabled();
+    await expect(recheck).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Remove Full Harness device trust", exact: true })).toHaveCount(0);
+    expect(reads).toBe(2);
+    expect(writes).toEqual([]);
+  });
+
+  test(`O4 unregistered device recovery through ${input} never submits consent during navigation`, async ({ page }) => {
+    await page.setViewportSize({ width: input === "pointer" ? 375 : 1280, height: 640 });
+    await page.addInitScript(() => {
+      Object.defineProperty(window, "casimirDesktop", { value: { getRuntimeSnapshot: async () => null } });
+      window.addEventListener("helix-workstation-guidance", event => {
+        document.documentElement.dataset.fixtureGuidancePanel = (event as CustomEvent).detail.panelId;
+      });
+    });
+    let registered = false;
+    const writes: string[] = [];
+    await page.route("**/*", async route => {
+      const url = new URL(route.request().url());
+      if (url.origin !== origin) return route.abort("blockedbyclient");
+      if (!url.pathname.startsWith("/api/")) return route.continue();
+      const put = route.request().method() === "PUT";
+      if (route.request().method() !== "GET") writes.push(url.pathname);
+      if (url.pathname === "/api/desktop/mcp-tunnel-transition/full-harness-trust") {
+        if (put && !registered) return route.fulfill({ status: 404,
+          json: { error: "device_not_registered", message: "fixture-private-detail" } });
+        return route.fulfill({ json: { trust: {
+          schema: "helix.installed_device_full_harness_trust.v1", trusted: put && registered,
+          device_ref: "device:sha256:fixture", policy_revision: put ? 1 : 0,
+          authority_limited_to_tunnel_transport: true, environment_authority_granted: false,
+          trading_authority_granted: false, answer_authority: false, terminal_eligible: false,
+        } } });
+      }
+      return route.fulfill({ status: 401, json: { error: "fixture_session_required" } });
+    });
+    await page.goto(origin);
+    const trust = page.getByRole("button", { name: "Trust this device for Full Harness", exact: true });
+    await expect(trust).toBeEnabled();
+    const activate = async (button: typeof trust) => {
+      if (input === "pointer") await button.click();
+      else { await button.focus(); await page.keyboard.press("Enter"); }
+    };
+    await activate(trust);
+    await expect(page.getByText(/this device is not registered or is no longer active/i)).toBeVisible();
+    await expect(page.getByText("fixture-private-detail")).toHaveCount(0);
+    await activate(page.getByRole("button", { name: "Open Connections, Billing & Security", exact: true }));
+    await expect(page.locator("html")).toHaveAttribute("data-fixture-guidance-panel", "connections-billing-security");
+    expect(writes).toEqual(["/api/desktop/mcp-tunnel-transition/full-harness-trust"]);
+    // HTTP fixture only: simulate completed registration, then a separate consent click.
+    registered = true;
+    await activate(trust);
+    await expect(page.getByRole("button", { name: "Remove Full Harness device trust", exact: true })).toBeVisible();
+    expect(writes).toHaveLength(2);
+    await expect(page.getByRole("button", { name: "Open Connections, Billing & Security", exact: true })).toHaveCount(0);
+  });
+
+  test(`signed-out account entry supports ${input} without authenticating`, async ({ page }) => {
+    const mutations: string[] = [];
+    await page.addInitScript(() => {
+      window.addEventListener("helix-workstation-guidance", event => {
+        document.documentElement.dataset.fixtureGuidancePanel = (event as CustomEvent).detail.panelId;
+      });
+    });
+    await page.route("**/*", async route => {
+      const url = new URL(route.request().url());
+      if (url.origin !== origin) return route.abort("blockedbyclient");
+      if (!url.pathname.startsWith("/api/")) return route.continue();
+      if (route.request().method() !== "GET") mutations.push(url.pathname);
+      return route.fulfill({ status: 401, json: { error: "fixture_session_required" } });
+    });
+    await page.goto(origin);
+    const button = page.getByRole("button", { name: "Open account sign-in", exact: true });
+    await expect(button).toBeVisible();
+    if (input === "pointer") await button.click();
+    else { await button.focus(); await page.keyboard.press("Enter"); }
+    await expect(page.locator("html")).toHaveAttribute("data-fixture-guidance-panel", "account-session");
+    expect(mutations).toEqual([]);
+    await expect(page.getByText("Sign in to CasimirBot", { exact: true })).toBeVisible();
+  });
+}
+
+for (const input of ["pointer", "keyboard"] as const) {
  for (const clipboard of ["available", "denied", "missing", "hung"] as const) {
   test(`real ${input} binds once and copies with ${clipboard} clipboard`, async ({ page, context }) => {
+    if (clipboard === "available") {
+      await page.addInitScript(schemaVersion => {
+        Object.defineProperty(window, "casimirDesktop", { value: {
+          getRuntimeSnapshot: async () => null,
+          getMcpTunnelState: async () => ({ schemaVersion,
+            transport: "openai_secure_mcp_tunnel", access: "developer_private",
+            scope: "local_supervisor_coordination_and_device_check", status: "ready",
+            configured: true, vaultAvailable: true, binaryVersion: "0.0.13",
+            processRunning: true, healthy: true, ready: true, adminUiAvailable: true, failureCode: null,
+            recovery: { phase: "idle", attemptCount: 0, maxAttempts: 3, nextAttemptAt: null,
+              lastReason: null, automaticScope: "local_supervisor_coordination_and_device_check",
+              manualInterventionRequired: false },
+          }),
+          startMcpTunnel: async () => { throw new Error("fixture_unexpected_native_start"); },
+        } });
+      }, DESKTOP_MCP_TUNNEL_STATE_SCHEMA_VERSION);
+    }
     if (clipboard === "available") {
       await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
     } else {
@@ -94,6 +224,18 @@ for (const input of ["pointer", "keyboard"] as const) {
     if (input === "pointer") await checkbox.click();
     else { await checkbox.focus(); await page.keyboard.press("Space"); }
     await expect(checkbox).toBeChecked();
+    if (clipboard === "available") {
+      // A native attention event must retain the user's actual pointer/keyboard
+      // selection when transport is limited, without inventing a sign-out.
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("helix-workstation-guidance", {
+        detail: { kind: "user_attention", panelId: "agent-access", targetId: "full-harness-trust",
+          label: "Review fixture device trust." },
+      })));
+      await expect(page.getByText(/native connection is ready for Device Check and supervisor coordination/)).toBeVisible();
+      await expect(page.getByText("Sign in to CasimirBot", { exact: true })).toHaveCount(0);
+      await expect(checkbox).toBeChecked();
+      expect(submissions).toEqual([]);
+    }
     await page.getByRole("button", { name: "Recheck connection", exact: true }).click();
     await expect(checkbox).toBeChecked();
     const bind = page.getByRole("button", { name: "Bind current Helix chat", exact: true });

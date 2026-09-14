@@ -1,12 +1,14 @@
 import crypto from "node:crypto";
 import { DurableReasoningBindingAccess } from "../services/local-supervisor/durable-reasoning-binding-access";
-import { createNativePairingLedgerRepository } from "../services/local-supervisor/pairing-ledger-repository";
+import { createNativePairingLedgerRepository, PairingStorageError } from "../services/local-supervisor/pairing-ledger-repository";
 import { PairingTransitionService } from "../services/local-supervisor/pairing-transition-service";
 import { createPairingDestinationRegistrationStore, PairingDestinationRegistrationError } from "../services/local-supervisor/pairing-destination-registration";
 import { publishTemporalPerceptionFrontier } from "../services/environment-connectors/temporal-plans/temporal-frontier-publisher";
 import { readyUpEnvironmentSession } from "../services/environment-connectors/session/ready-up-session";
 import { helixEnvironmentSessionMcpSchema, helixEnvironmentSessionMcpCommandSchema } from "@shared/helix-environment-session-request";
+import { BindingVerificationError } from "../services/local-supervisor/binding-verification-error";
 import { preparationIntentsFor } from "../services/environment-connectors/session/preparation-intent-runtime";
+import { PreparationIntentError, PREPARATION_INTENT_FAILURES } from "../services/environment-connectors/session/preparation-intent-store";
 import { prepareBrowserEnvironmentSession } from "../services/environment-connectors/session/prepare-browser-session";
 import { EnvironmentSessionPreparationError } from "../services/environment-connectors/session/preparation-error";
 import { admitTemporalPlan } from "../services/environment-connectors/temporal-plans/temporal-plan-admission";
@@ -442,6 +444,7 @@ import {
   isEnvironmentCommandAuthorityError,
 } from "../services/environment-connectors/commands";
 import {
+  assertPendingFabricWorkstationSource,
   bindOwnRoomEnvironmentSubject,
   isRoomEnvironmentSubjectError,
   listRoomEnvironmentProjections,
@@ -1012,6 +1015,8 @@ export type HelixEnvironmentActionAuthorityInspector = (input: {
 }>;
 export type HelixMinecraftLocalLifecycleRunner = (input: {
   request: HelixMinecraftLocalLifecycleRequest;
+  ownerProfileId: string;
+  allowServerStartup: boolean;
 }) => Promise<HelixMinecraftLocalLifecycleReceipt>;
 export type HelixEnvironmentPlayerPairLocalHandoff = (input: {
   roomId: string;
@@ -2889,6 +2894,7 @@ const callRoomObservationTool = async (
         schema: "helix.minecraft_local_lifecycle_error.v1",
         error: code,
         message: `Minecraft lifecycle stopped at ${code}. Inspect current client/server state before another launch.`,
+        ...(error.serverObservation ? { server_lifecycle: error.serverObservation } : {}),
         retryable: false,
         credential_included: false,
         content_role: "minecraft_local_lifecycle_error_not_assistant_answer",
@@ -3282,7 +3288,7 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
   server.registerTool("helix_minecraft_local_lifecycle_launch", {
     title: "Launch and join the local Fabric play session",
     description:
-      "Launches or reuses the prepared same-host Fabric client and joins the loopback server under either an exact current Player Embodiment lease or the separately trusted developer-device Workstation Lifecycle bootstrap. Bootstrap grants no Minecraft action authority. An explicit restart_client request still requires an active Player Embodiment lease. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence for Codex re-entry.",
+      "Launches or reuses the authenticated owner's saved Fabric client and stages a loopback join under an exact active Player Embodiment lease or separately trusted developer-device workstation permission. Saved device trust additionally permits starting or reusing that owner's saved loopback Fabric server with an already accepted EULA and installed Java 21. A player lease alone cannot start the dedicated server. Explicit restart_client still requires an active Player Embodiment lease. Partial server startup is reported separately if client setup fails. Startup grants no gameplay authority; all receipts are nonterminal observations.",
     inputSchema: z.object({
       room_id: helixSharedLiveRoomIdSchema,
       environment_binding_id: z.string().trim().min(1).max(320),
@@ -3860,7 +3866,15 @@ export const createHelixMcpServer = (input: {
     try {
       return toolSuccess(await operation());
     } catch (error) {
-      if (error instanceof HelixLocalSupervisorCoordinationError || error instanceof PairingDestinationRegistrationError) {
+      if (error instanceof PreparationIntentError && Object.hasOwn(PREPARATION_INTENT_FAILURES, error.code)) {
+        return toolError(new HelixAgentApiServiceError(
+          409,
+          error.code,
+          PREPARATION_INTENT_FAILURES[error.code],
+          false,
+        ), requiredScopes);
+      }
+      if (error instanceof HelixLocalSupervisorCoordinationError || error instanceof PairingDestinationRegistrationError || error instanceof PairingStorageError) {
         return toolError(new HelixAgentApiServiceError(
           error.status,
           error.code,
@@ -3898,6 +3912,13 @@ export const createHelixMcpServer = (input: {
           error.status >= 500,
         ), requiredScopes);
       }
+      if (error instanceof BindingVerificationError) {
+        return { ...toolSuccess({ schema: "helix.reasoning_binding_verification_error.v1",
+          error: error.code, binding_failure_phase: error.phase, binding_failure_reason: error.reason,
+          credential_included: false, raw_content_included: false,
+          execution_authority: false, answer_authority: false, assistant_answer: false, terminal_eligible: false,
+        }), isError: true as const };
+      }
       const temporalProjection = temporalPlanErrorProjection(error);
       if (error instanceof EnvironmentSessionPreparationError) {
         return { ...toolSuccess(error.projection), isError: true as const };
@@ -3924,9 +3945,19 @@ export const createHelixMcpServer = (input: {
       if (isEnvironmentDurableGoalError(error)) {
         // Temporal admission resolves durable identity/evidence inside this
         // wrapper too. Keep the typed refusal, never arbitrary exception text.
+        const expiry = error.code === "durable_goal_evidence_stale" ? error.evidenceExpiry : undefined;
+        const boundedMs = (value: unknown): value is number => typeof value === "number" &&
+          Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+        const stages = expiry?.context_stage_ms;
+        const evidenceFreshness = expiry && boundedMs(expiry.evidence_age_ms) && boundedMs(expiry.max_age_ms)
+          ? { evidence_age_ms: expiry.evidence_age_ms, max_age_ms: expiry.max_age_ms,
+            ...(stages && boundedMs(stages.goal) && boundedMs(stages.catalog) && boundedMs(stages.perception)
+              ? { context_stage_ms: { goal: stages.goal, catalog: stages.catalog, perception: stages.perception } } : {}) }
+          : undefined;
         return { ...toolSuccess({
           schema: "helix.environment_durable_goal_error.v1",
           error: error.code,
+          ...(evidenceFreshness ? { evidence_freshness: evidenceFreshness } : {}),
           message: "Temporal admission requires current durable-goal identity and evidence; revalidate the named prerequisite.",
           retryable: false,
           credential_included: false,
@@ -4581,7 +4612,13 @@ export const createHelixMcpServer = (input: {
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
       }, async (rawArgs: z.infer<typeof helixEnvironmentSessionMcpSchema>) => callLocalSupervisorTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
-        const args = helixEnvironmentSessionMcpCommandSchema.parse(rawArgs);
+        const parsed = helixEnvironmentSessionMcpCommandSchema.safeParse(rawArgs);
+        if (!parsed.success) {
+          throw new EnvironmentSessionPreparationError(
+            new HelixReasoningTaskBindingError("environment_session_request_invalid", 400),
+            [], false, undefined, "request_validation");
+        }
+        const args = parsed.data;
         requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
         requireCurrentRoomFeature();
         const identity = localSupervisorIdentity(args.client_continuation_ref);
@@ -4709,7 +4746,10 @@ export const createHelixMcpServer = (input: {
           clientContinuationRef: args.client_continuation_ref, bindingId: args.reasoning_binding_id,
           bindingEpoch: args.binding_epoch, helixConversationId: args.helix_conversation_id,
           missionId: args.mission_id, runId: args.run_id };
-        await reasoningAccess!.verifyTaskAssociation(binding);
+        try { await reasoningAccess!.verifyTaskAssociation(binding); }
+        catch (error) {
+          throw new EnvironmentSessionPreparationError(error, [], false, undefined, "task_binding");
+        }
         if ("request_id" in args) {
           const receipt = await (input.environmentSessionAutoPrepare ?? prepareBrowserEnvironmentSession)({
             sessionId: input.principal.accountContext.session_id ?? "", profileRef: input.principal.accountProfileId,
@@ -5138,9 +5178,21 @@ export const createHelixMcpServer = (input: {
     const authenticatedPairingDestination = async (continuationRef: string) => {
       const identity = localSupervisorIdentity(continuationRef);
       const deviceId = process.env.HELIX_DESKTOP_DEVICE_ID?.trim();
+      if (!deviceId) {
+        throw new HelixLocalSupervisorCoordinationError("pairing_registration_installation_required", 403);
+      }
       const trust = await input.desktopFullHarnessTrustReader?.({ authenticatedProfileRef: input.principal.accountProfileId });
-      if (!deviceId || !trust?.trusted || !trust.accountSessionReady || !trust.agentAccountBindingReady) {
+      if (!trust) {
+        throw new HelixLocalSupervisorCoordinationError("pairing_registration_readiness_unavailable", 503);
+      }
+      if (!trust.trusted) {
         throw new HelixLocalSupervisorCoordinationError("pairing_registration_device_trust_required", 403);
+      }
+      if (!trust.accountSessionReady) {
+        throw new HelixLocalSupervisorCoordinationError("pairing_registration_account_session_required", 403);
+      }
+      if (!trust.agentAccountBindingReady) {
+        throw new HelixLocalSupervisorCoordinationError("pairing_registration_account_link_required", 403);
       }
       const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
       return { issuer: opaque("issuer", input.principal.issuer), profileId: input.principal.accountProfileId,
@@ -5169,7 +5221,7 @@ export const createHelixMcpServer = (input: {
       } catch (error) {
         const code = error instanceof Error ? error.message : "";
         if (["pairing_acceptance_invalid", "pairing_destination_mismatch", "pairing_expired",
-          "pairing_revoked", "pairing_not_accepted"].includes(code)) {
+          "pairing_revoked", "pairing_superseded", "pairing_not_accepted", "pairing_replacement_required"].includes(code)) {
           throw new HelixLocalSupervisorCoordinationError(code,
             ["pairing_acceptance_invalid", "pairing_destination_mismatch"].includes(code) ? 403 : 409);
         }
@@ -5198,7 +5250,8 @@ export const createHelixMcpServer = (input: {
       } catch (error) {
         const code = error instanceof Error ? error.message : "";
         if (["pairing_acceptance_invalid", "pairing_destination_mismatch", "pairing_expired",
-          "pairing_revoked", "pairing_transition_conflict"].includes(code)) {
+          "pairing_revoked", "pairing_superseded", "pairing_transition_conflict", "pairing_replacement_conflict",
+          "pairing_replacement_scope_mismatch", "pairing_predecessor_unavailable", "pairing_replacement_not_pending"].includes(code)) {
           throw new HelixLocalSupervisorCoordinationError(code,
             ["pairing_acceptance_invalid", "pairing_destination_mismatch"].includes(code) ? 403 : 409);
         }
@@ -8115,7 +8168,7 @@ export const createHelixMcpServer = (input: {
     {
       title: "Launch and join the local Fabric play session",
       description:
-        "Launches or reuses the prepared same-host Fabric client and joins the loopback server under either an exact current Player Embodiment lease or the separately trusted developer-device Workstation Lifecycle bootstrap. Bootstrap grants no Minecraft action authority. An explicit restart_client request still requires an active Player Embodiment lease. Startup alone is not permission, no authority is widened, and the receipt is nonterminal evidence for Codex re-entry.",
+        "Launches or reuses the authenticated owner's saved Fabric client and stages a loopback join under an exact active Player Embodiment lease or separately trusted developer-device workstation permission. Saved device trust additionally permits starting or reusing that owner's saved loopback Fabric server with an already accepted EULA and installed Java 21. A player lease alone cannot start the dedicated server. Explicit restart_client still requires an active Player Embodiment lease. Partial server startup is reported separately if client setup fails. Startup grants no gameplay authority; all receipts are nonterminal observations.",
       inputSchema: z.object({
         room_id: helixSharedLiveRoomIdSchema,
         environment_binding_id: z.string().trim().min(1).max(320),
@@ -8147,17 +8200,23 @@ export const createHelixMcpServer = (input: {
             false,
           );
         }
-        const inspected = await actionAuthorityInspector({
-          roomId: argumentsValue.room_id,
-          profileId: input.principal.accountProfileId,
-          environmentBindingId: argumentsValue.environment_binding_id,
-        });
         const requestedActionAuthorityId =
           argumentsValue.action_authority_id ?? null;
         const actionAuthorityId = requestedActionAuthorityId ===
           HELIX_MINECRAFT_TRUSTED_DEVICE_LIFECYCLE_BOOTSTRAP
           ? null
           : requestedActionAuthorityId;
+        const pendingWorkstationBootstrap = actionAuthorityId === null &&
+          argumentsValue.environment_binding_id.startsWith("environment_binding:pending:");
+        // The first source cannot publish an active environment until its
+        // application runs. Verify its exact stored owner/source below instead
+        // of requiring player-action readiness for this separate OS capability.
+        const inspected = pendingWorkstationBootstrap ? { authorities: [] } :
+          await actionAuthorityInspector({
+            roomId: argumentsValue.room_id,
+            profileId: input.principal.accountProfileId,
+            environmentBindingId: argumentsValue.environment_binding_id,
+          });
         const authority = actionAuthorityId === null ? null :
           inspected.authorities.find((entry) =>
           entry.action_authority_id === actionAuthorityId &&
@@ -8193,6 +8252,9 @@ export const createHelixMcpServer = (input: {
             false,
           );
         }
+        const workstationTrust = await input.desktopFullHarnessTrustReader?.({
+          authenticatedProfileRef: input.principal.accountProfileId,
+        });
         if (!authority) {
           if (argumentsValue.request.restart_client) {
             throw new HelixAgentApiServiceError(
@@ -8202,10 +8264,7 @@ export const createHelixMcpServer = (input: {
               false,
             );
           }
-          const trust = await input.desktopFullHarnessTrustReader?.({
-            authenticatedProfileRef: input.principal.accountProfileId,
-          });
-          if (!trust?.trusted) {
+          if (!workstationTrust?.trusted) {
             throw new HelixAgentApiServiceError(
               403,
               "account_policy_blocked",
@@ -8216,10 +8275,19 @@ export const createHelixMcpServer = (input: {
               },
             );
           }
+          if (pendingWorkstationBootstrap) {
+            await assertPendingFabricWorkstationSource({
+              roomId: argumentsValue.room_id,
+              profileId: input.principal.accountProfileId,
+              environmentBindingId: argumentsValue.environment_binding_id,
+            });
+          }
         }
         const receipt = helixMinecraftLocalLifecycleReceiptSchema.parse(
           await minecraftLocalLifecycleRunner({
             request: argumentsValue.request,
+            ownerProfileId: input.principal.accountProfileId,
+            allowServerStartup: workstationTrust?.trusted === true,
           }),
         );
         return {

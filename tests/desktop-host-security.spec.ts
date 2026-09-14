@@ -107,6 +107,37 @@ describe("desktop Electron session security", () => {
     expect(devicePermission?.()).toBe(false);
   });
 
+  it("allows only exact-origin sanitized clipboard writes and never clipboard reads", () => {
+    let check: (...args: any[]) => boolean;
+    let request: (...args: any[]) => void;
+    let origin: string | null = "http://127.0.0.1:43117";
+    installDesktopSessionSecurity({
+      setPermissionCheckHandler(handler: typeof check) { check = handler; },
+      setPermissionRequestHandler(handler: typeof request) { request = handler; },
+      setDevicePermissionHandler() {},
+      on() {},
+    } as unknown as Session, { getTrustedRendererOrigin: () => origin });
+    const trusted = "http://127.0.0.1:43117";
+    const contents = (url: string) => ({ getURL: () => url });
+    const cases = [
+      ["clipboard-sanitized-write", trusted, trusted, true],
+      ["clipboard-read", trusted, trusted, false],
+      ["deprecated-sync-clipboard-read", trusted, trusted, false],
+      ["clipboard-sanitized-write", trusted, "http://127.0.0.1:43118", false],
+      ["clipboard-sanitized-write", "https://example.com", trusted, false],
+      ["clipboard-sanitized-write", trusted, "invalid", false],
+    ] as const;
+    for (const [permission, owner, requester, allowed] of cases) {
+      expect(check!(contents(owner), permission, requester, {})).toBe(allowed);
+      const callback = vi.fn();
+      request!(contents(owner), permission, callback, { requestingUrl: requester });
+      expect(callback).toHaveBeenCalledWith(allowed);
+    }
+    expect(check!(null, "clipboard-sanitized-write", trusted, {})).toBe(false);
+    origin = null;
+    expect(check!(contents(trusted), "clipboard-sanitized-write", trusted, {})).toBe(false);
+  });
+
   it("keeps risky renderer features explicitly disabled", async () => {
     const mainSource = await readFile(
       path.resolve("apps/desktop/src/main.ts"),
@@ -226,7 +257,7 @@ describe("desktop Electron session security", () => {
       "$ids -contains [uint32]$_.OwningProcess",
     );
     expect(smokeSource).toContain(
-      "$expectedLoopbackListeners = if ($friendsCoordinationConfigured) { 4 } else { 3 }",
+      "$expectedLoopbackListeners = if ($friendsCoordinationConfigured) { 5 } else { 4 }",
     );
     expect(smokeSource).toContain(
       "$listenerCount -eq $expectedLoopbackListeners",

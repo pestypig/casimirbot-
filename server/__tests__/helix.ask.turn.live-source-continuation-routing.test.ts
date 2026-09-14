@@ -1,6 +1,6 @@
 import express from "express";
 import request from "supertest";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   RETIRED_WORKSPACE_ACTION_REGISTRY,
   RETIRED_WORKSTATION_DYNAMIC_TOOL_ACTIONS,
@@ -55,6 +55,20 @@ import {
   resetLiveInterpretationHypothesesForTest,
 } from "../services/situation-room/live-interpretation-hypothesis-store";
 import type { HelixLiveSourceProducerFreshness } from "@shared/helix-live-source-producer-freshness";
+
+// Route fixtures must not scan or append to the operator's durable history.
+// Keep the real persistent ledger enabled, but give this worker its own files.
+const ledgerEnvironment = vi.hoisted(() => {
+  const previous = process.env.HELIX_THREAD_LEDGER_PATH;
+  process.env.HELIX_THREAD_LEDGER_PATH =
+    `artifacts/nav1o-routing-test-ledgers/${process.pid}-${Date.now()}/ledger.jsonl`;
+  return { previous };
+});
+
+afterAll(() => {
+  if (ledgerEnvironment.previous === undefined) delete process.env.HELIX_THREAD_LEDGER_PATH;
+  else process.env.HELIX_THREAD_LEDGER_PATH = ledgerEnvironment.previous;
+});
 
 const threadId = "thread:live-source-continuation";
 let developerSessionCookie = "";
@@ -204,6 +218,25 @@ const seedBackendVisualSource = async (app: express.Express, targetThreadId = th
 };
 
 describe("live source continuation Ask routing", () => {
+  // Opt-in diagnostics: flush the worker profile before Vitest terminates it.
+  // Profile only test execution, excluding the cold import and fixture reset.
+  let workerProfiler: import("node:inspector/promises").Session | null = null;
+  afterEach(async () => {
+    const profiler = workerProfiler;
+    workerProfiler = null;
+    if (!profiler) return;
+    try {
+      const { profile } = await profiler.post("Profiler.stop");
+      const { mkdir, writeFile } = await import("node:fs/promises");
+      const directory = "artifacts/nav1o-routing-worker-profiles";
+      await mkdir(directory, { recursive: true });
+      const output = `${directory}/worker-${process.pid}-${Date.now()}.cpuprofile`;
+      await writeFile(output, JSON.stringify(profile), { flag: "wx" });
+      console.info(`[routing-profile] ${output}`);
+    } finally {
+      profiler.disconnect();
+    }
+  });
   // The retired route is intentionally large and can take longer than an
   // individual behavior budget to cold-load on constrained acceptance hosts.
   // Pay that one-time module cost in suite setup so route assertions continue
@@ -253,6 +286,15 @@ describe("live source continuation Ask routing", () => {
         freeRatio: 0.5,
       }),
     });
+  });
+
+  beforeEach(async () => {
+    if (process.env.HELIX_ROUTING_WORKER_PROFILE !== "1") return;
+    const { Session } = await import("node:inspector/promises");
+    workerProfiler = new Session();
+    workerProfiler.connect();
+    await workerProfiler.post("Profiler.enable");
+    await workerProfiler.post("Profiler.start");
   });
 
   it("routes keep-checking-screen prompts to live pipeline setup instead of model-only", async () => {

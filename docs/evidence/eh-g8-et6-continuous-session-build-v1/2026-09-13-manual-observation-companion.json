@@ -1,0 +1,18 @@
+{
+  "observed_at": "2026-09-13T10:59:45.3564391Z",
+  "scope": "development companion build and archive inspection; not deployed or live qualified",
+  "artifact": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+  "sha256": "9e9b6a83cee0f995fc9f0a44b4b35196d32f5d54bffcf4e12de47b38c7ea3b29",
+  "bytes": 543209,
+  "mod_id": "helix_fabric_player_agent",
+  "mod_version": "0.4.12",
+  "minecraft_dependency": "~1.21.8",
+  "archive_entries": 149,
+  "controller_present": true,
+  "inspected_test_entries": [],
+  "bytecode_measurement_copy_verified": true,
+  "controller_tests_passed": 40,
+  "cross_language_manual_case_passed": true,
+  "deployed": false,
+  "live_acceptance": false
+}

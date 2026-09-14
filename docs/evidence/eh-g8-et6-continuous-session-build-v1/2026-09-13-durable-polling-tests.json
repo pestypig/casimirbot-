@@ -1,0 +1,43 @@
+{
+  "schema": "casimirbot.durable_mcp_polling_regressions.v1",
+  "scope": "Deterministic components and isolated real handlers; not live human pairing or integrated gameplay acceptance",
+  "first_reproduced_boundary": "Accepted durable exact-chat steering was unavailable solely because the authenticated task declared tool_activity_only instead of optional public checkpoints.",
+  "red": { "log": ".tmp/durable-mcp-polling-red-20260913.log", "failed": 2, "passed": 2 },
+  "focused_current_runs": [
+    { "log": ".tmp/durable-mcp-polling-core-20260913.log", "passed": 22, "failed": 0, "scope": "Real binding store, durable access and accepted-grant preflight" },
+    { "log": ".tmp/durable-mcp-polling-handlers-20260913.log", "passed": 37, "failed": 0, "scope": "35 MCP handler tests and 2 jsdom rendered real-route workflow tests; not native pointer consent" },
+    { "log": ".tmp/durable-mcp-polling-recheck-ui-final-20260913.log", "passed": 52, "failed": 0, "scope": "Agent Access rendering and recheck, truthful polling/checkpoint/delivery distinction and unchanged read-only operations" }
+  ],
+  "full_discipline": {
+    "log": ".tmp/durable-mcp-polling-discipline-full-20260913.log",
+    "exit_code": 0,
+    "selected_tests_passed": 101,
+    "selected_tests_failed": 0,
+    "prompt_prelude": 4,
+    "prompt_adversarial_cases": 31,
+    "api_fixed_contracts": 15,
+    "api_scenarios": 16,
+    "live_source_continuation": 26,
+    "live_source_identity": 9,
+    "shard_skips": "Each shard intentionally skips tests selected by other shards; these are not additional passing cases.",
+    "server_build_exit_code": 0,
+    "build_warnings": "Four duplicate key/case warnings in unrelated existing demonstration, solar-derived and starsim surfaces.",
+    "empirical_selected_pass_fraction": 1,
+    "live_success_probability_inferred": false
+  },
+  "docs_audit": { "log": ".tmp/durable-mcp-polling-docs-audit-20260913.log", "exit_code": 0 },
+  "preserved_boundaries": [
+    "Only a freshly validated accepted finite durable grant enables this polling transport.",
+    "Fresh exact-task current-service presence remains required for agent-origin ingress and Ready up association.",
+    "Wrong destination, grant expiry, revocation, stale presence and missing durable preflight reject.",
+    "Retry identity and consent deadline persist; a restart changes only the transient runtime binding.",
+    "Legacy claim admission is unchanged; polling does not imply checkpoints, idle wake or automatic delivery."
+  ],
+  "live_pairing_accepted": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

@@ -99,6 +99,10 @@ export const agentConnectionSetupReducer = (
 ): AgentConnectionSetupState => {
   switch (action.type) {
     case "choose":
+      // Native attention can reselect the current app while transport is
+      // limited or unavailable. That event is not evidence of a signed-out
+      // account; only a fresh readiness response may reset verified progress.
+      if (state.selectedProfile === action.profile) return state;
       return { ...state, selectedProfile: action.profile, viewedStep: "account", explanationOpen: false };
     case "view":
       if (!state.selectedProfile && action.step !== "choose") return state;

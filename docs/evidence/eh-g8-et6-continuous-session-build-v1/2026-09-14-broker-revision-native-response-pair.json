@@ -1,0 +1,182 @@
+{
+  "schema": "casimirbot.native_readiness_response_pair.v1",
+  "observed_at": "2026-09-14T10:59:00.849Z",
+  "package_evidence": "2026-09-14-broker-revision-package.json",
+  "earlier_snapshot": "2026-09-14-broker-revision-native.json",
+  "provenance": "Native EXE developer Network panel, filtered to the ordinary Ready up endpoint. Copy response only; no request headers, cookies, credentials or HAR exported.",
+  "success": {
+    "response": {
+      "ok": true,
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+        "observed_at_ms": 1789382788686,
+        "ready": true,
+        "valid_until_ms": 1789382789932,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "service_instance:63fe3efa404ac133d9442c82c7609002",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "reasoning_binding:2b886d1167d128749b70926af7a082e8",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "reasoning_binding:2b886d1167d128749b70926af7a082e8",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": 1789389344122,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": 1789382816600,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "verified",
+            "context_ref": "sha256:eca1101560400e1fbb7aa658ec9702cee192a92eccb0f4b147b71374bf2d0ce6",
+            "evidence_ref": "environment_probe_evidence:d090022f8a31b8183ea7358833f1c9ce3c794448",
+            "observed_at_ms": 1789382786935,
+            "expires_at_ms": 1789382789932,
+            "reason_codes": [],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [],
+        "next_check": null,
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789387687647
+      },
+      "requested_by": "authenticated_browser_owner"
+    },
+    "response_sha256": "308c319fd8e12f0d59774f65fb1fe100cf6a6430c83374bddf96b55c77ba664a",
+    "native_http_status": 200,
+    "native_network_duration_ms": 8910,
+    "native_visible_message": "Session prerequisites checked. Ready for the bound AI task to request admitted actions; no movement was started.",
+    "validity_remaining_at_collection_ms": 1246
+  },
+  "later_failure": {
+    "response": {
+      "schema": "helix.environment_session_error.v1",
+      "ok": false,
+      "error": "environment_session_readiness_expired",
+      "repairs": [],
+      "partial_effects_unknown": false,
+      "readiness_confirmed": false,
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "credential_included": false
+    },
+    "response_sha256": "d5ca452784672a704283372aad102936d9aa342729516f4609a13bfd7f05d792",
+    "native_observed_at": "2026-09-14T10:50:30.384Z",
+    "native_network_duration_ms": null,
+    "native_visible_message": "Session is not ready: environment_session_readiness_expired. Your binding was not replaced."
+  },
+  "findings": [
+    "Native success is now directly evidenced; this extends the earlier snapshot that had not captured its brief valid state.",
+    "The next ordinary native request failed at the final readiness-expiry guard after association revalidation, with no repairs and no unknown partial effects.",
+    "The strict five-second freshness deadline was preserved. Exact internal cost attribution remains unmeasured.",
+    "Repository initialization performs a durability barrier before a further per-read barrier. Initialization-only reuse is under isolated regression; it is not yet packaged."
+  ],
+  "next_packet": "docs/work-packets/eh-g8-cs-ready-up-durability-cost-v1.md",
+  "gameplay_workflows_submitted": 0,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "credential_included": false,
+  "hidden_reasoning_included": false
+}

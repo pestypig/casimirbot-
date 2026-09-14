@@ -376,6 +376,17 @@ describe("Helix MCP Minecraft action boundary", () => {
         retryable: false, execution_authority: false, answer_authority: false, terminal_eligible: false });
       expect(JSON.stringify(result)).not.toContain("private-error-sentinel");
       expect(executeAction).not.toHaveBeenCalled();
+      admit.mockRejectedValueOnce(new EnvironmentDurableGoalError("durable_goal_evidence_stale", 409,
+        "private-expiry-sentinel", [], [], { evidence_age_ms: 6157, max_age_ms: 5000,
+          context_stage_ms: { goal: 100, catalog: 200, perception: 300 }, private_extra: "private-diagnostic-sentinel" } as never));
+      const stale = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit",
+        arguments: temporalSubmissionFixture });
+      expect(stale.isError).toBe(true);
+      expect(stale.structuredContent).toMatchObject({ error: "durable_goal_evidence_stale",
+        evidence_freshness: { evidence_age_ms: 6157, max_age_ms: 5000,
+          context_stage_ms: { goal: 100, catalog: 200, perception: 300 } }, execution_authority: false });
+      expect(JSON.stringify(stale)).not.toMatch(/private-(expiry|diagnostic)-sentinel/);
+      expect(executeAction).not.toHaveBeenCalled();
       admit.mockRejectedValueOnce(new EnvironmentActionBrokerError(
         "action_policy_denied", 409, "private-broker-error-sentinel"));
       const brokerRejection = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit",

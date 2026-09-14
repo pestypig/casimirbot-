@@ -1,0 +1,32 @@
+{
+  "mode": "constraint-pack",
+  "pack": {
+    "notes": [
+      "Scope: saved Fabric workstation lifecycle patch and development package, not full repository or physical viability.",
+      "56 focused real handler/schema/UI/orchestration tests passed; one case executes 17 isolated OS scenarios including cross-process mutex contention.",
+      "Desktop npm ls dependency graph passed; package staged dependency closure and content comparison passed.",
+      "No ET6 or CS1-CS4 acceptance promotion.",
+      "After the first packaged rejection, three focused tests were rerun: all 17 OS scenarios and both owner-profile tests passed with dotted Java property keys; production config was unchanged.",
+      "One additional passing deterministic test executes eight real Launcher selection-guard cases with isolated public-UI observations. Packaged fixed-script hash comparison passed."
+    ],
+    "id": "repo-convergence",
+    "autoTelemetry": false,
+    "telemetry": {
+      "tests": {
+        "total": 57,
+        "failed": 0
+      },
+      "schema": {
+        "contracts": true
+      },
+      "build": {
+        "status": "pass",
+        "durationMs": 37306
+      },
+      "deps": {
+        "coherence": true
+      }
+    }
+  },
+  "traceId": "cs-launcher-profile-20260913"
+}

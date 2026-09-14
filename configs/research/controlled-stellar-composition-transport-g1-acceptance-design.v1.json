@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "controlled-stellar-composition-transport-g1-acceptance-design/1",
+  "status": "decision_policy_frozen_source_binding_incomplete",
+  "launchAllowed": false,
+  "modelDesign": "controlled-stellar-composition-transport-g1-model-design.v1.json",
+  "interpretation": "Preregistered componentwise research acceptance criteria, not a joint statistical confidence statement or evidence of physical viability.",
+  "nominalFit": {
+    "luminosityW": 3.828e26,
+    "radiusM": 6.957e8,
+    "surfaceZOverX": 0.02292,
+    "relativeToleranceEach": 0.0001,
+    "sources": ["https://arxiv.org/abs/1510.07674", "https://arxiv.org/abs/1611.09867"],
+    "role": "conventional calibration; these are not three independent observational discoveries",
+    "Teff": "derived from L, R and pinned Stefan-Boltzmann constant; relative identity residual <=1e-6; not a fourth independent fit term"
+  },
+  "heldOutScalarRules": {
+    "surfaceHelium": {
+      "target": 0.2485,
+      "uncertaintyWidth": 0.0035,
+      "source": "https://arxiv.org/abs/1611.09867",
+      "location": "Table 4 solar column summary attributed to Basu and Antia 2004",
+      "acceptAbsoluteResidualAtMost": 0.0105
+    },
+    "convectionZoneBaseRadiusFraction": {
+      "target": 0.713,
+      "uncertaintyWidth": 0.001,
+      "source": "https://arxiv.org/abs/1611.09867",
+      "location": "Table 4 solar column summary attributed to Basu and Antia 1997",
+      "acceptAbsoluteResidualAtMost": 0.003
+    },
+    "neutrinos": {
+      "requiredChannels": ["pp", "be7", "b8", "cno"],
+      "comparisonSpace": "all-flavor production flux at 1 AU, cm^-2 s^-1, conditional on the observation source's flavor-conversion assumptions",
+      "candidateSources": ["https://doi.org/10.1038/s41586-018-0624-y", "https://arxiv.org/abs/2205.15975"],
+      "binding": "controlled-stellar-composition-transport-g1-neutrino-source.v1.json binds all four scalar fluxes, asymmetric errors and conditional flavor-conversion assumptions; structural source binding remains independently required",
+      "rule": "abs(model-observed) <= 3*source_uncertainty_width on the residual's side",
+      "widthDefinition": "published total asymmetric width if supplied; otherwise sum absolute same-side quoted statistical and systematic widths, without inventing their independence",
+      "meaning": "conservative componentwise research envelope; not an exact likelihood or 99.7 percent joint confidence",
+      "doNot": ["reuse detector-fit correlation as global-flux covariance", "treat interaction count rate as production flux", "reuse GLOBAL or SSM table rows as independent measurements", "infer errors from central values"]
+    }
+  },
+  "structuralProfiles": {
+    "required": ["sound_speed", "density"],
+    "referenceBinding": "primary inversion dataset with exact grid, reference-model convention, error widths and averaging/resolution metadata must be retained; currently unresolved",
+    "radialDomain": "intersection of inversion's published reliable support and resolved model domain; frozen before run, no post-result exclusion of discrepant radii",
+    "rule": "every retained residual magnitude <=3 times the published pointwise uncertainty width; report full vector and maximum, no global p-value",
+    "correlatedPoints": "not independent replications; no point-count increase in claimed significance",
+    "missingDataOrUnresolvedSupport": "BLOCK_SOURCE_BINDING, never substitute a model profile or fixture for solar inversion data"
+  },
+  "numericalAcceptance": {
+    "ageAbsoluteToleranceYears": 1,
+    "speciesSumAbsoluteTolerance": 1e-10,
+    "minimumSpeciesMassFraction": -1e-12,
+    "relativeMassDriftTolerance": 1e-8,
+    "energyBudgetRelativeResidualTolerance": 0.001,
+    "energyLedger": "include nuclear, neutrino, gravothermal, surface and any declared boundary work; define sign conventions and integration before execution",
+    "convergence": "all mesh-only, time-only and combined refinements satisfy model-design v1 at fixed age/parameters, without refit; missing observational widths block corresponding numerical comparison",
+    "basis": "pre-result numerical design requirements, not uncertainties measured by the cited observational papers"
+  },
+  "multipleComparisonPolicy": {
+    "mode": "intersection_of_componentwise_envelopes_no_joint_significance_claim",
+    "allRequiredComponentsMustPass": true,
+    "combineAsIndependentChiSquare": false,
+    "combineStatisticalAndModelErrorsWithoutEvidence": false,
+    "adjustThresholdsAfterResults": false,
+    "missingRequiredComponent": "BLOCKED_BASELINE_CALIBRATION",
+    "anyFailedComponent": "BLOCKED_BASELINE_CALIBRATION",
+    "failureReport": "complete residual vector plus first failure in preregistered order; retain failures and no optimizer retuning on held-out tests"
+  },
+  "laterGateRequirements": {
+    "G5": ["parent-bound mode frequencies and r02/r13", "Li/Be and surface abundance", "Ledoux/Schwarzschild and Brunt-Vaisala diagnostics with convection zones distinguished from radiative stability"],
+    "note": "These remain required by the parent program; this G1 policy neither closes nor removes them."
+  }
+}

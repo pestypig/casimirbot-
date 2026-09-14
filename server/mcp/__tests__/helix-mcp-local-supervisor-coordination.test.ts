@@ -1,5 +1,8 @@
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import * as pairingRepository from "../../services/local-supervisor/pairing-ledger-repository";
+import * as steeringRepository from "../../services/local-supervisor/durable-steering-repository";
+import { migration090 } from "../../db/migrations/090_durable_steering";
+import { commitEmbeddedPairingReplacement } from "../../services/local-supervisor/embedded-pairing-replacement-commit";
 import { migration087 } from "../../db/migrations/087_pairing_ledger";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import express from "express";
@@ -109,22 +112,89 @@ const heartbeat = async (client: Client, continuation: string, objective: string
   });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await Promise.allSettled(clients.splice(0).map((client) => client.close()));
   await Promise.allSettled(servers.splice(0).map((server) => server.close()));
 });
 
 describe("Helix MCP local-supervisor coordination", () => {
+  it("admits Ready up after recovery through the native encrypted pairing repository", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const crypto = await import("node:crypto");
+    const { startDesktopProviderCredentialBroker } = await import("../../../apps/desktop/src/provider-credential-broker");
+    const { createPairingLedgerRow, acceptPairingLedgerRow, pairingApprovalSchema } = await import("../../services/local-supervisor/pairing-ledger-contract");
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "casimir-ready-native-pairing-"));
+    const broker = await startDesktopProviderCredentialBroker({ keyring: { activeKey: crypto.randomBytes(32).toString("base64url"), retiredKeys: [] } });
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("HELIX_LOCAL_DB_PATH", path.join(directory, "snapshot.json"));
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_PERSIST", "1");
+    vi.stubEnv("HELIX_LOCAL_PG_MEM_WRITE_MODE", "deferred");
+    vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_BROKER_ORIGIN", broker.origin);
+    vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN", broker.token);
+    vi.stubEnv("HELIX_DESKTOP_DEVICE_ID", "fixture-ready-native-device");
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    const db = await import("../../db/client");
+    try {
+      await db.ensureDatabase();
+      await db.getPool().query("INSERT INTO helix_accounts(profile_id,display_name) VALUES ('fixture-ready-native-owner','Fixture')");
+      const identity = principal("fixture-ready-native-owner", "fixture-ready-native-client");
+      identity.mcpClientRef = identity.oauthClientRef;
+      identity.scopes.add(HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE);
+      const hash = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
+      const destination = { issuer: hash("issuer", identity.issuer), profileId: identity.accountProfileId,
+        installationId: hash("installation", "fixture-ready-native-device"), clientId: identity.mcpClientRef!, taskId: "fixture-ready-native-task" };
+      const repository = await pairingRepository.createNativePairingLedgerRepository();
+      const row = createPairingLedgerRow({ id: "pairing:fixture-ready-native", requestDigest: "a".repeat(64),
+        acceptanceSecretDigest: "b".repeat(64), consentReceiptId: "fixture-ready-native-consent",
+        approval: pairingApprovalSchema.parse({ destination, chatId: "fixture-ready-native-chat",
+          environment: { roomId: "fixture-ready-native-room", runId: "fixture-ready-native-run" },
+          scope: "exact_chat_steering", policyRevision: 1 }) }, new Date());
+      await repository.insert(row);
+      await repository.compareAndSwap(acceptPairingLedgerRow(row, destination, new Date()), 1);
+      const presence = new HelixLocalSupervisorCoordinationStore("fixture-ready-native-service");
+      const runtime = new HelixReasoningTaskBindingStore(presence);
+      const automatic = vi.fn().mockResolvedValue({ readiness: { ready: false }, repairs: [], execution_authority: false });
+      const client = await connect(presence, identity, { reasoningTaskBindingStore: runtime,
+        desktopFullHarnessTrustReader: async () => ({ trusted: true, accountSessionReady: true, agentAccountBindingReady: true }),
+        environmentSessionAutoPrepare: automatic });
+      await heartbeat(client, destination.taskId, "Fixture native Ready up");
+      const restored = await client.callTool({ name: "helix_reasoning_pairing_recover", arguments: {
+        client_continuation_ref: destination.taskId, id: row.id } });
+      expect(restored.isError, JSON.stringify(restored)).not.toBe(true);
+      const binding = (restored.structuredContent as any).binding;
+      for (let index = 0; index < 3; index++) {
+        const result = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+          client_continuation_ref: destination.taskId, reasoning_binding_id: binding.reasoning_binding_id,
+          binding_epoch: binding.binding_epoch, helix_conversation_id: row.approval.chatId,
+          mission_id: null, run_id: row.approval.environment!.runId, request_id: "fixture-native-ready" } });
+        expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      }
+      expect(automatic).toHaveBeenCalledTimes(3);
+    } finally {
+      await db.resetDbClient(); await broker.close(); vi.unstubAllEnvs();
+      for (const name of fs.readdirSync(directory)) fs.unlinkSync(path.join(directory, name));
+      fs.rmdirSync(directory);
+    }
+  }, 60000);
+
   it("accepts a durable invitation through MCP after idle and service replacement without extending consent", async () => {
-    const pool = new (newDb().adapters.createPg().Pool)();
+    const memoryDb = newDb();
+    const pool = new (memoryDb.adapters.createPg().Pool)();
     await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
     await pool.query("INSERT INTO helix_accounts VALUES ('profile:pairing')");
     const dbClient = await pool.connect();
-    try { for (const migration of [migration087, migration088, migration089]) {
+    try { for (const migration of [migration087, migration088, migration089, migration090]) {
       await migration.run(dbClient, { enablePgvector: false });
     } } finally { dbClient.release(); }
     const vault = ephemeralPairingVault();
-    const repo = new pairingRepository.PairingLedgerRepository(pool, vault, async () => {});
+    const flush = vi.fn(async () => {});
+    const repo = new pairingRepository.PairingLedgerRepository(pool, vault, flush,
+      async writes => commitEmbeddedPairingReplacement(memoryDb, writes));
     const factory = vi.spyOn(pairingRepository, "createNativePairingLedgerRepository").mockResolvedValue(repo);
+    const steeringFactory = vi.spyOn(steeringRepository, "createNativeDurableSteeringRepository")
+      .mockResolvedValue(new steeringRepository.DurableSteeringRepository(pool, vault, flush));
     const registrations = new destinationRegistration.PairingDestinationRegistrationStore(pool, async () => {}, () => new Date(), vault);
     const registrationFactory = vi.spyOn(destinationRegistration, "createPairingDestinationRegistrationStore").mockResolvedValue(registrations);
     const identity = principal("profile:pairing", "oauth:pairing");
@@ -211,7 +281,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       const restoredRuntime = await recover(runtimeClient);
       expect(restoredRuntime.isError).not.toBe(true);
       expect(restoredRuntime.structuredContent).toMatchObject({ runtime_binding_active: true,
-        binding: { status: "active", continuation_transport: "unavailable", execution_authority: false } });
+        binding: { status: "active", continuation_transport: "polling", negotiated_observability_level: "tool_activity_only", execution_authority: false } });
       const runtimeBinding = (restoredRuntime.structuredContent as any).binding;
       const visualArgs = { reasoning_binding_id: runtimeBinding.reasoning_binding_id, binding_epoch: runtimeBinding.binding_epoch };
       const visualRead = await runtimeClient.callTool({ name: "helix_visual_sequence_list", arguments: visualArgs });
@@ -228,9 +298,8 @@ describe("Helix MCP local-supervisor coordination", () => {
       const currentPresence = await runtimeClient.callTool({ name: "helix_local_supervisor_presence_update", arguments: {
         client_continuation_ref: actor.taskId, declared_objective_summary: "Fixture steering exchange",
         lifecycle_state: "active", resource_claims: [], heartbeat_ttl_seconds: 180,
-        thread_observability_bridge: { supported_levels: ["tool_activity_only", "checkpoint_publish", "continuation_ready"],
-          requested_level: "continuation_ready", checkpoint_publication: {
-            freshness_window_seconds: 120, retention: "current_session", revocation: "independent" } },
+        thread_observability_bridge: { supported_levels: ["tool_activity_only"],
+          requested_level: "tool_activity_only", checkpoint_publication: null },
       } });
       expect(currentPresence.isError).not.toBe(true);
       const prompt = { client_continuation_ref: actor.taskId, reasoning_binding_id: runtimeBinding.reasoning_binding_id,
@@ -310,7 +379,129 @@ describe("Helix MCP local-supervisor coordination", () => {
       expect(revokedDisplay.status).toBe(409);
       expect(revokedDisplay.body.error).toBe("pairing_revoked");
       expect((await repo.read(actor.profileId, args.id))?.revision).toBe(3);
-    } finally { factory.mockRestore(); registrationFactory.mockRestore(); vi.useRealTimers(); vi.unstubAllEnvs(); await pool.end(); }
+      // O2/O5: the real human revoke route commits while the first MCP
+      // acceptance is awaiting durability. No stale accepted result may escape.
+      const raceInvitation = await httpRequest(app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", "helix_session=browser:pairing").send({ requestId: "fixture-accept-revoke-race",
+          registrationId: listed.body.destinations[0].registrationId, chatId: "chat:fixture", environment: null,
+          invitationSeconds: 900, pairingSeconds: 28800 });
+      expect(raceInvitation.status).toBe(200);
+      const raceArgs = { client_continuation_ref: actor.taskId, ...raceInvitation.body.invitation };
+      flush.mockImplementationOnce(async () => {
+        const result = await httpRequest(app)
+          .post(`/api/account/session/agent-connections/reasoning-pairings/${encodeURIComponent(raceArgs.id)}/revoke`)
+          .set("Cookie", "helix_session=browser:pairing").send({});
+        expect(result.status).toBe(200);
+        expect(result.body.pairing).toMatchObject({ state: "revoked", revision: 3 });
+      });
+      const raced = await call(runtimeClient, raceArgs);
+      expect(raced.isError).toBe(true);
+      expect(JSON.stringify(raced)).toContain("pairing_revoked");
+      expect(JSON.stringify(raced)).not.toContain(raceArgs.secret);
+      expect((await repo.read(actor.profileId, raceArgs.id))?.revision).toBe(3);
+      // Replacement uses real MCP register/accept/recover handlers and the real
+      // browser consent route. Only fixture identity/key and storage factory
+      // ports are injected; no production consent or model loop is involved.
+      const replacementIssue = (body: unknown) => httpRequest(app)
+        .post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", "helix_session=browser:pairing").send(body);
+      const initialBody = { requestId: "fixture-replacement-predecessor",
+        registrationId: listed.body.destinations[0].registrationId, chatId: "chat:replacement", environment: null,
+        invitationSeconds: 900, pairingSeconds: 28800 };
+      const predecessorInvitation = await replacementIssue(initialBody);
+      expect(predecessorInvitation.status).toBe(200);
+      const predecessorArgs = { client_continuation_ref: actor.taskId, ...predecessorInvitation.body.invitation };
+      const predecessorResult = await call(runtimeClient, predecessorArgs);
+      expect(predecessorResult.isError).not.toBe(true);
+      const predecessorBinding = (predecessorResult.structuredContent as any).binding;
+      const nextTask = "task:replacement-destination";
+      const nextRegistration = await runtimeClient.callTool({ name: "helix_reasoning_destination_register", arguments: {
+        client_continuation_ref: nextTask, request_id: "fixture-next-register", duration_seconds: 3600 } });
+      expect(nextRegistration.isError).not.toBe(true);
+      const nextBody = { ...initialBody, requestId: "fixture-reviewed-successor",
+        registrationId: (nextRegistration.structuredContent as any).registration.registrationId,
+        replacement: { pairingId: predecessorArgs.id, revision: 2 } };
+      const successorInvitation = await replacementIssue(nextBody);
+      const competingInvitation = await replacementIssue({ ...nextBody, requestId: "fixture-competing-successor" });
+      expect(successorInvitation.status).toBe(200); expect(competingInvitation.status).toBe(200);
+      const nextArgs = { client_continuation_ref: nextTask, ...successorInvitation.body.invitation };
+      const competitorArgs = { client_continuation_ref: nextTask, ...competingInvitation.body.invitation };
+      const pendingReplacement = await runtimeClient.callTool({ name: "helix_reasoning_pairing_recover",
+        arguments: { client_continuation_ref: nextTask, id: nextArgs.id } });
+      expect(pendingReplacement.isError).toBe(true);
+      expect(JSON.stringify(pendingReplacement)).toContain("pairing_replacement_required");
+      expect(JSON.stringify(await call(runtimeClient, { ...nextArgs, client_continuation_ref: actor.taskId })))
+        .toContain("pairing_destination_mismatch");
+      expect((await repo.read(actor.profileId, predecessorArgs.id))?.revision).toBe(2);
+      const competitors = await Promise.all([call(runtimeClient, nextArgs), call(runtimeClient, competitorArgs)]);
+      expect(competitors.filter(result => !result.isError)).toHaveLength(1);
+      expect(JSON.stringify(competitors.find(result => result.isError))).toContain("pairing_replacement_conflict");
+      const winner = competitors[0].isError ? competitorArgs : nextArgs;
+      const loser = competitors[0].isError ? nextArgs : competitorArgs;
+      const winningResult = competitors.find(result => !result.isError)!;
+      expect((await call(runtimeClient, winner)).structuredContent).toEqual(winningResult.structuredContent);
+      expect((await repo.read(actor.profileId, loser.id))?.acceptedAt).toBeNull();
+      for (const operation of [
+        () => call(runtimeClient, predecessorArgs),
+        () => runtimeClient.callTool({ name: "helix_reasoning_pairing_recover", arguments: {
+          client_continuation_ref: actor.taskId, id: predecessorArgs.id } }),
+        () => runtimeClient.callTool({ name: "helix_reasoning_steering_read", arguments: {
+          client_continuation_ref: actor.taskId, reasoning_binding_id: predecessorBinding.reasoning_binding_id,
+          binding_epoch: predecessorBinding.binding_epoch } }),
+        () => runtimeClient.callTool({ name: "helix_reasoning_prompt_submit", arguments: { ...prompt,
+          reasoning_binding_id: predecessorBinding.reasoning_binding_id, binding_epoch: predecessorBinding.binding_epoch,
+          helix_conversation_id: "chat:replacement", client_event_ref: "fixture-stale-replacement-prompt" } }),
+        () => runtimeClient.callTool({ name: "helix_reasoning_steering_acknowledge", arguments: {
+          client_continuation_ref: actor.taskId, reasoning_binding_id: predecessorBinding.reasoning_binding_id,
+          binding_epoch: predecessorBinding.binding_epoch, steering_event_ref: "steering:fixture-stale-event" } }),
+      ]) {
+        const rejected = await operation(); expect(rejected.isError).toBe(true);
+        expect(JSON.stringify(rejected)).toContain("pairing_superseded");
+      }
+      const restoredReplacement = await connect(new HelixLocalSupervisorCoordinationStore("service:replacement-recovered"), identity,
+        { desktopFullHarnessTrustReader: trust });
+      const recoveredReplacement = await restoredReplacement.callTool({ name: "helix_reasoning_pairing_recover",
+        arguments: { client_continuation_ref: nextTask, id: winner.id } });
+      expect(recoveredReplacement.isError).not.toBe(true);
+      expect((recoveredReplacement.structuredContent as any).pairing).toEqual((winningResult.structuredContent as any).pairing);
+      const revokeReplacement = await httpRequest(app)
+        .post(`/api/account/session/agent-connections/reasoning-pairings/${encodeURIComponent(winner.id)}/revoke`)
+        .set("Cookie", "helix_session=browser:pairing").send({});
+      expect(revokeReplacement.status).toBe(200);
+      expect(JSON.stringify(await call(runtimeClient, winner))).toContain("pairing_revoked");
+      expect(JSON.stringify(await call(runtimeClient, predecessorArgs))).toContain("pairing_superseded");
+      expect(JSON.stringify(await call(runtimeClient, loser))).toContain("pairing_replacement_conflict");
+      const open = vi.spyOn(vault, "open");
+      open.mockRejectedValueOnce(new Error("fixture-private-broker-diagnostic"));
+      const storageFailure = await recover(recovered);
+      expect(storageFailure.isError).toBe(true);
+      expect(JSON.stringify(storageFailure)).toContain("pairing_storage_unreadable");
+      expect(JSON.stringify(storageFailure)).not.toContain("fixture-private-broker-diagnostic");
+      open.mockRestore();
+    } finally { factory.mockRestore(); steeringFactory.mockRestore(); registrationFactory.mockRestore(); vi.useRealTimers(); vi.unstubAllEnvs(); await pool.end(); }
+  });
+  it.each([
+    ["", null, "pairing_registration_installation_required"],
+    ["fixture-device", null, "pairing_registration_readiness_unavailable"],
+    ["fixture-device", { trusted: false, accountSessionReady: false, agentAccountBindingReady: false }, "pairing_registration_device_trust_required"],
+    ["fixture-device", { trusted: true, accountSessionReady: false, agentAccountBindingReady: false }, "pairing_registration_account_session_required"],
+    ["fixture-device", { trusted: true, accountSessionReady: true, agentAccountBindingReady: false }, "pairing_registration_account_link_required"],
+  ])("O4 diagnostic: pairing prerequisite reports its first missing boundary (%s, %j)", async (device, readiness, expected) => {
+    vi.stubEnv("HELIX_DESKTOP_DEVICE_ID", device as string);
+    const factory = vi.spyOn(destinationRegistration, "createPairingDestinationRegistrationStore");
+    try {
+      const client = await connect(new HelixLocalSupervisorCoordinationStore("service:diagnostic"),
+        principal("profile:diagnostic", "oauth:diagnostic"), {
+          desktopFullHarnessTrustReader: vi.fn().mockResolvedValue(readiness),
+        });
+      const result = await client.callTool({ name: "helix_reasoning_destination_register", arguments: {
+        client_continuation_ref: "task:diagnostic", request_id: "fixture-diagnostic", duration_seconds: 900,
+      } });
+      expect(result.isError).toBe(true);
+      expect((result.structuredContent as any).error).toBe(expected);
+      expect(factory).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).not.toContain("fixture-device");
+    } finally { factory.mockRestore(); vi.unstubAllEnvs(); }
   });
   it("registers a durable declared destination through the real handler without heartbeat or consent", async () => {
     const pool = new (newDb().adapters.createPg().Pool)();
@@ -686,6 +877,34 @@ describe("Helix MCP local-supervisor coordination", () => {
     }
   });
 
+  it("returns a typed preparation blocker after presence expiry and recovers on the same task", async () => {
+    vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
+    let clock = new Date();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(clock);
+    const store = new HelixLocalSupervisorCoordinationStore("service_instance:88888888888888888888888888888889", () => clock);
+    const identity = principal("profile:expired-preparation", "client:expired-preparation");
+    identity.scopes.add(HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE);
+    const client = await connect(store, identity, { reasoningTaskBindingStore: new HelixReasoningTaskBindingStore(store) });
+    const initialPresence = await heartbeat(client, "task:expired-preparation", "Inspect setup");
+    expect(initialPresence.isError, JSON.stringify(initialPresence)).not.toBe(true);
+    const read = () => client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+      operation: "read_preparation", client_continuation_ref: "task:expired-preparation" } });
+    expect((await read()).structuredContent).toMatchObject({ intents: [], ready: false });
+    clock = new Date(clock.getTime() + 61000);
+    vi.setSystemTime(clock);
+    const expired = await read();
+    expect(expired.isError).toBe(true);
+    expect(expired.structuredContent).toMatchObject({ error: "preparation_target_unavailable", retryable: false });
+    await heartbeat(client, "task:expired-preparation", "Inspect setup");
+    expect((await read()).structuredContent).toMatchObject({ intents: [], ready: false, execution_authority: false });
+    const missing = await client.callTool({ name: "helix_environment_session_ready_up", arguments: {
+      operation: "acknowledge_preparation", client_continuation_ref: "task:expired-preparation",
+      intent_id: "environment_preparation:missing", run_id: "run:missing" } });
+    expect(missing.isError).toBe(true);
+    expect(missing.structuredContent).toMatchObject({ error: "preparation_intent_unavailable", retryable: false });
+  });
+
   it("shares a browser preparation mailbox with exact MCP pickup and verified acknowledgement", async () => {
     vi.stubEnv("HELIX_PUBLIC_ROOMS_EXPERIMENT", "1");
     const membership = vi.spyOn(roomMembership, "readSharedRealtimeRoomMembership").mockResolvedValue({
@@ -910,6 +1129,19 @@ describe("Helix MCP local-supervisor coordination", () => {
       const partial = await client.callTool({ name: "helix_environment_session_ready_up", arguments: automaticArgs });
       expect(partial.isError).toBe(true);
       expect(partial.structuredContent).toEqual(partialError.projection);
+      const mixed = await client.callTool({ name: "helix_environment_session_ready_up",
+        arguments: { ...automaticArgs, room_id: "room:override" } });
+      expect(mixed.structuredContent).toMatchObject({ error: "environment_session_request_invalid",
+        failure_phase: "request_validation", readiness_confirmed: false, partial_effects_unknown: false });
+      expect(automatic).toHaveBeenCalledTimes(2);
+      const brokenBinding = vi.spyOn(reasoning, "verifyTaskAssociation")
+        .mockImplementationOnce(() => { throw new Error("fixture-private-binding-storage"); });
+      const unavailable = await client.callTool({ name: "helix_environment_session_ready_up", arguments: automaticArgs });
+      expect(unavailable.structuredContent).toMatchObject({ error: "environment_session_preparation_failed",
+        failure_phase: "task_binding", readiness_confirmed: false, partial_effects_unknown: false });
+      expect(JSON.stringify(unavailable)).not.toContain("fixture-private-binding-storage");
+      brokenBinding.mockRestore();
+      expect(automatic).toHaveBeenCalledTimes(2);
       const wrongTask = await client.callTool({ name: "helix_environment_session_ready_up",
         arguments: { ...automaticArgs, client_continuation_ref: "task:foreign" } });
       expect(wrongTask.isError).toBe(true);

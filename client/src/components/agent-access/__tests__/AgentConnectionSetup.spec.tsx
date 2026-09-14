@@ -24,6 +24,9 @@ import {
   requestWorkstationGuidance,
 } from "@/lib/workstation/workstationGuidance";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
+import { buildProfileStoragePayload } from "@/lib/workstation/profileStorageSync";
+import { HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT } from "@/lib/workstation/accountCapabilityPolicy";
 
 const response = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), {
@@ -139,6 +142,7 @@ beforeEach(() => {
   window.localStorage.clear();
   delete window.casimirDesktop;
   useAgiChatStore.setState({ activeId: undefined });
+  useWorkspaceMemoryRegistryStore.setState({ artifacts: {} });
 });
 
 afterEach(() => {
@@ -150,6 +154,80 @@ afterEach(() => {
 });
 
 describe("AgentConnectionSetup", () => {
+  it("rechecks account changes as observations without trusting event identity or starting transport", async () => {
+    let authenticated = false;
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+      authenticated ? response(connectionStatus(true)) : response({}, 401));
+    vi.stubGlobal("fetch", fetchMock);
+    const { unmount } = render(<AgentConnectionSetup />);
+    fireEvent.click(screen.getByRole("button", { name: /Codex App/i }));
+    await screen.findByText("Sign in to CasimirBot");
+    const reads = () => fetchMock.mock.calls.filter(([url]) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT)).length;
+    const initial = reads();
+    fireEvent(window, new CustomEvent(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, {
+      detail: { account_profile_changed: true, account_profile_id: "untrusted-event-identity" },
+    }));
+    await waitFor(() => expect(reads()).toBe(initial + 1));
+    await screen.findByText("Sign in to CasimirBot");
+    authenticated = true;
+    fireEvent(window, new CustomEvent(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT));
+    await waitFor(() => expect(reads()).toBe(initial + 2));
+    await waitFor(() => expect(screen.queryByText("Sign in to CasimirBot")).not.toBeInTheDocument());
+    authenticated = false;
+    fireEvent(window, new CustomEvent(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT));
+    await screen.findByText("Sign in to CasimirBot");
+    expect(reads()).toBe(initial + 3);
+    expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("untrusted-event-identity");
+    unmount();
+    fireEvent(window, new CustomEvent(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT));
+    expect(reads()).toBe(initial + 3);
+  });
+
+  it("O4 includes reviewed setup preferences in profile backup without storing approval or credentials", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response({}, 401));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentConnectionSetup />);
+    fireEvent.click(screen.getByRole("button", { name: /Codex App/i }));
+    await screen.findByText("Sign in to CasimirBot");
+    const registry = useWorkspaceMemoryRegistryStore.getState().buildRegistrySnapshot();
+    const payload = buildProfileStoragePayload(registry, "profile:fixture");
+    const entry = payload.entries.find(item => item.storage_key === AGENT_CONNECTION_SETUP_STORAGE_KEY);
+    expect(entry).toBeDefined();
+    expect(JSON.parse(entry!.value)).toEqual({ schema: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      selected_profile: "codex_app", viewed_step: "account" });
+    expect(payload.artifacts).toContainEqual(expect.objectContaining({
+      artifact_id: "agent-connection-setup:preferences", storage_key: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      owner_scope: "profile", profile_id: "profile:fixture",
+    }));
+    expect(fetchMock.mock.calls.every(call => (call[1] as RequestInit | undefined)?.method !== "POST")).toBe(true);
+  });
+
+  it("offers direct account navigation after a signed-out readiness response without starting authentication", async () => {
+    useAgiChatStore.setState({ activeId: "fixture-retained-chat" });
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY, selected_profile: "codex_app", viewed_step: "ready",
+    }));
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => response({}, 401));
+    vi.stubGlobal("fetch", fetchMock);
+    const guidance = vi.fn();
+    window.addEventListener(HELIX_WORKSTATION_GUIDANCE_EVENT, guidance);
+    try {
+      render(<AgentConnectionSetup />);
+      const button = await screen.findByRole("button", { name: "Open account sign-in" });
+      expect(screen.getByText("Sign in to CasimirBot")).toBeInTheDocument();
+      const before = fetchMock.mock.calls.length;
+      fireEvent.click(button);
+      expect(guidance).toHaveBeenCalledTimes(1);
+      expect(guidance.mock.calls[0][0].detail).toMatchObject({ kind: "user_attention", panelId: "account-session" });
+      expect(fetchMock).toHaveBeenCalledTimes(before);
+      expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+      expect(useAgiChatStore.getState().activeId).toBe("fixture-retained-chat");
+    } finally {
+      window.removeEventListener(HELIX_WORKSTATION_GUIDANCE_EVENT, guidance);
+    }
+  });
+
   it("recovers cold-start setup to binding by read-only polling", async () => {
     let current = connectionStatus(false);
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT) ? response(current) : response({}, 404));
@@ -268,6 +346,54 @@ describe("AgentConnectionSetup", () => {
       `${AGENT_CONNECTION_READINESS_ENDPOINT}?client_profile=codex_app`,
       expect.objectContaining({ credentials: "same-origin" }),
     );
+  });
+
+  it("explains ready limited scope without pretending transport timed out or starting it", async () => {
+    const getMcpTunnelState = vi.fn(async () => ({ ...fullTunnelState,
+      scope: "local_supervisor_coordination_and_device_check" }));
+    const startMcpTunnel = vi.fn();
+    window.casimirDesktop = Object.freeze({ getRuntimeSnapshot: vi.fn(async () => null), getMcpTunnelState, startMcpTunnel });
+    vi.stubGlobal("fetch", nativeFetch(() => response(connectionStatus(true))));
+    render(<AgentConnectionSetup />);
+    requestWorkstationGuidance({ kind: "user_attention", panelId: "agent-access",
+      controlId: "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat", label: "Review binding." });
+    expect(await screen.findByText(/native connection is ready for Device Check and supervisor coordination/)).toBeInTheDocument();
+    expect(screen.queryByText(/did not become ready within 5 seconds/)).not.toBeInTheDocument();
+    expect(startMcpTunnel).not.toHaveBeenCalled();
+    expect(getMcpTunnelState).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["limited", "failed"])("O4 preserves verified account state when repeated guidance sees %s transport", async (mode) => {
+    const getMcpTunnelState = vi.fn(() => mode === "limited"
+      ? Promise.resolve({ ...fullTunnelState, scope: "local_supervisor_coordination_and_device_check" })
+      : Promise.reject(new Error("private native failure")));
+    const startMcpTunnel = vi.fn();
+    window.casimirDesktop = Object.freeze({
+      getRuntimeSnapshot: vi.fn(async () => null), getMcpTunnelState, startMcpTunnel,
+    });
+    let signedOut = false;
+    const fetchMock = nativeFetch(() => response(signedOut ? {} : connectionStatus(true), signedOut ? 401 : 200));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentConnectionSetup />);
+    fireEvent.click(screen.getByRole("button", { name: /Codex App/i }));
+    await screen.findByText("AI app connected");
+
+    act(() => requestWorkstationGuidance({ kind: "user_attention", panelId: "agent-access",
+      targetId: "full-harness-trust", label: "Review device trust." }));
+    await screen.findByText(mode === "limited"
+      ? /native connection is ready for Device Check and supervisor coordination/
+      : /could not read native Full Harness transport readiness/);
+    expect(screen.queryByText("Sign in to CasimirBot")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open account sign-in" })).not.toBeInTheDocument();
+    expect(screen.getByText("AI app connected")).toBeInTheDocument();
+    expect(startMcpTunnel).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+
+    // Retaining navigation is not authentication: an actual new 401 must still
+    // replace the projection and require sign-in.
+    signedOut = true;
+    fireEvent(window, new CustomEvent(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT));
+    await screen.findByText("Sign in to CasimirBot");
   });
 
   it("rechecks readiness when MCP presents the OAuth account-link prerequisite", async () => {
@@ -475,7 +601,7 @@ describe("AgentConnectionSetup", () => {
     expect(screen.getByText(/Keep any active binding/)).toBeInTheDocument();
   });
 
-  it("keeps exact-task binding discoverable when continuation needs a recheck", async () => {
+  it("explains connected tool-only support without recommending another presence refresh", async () => {
     useAgiChatStore.setState({ activeId: "helix-chat-test" });
     window.localStorage.setItem(
       AGENT_CONNECTION_SETUP_STORAGE_KEY,
@@ -493,13 +619,15 @@ describe("AgentConnectionSetup", () => {
     expect(
       await screen.findByText("Bind the current Helix chat to this exact AI task"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/continuation was unavailable at the last check/i)).toBeInTheDocument();
+    expect(screen.getByText(/Repeating the same presence refresh cannot enable steering/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Ask that same AI task to refresh its CasimirBot presence/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Bind current Helix chat" }),
     ).toBeDisabled();
     const recheck = screen.getByRole("button", { name: "Recheck connection" });
     fireEvent.click(recheck);
     await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT))).toHaveLength(2));
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
   });
 
   it("rechecks stale continuation on return without issuing a binding or duplicating focus reads", async () => {
@@ -626,16 +754,16 @@ describe("AgentConnectionSetup", () => {
     vi.stubGlobal("fetch", nativeFetch(() => response(current)));
     render(<AgentConnectionSetup />);
     fireEvent.click(screen.getByRole("button", { name: "Start Harness" }));
-    await screen.findByText(/The connection is visible, but this exact task's continuation is unavailable/);
+    await screen.findAllByText(/This task is connected, but its client has declared tool activity only/);
     current = connectionStatus(true);
     current.readiness.continuation_readiness = "polling";
     current.thread_observability_bridge.negotiated_level = "continuation_ready";
     fireEvent.focus(window);
-    await waitFor(() => expect(screen.queryByText(/The connection is visible, but this exact task's continuation is unavailable/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryAllByText(/This task is connected, but its client has declared tool activity only/)).toHaveLength(0));
     expect(screen.getByText(/Connection checked. Review the exact-task binding below/)).toBeInTheDocument();
     current = connectionStatus(true);
     fireEvent.focus(window);
-    await screen.findByText(/The connection is visible, but this exact task's continuation is unavailable/);
+    await screen.findAllByText(/This task is connected, but its client has declared tool activity only/);
     expect(screen.queryByText(/Connection checked. Review the exact-task binding below/)).not.toBeInTheDocument();
     expect(startMcpTunnel).toHaveBeenCalledTimes(1);
   });
@@ -737,7 +865,29 @@ describe("AgentConnectionSetup", () => {
     expect(
       await screen.findByText("Sanitized onboarding diagnostics copied."),
     ).toBeInTheDocument();
-  });
+    writeText.mockRejectedValueOnce(new Error("private clipboard diagnostic"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
+    const fallback = await screen.findByRole("textbox", { name: "Sanitized onboarding diagnostics" });
+    expect(fallback).toHaveAttribute("readonly");
+    const fallbackText = (fallback as HTMLTextAreaElement).value;
+    expect(JSON.parse(fallbackText)).toMatchObject({ credential_included: false, native_tunnel: { ready: true } });
+    expect(fallbackText).not.toMatch(/profile-ref|mcp-client-ref|thread-ref|private clipboard diagnostic/);
+    fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
+    await screen.findByText("Sanitized onboarding diagnostics copied.");
+    expect(screen.queryByRole("textbox", { name: "Sanitized onboarding diagnostics" })).not.toBeInTheDocument();
+    let finishLateRead!: (value: typeof fullTunnelState) => void;
+    vi.mocked(window.casimirDesktop!.getMcpTunnelState!).mockImplementationOnce(
+      () => new Promise(resolve => { finishLateRead = resolve; }),
+    );
+    const writesBeforeTimeout = writeText.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
+    await screen.findByText("Diagnostics could not be collected. Native transport state remains unverified.", {}, { timeout: 6500 });
+    expect(writeText).toHaveBeenCalledTimes(writesBeforeTimeout);
+    fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
+    await screen.findByText("Sanitized onboarding diagnostics copied.");
+    await act(async () => { finishLateRead(fullTunnelState); });
+    expect(writeText).toHaveBeenCalledTimes(writesBeforeTimeout + 1);
+  }, 10_000);
 
   it("guides Codex setup without treating the optional plugin as connection proof", async () => {
     const openCodexPlugin = vi.fn(async () => undefined);
@@ -956,6 +1106,35 @@ describe("AgentConnectionSetup", () => {
     ));
     expect(fetchMock.mock.calls.every(([, init]: any[]) => !init?.method || init.method === "GET")).toBe(true);
     expect(screen.queryByText(/Catalog probe: current/)).not.toBeInTheDocument();
+  });
+
+  it("shows accepted durable polling without claiming public checkpoint or automatic delivery support", async () => {
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, JSON.stringify({
+      schema: AGENT_CONNECTION_SETUP_STORAGE_KEY, selected_profile: "codex_app", viewed_step: "ready",
+    }));
+    useAgiChatStore.setState({ activeId: "helix-chat-test" });
+    const binding = { reasoning_binding_id: "reasoning_binding:durable-polling", pairing_id: "pairing:approved",
+      helix_conversation_id: "helix-chat-test", status: "active", continuation_transport: "polling",
+      binding_epoch: 2, service_instance_ref: "service-ref", expires_at: new Date(Date.now() + 3600000).toISOString() };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT)) return response(connectionStatus(true));
+      if (url.includes("reasoning-bindings/")) return response({ binding });
+      return response({}, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentConnectionSetup />);
+    expect(await screen.findByText(/The approved task can pick up queued steering/)).toHaveTextContent("does not wake an idle task or enable automatic delivery");
+    expect(screen.getByText(/Thread visibility:/)).toHaveTextContent("tool activity only");
+    expect(screen.getByText(/Thread visibility:/)).toHaveTextContent("not requested");
+    expect(screen.queryByText(/Repeating the same presence refresh cannot enable steering/)).not.toBeInTheDocument();
+    expect(screen.getByText(/AI availability:/)).toHaveTextContent("polling pickup still requires the AI task to run");
+    const readsBeforeRecheck = fetchMock.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Recheck connection" }));
+    await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(readsBeforeRecheck));
+    expect(screen.queryByText(/Repeating the same presence refresh cannot enable steering/)).not.toBeInTheDocument();
+    expect(screen.getByText("Bind the current Helix chat to this exact AI task").closest("[data-helix-guidance-target]"))
+      .not.toHaveAttribute("data-helix-guidance-integration-blocked", "true");
+    expect(fetchMock.mock.calls.every(([, init]: any[]) => !init?.method || init.method === "GET")).toBe(true);
   });
 
   it("rehydrates the current exact reasoning binding after readiness reload", async () => {
@@ -1410,7 +1589,7 @@ describe("AgentConnectionSetup", () => {
       expect.objectContaining({
         method: "PUT",
         credentials: "same-origin",
-        body: JSON.stringify({ trusted: true }),
+        body: JSON.stringify({ trusted: true, expected_policy_revision: 0 }),
       }),
     );
     expect(
@@ -1418,6 +1597,103 @@ describe("AgentConnectionSetup", () => {
         /never grants in-environment Minecraft actions, trading, answer, or terminal authority/i,
       ),
     ).toBeInTheDocument();
+  });
+
+  it.each(["response", "body", "rejection"] as const)("O4 recovers an unavailable initial trust %s by reading without submitting consent", async (failure) => {
+    vi.useFakeTimers();
+    const startMcpTunnel = vi.fn();
+    window.casimirDesktop = Object.freeze({ getRuntimeSnapshot: vi.fn(async () => null), startMcpTunnel });
+    let releaseLate: () => void = () => {};
+    let reads = 0;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url !== FULL_HARNESS_TRUST_ENDPOINT) return response(connectionStatus(false));
+      expect(init?.method ?? "GET").toBe("GET");
+      if (++reads !== 1) return response({ trust: fullHarnessTrust(false) });
+      if (failure === "rejection") throw new Error("private-transport-detail");
+      if (failure === "response") return new Promise<Response>(resolve => {
+        releaseLate = () => resolve(response({ trust: fullHarnessTrust(true) }));
+      });
+      return { ok: true, json: () => new Promise(resolve => {
+        releaseLate = () => resolve({ trust: fullHarnessTrust(true) });
+      }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => { render(<AgentConnectionSetup />); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_100); });
+    expect(screen.getByText(/could not read this device's current trust status/i)).toBeInTheDocument();
+    expect(screen.queryByText("private-transport-detail")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trust this device for Full Harness" })).toBeDisabled();
+    const recheck = screen.getByRole("button", { name: "Recheck device trust" });
+    expect(recheck).toBeEnabled();
+    await act(async () => { fireEvent.click(recheck); });
+    expect(screen.getByRole("button", { name: "Trust this device for Full Harness" })).toBeEnabled();
+    expect(screen.queryByText(/could not read this device's current trust status/i)).not.toBeInTheDocument();
+    await act(async () => { releaseLate(); });
+    expect(screen.queryByRole("button", { name: "Remove Full Harness device trust" })).not.toBeInTheDocument();
+    expect(reads).toBe(2);
+    expect(startMcpTunnel).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
+  });
+
+  it.each(["response", "body"] as const)("O4 reconciles a hung trust save %s without replay or stale completion", async (failure) => {
+    vi.useFakeTimers();
+    const startMcpTunnel = vi.fn();
+    window.casimirDesktop = Object.freeze({ getRuntimeSnapshot: vi.fn(async () => null), startMcpTunnel });
+    let releaseLate: () => void = () => {};
+    let reads = 0;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url !== FULL_HARNESS_TRUST_ENDPOINT) return response(connectionStatus(false));
+      if (init?.method !== "PUT") return response({ trust: {
+        ...fullHarnessTrust(false), policy_revision: ++reads === 1 ? 0 : 2,
+      } });
+      if (failure === "response") return new Promise<Response>(resolve => {
+        releaseLate = () => resolve(response({ trust: fullHarnessTrust(true) }));
+      });
+      return { ok: true, json: () => new Promise(resolve => {
+        releaseLate = () => resolve({ trust: fullHarnessTrust(true) });
+      }) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await act(async () => { render(<AgentConnectionSetup />); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Trust this device for Full Harness" })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_100); });
+    expect(screen.queryByRole("button", { name: "Saving device trust…" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trust this device for Full Harness" })).toBeDisabled();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Recheck device trust" })); });
+    expect(screen.getByRole("button", { name: "Trust this device for Full Harness" })).toBeEnabled();
+    await act(async () => { releaseLate(); });
+    expect(screen.queryByRole("button", { name: "Remove Full Harness device trust" })).not.toBeInTheDocument();
+    expect(reads).toBe(2);
+    const writes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT");
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(String(writes[0][1]?.body))).toEqual({ trusted: true, expected_policy_revision: 0 });
+    expect(startMcpTunnel).not.toHaveBeenCalled();
+  });
+
+  it("O4 directs a signed-in unregistered device to security without repeating consent", async () => {
+    window.casimirDesktop = Object.freeze({ getRuntimeSnapshot: vi.fn(async () => null) });
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => Promise.resolve(
+      url !== FULL_HARNESS_TRUST_ENDPOINT ? response(connectionStatus(false))
+        : init?.method === "PUT" ? response({ error: "device_not_registered", message: "private-server-detail" }, 404)
+          : response({ trust: fullHarnessTrust(false) }),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AgentConnectionSetup />);
+    const button = await screen.findByRole("button", { name: "Trust this device for Full Harness" });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByText(/this device is not registered or is no longer active/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Sign in with a developer account and verify/)).not.toBeInTheDocument();
+    expect(screen.queryByText("private-server-detail")).not.toBeInTheDocument();
+    const guidance = vi.fn();
+    window.addEventListener(HELIX_WORKSTATION_GUIDANCE_EVENT, guidance);
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Open Connections, Billing & Security" }));
+      expect(guidance).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.objectContaining({
+        panelId: "connections-billing-security", kind: "user_attention",
+      }) }));
+      expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(1);
+    } finally { window.removeEventListener(HELIX_WORKSTATION_GUIDANCE_EVENT, guidance); }
   });
 
   it("resumes one pending Start Harness attempt after device trust is granted", async () => {

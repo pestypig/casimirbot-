@@ -278,4 +278,32 @@ describe("native desktop MCP tunnel transition executor", () => {
     });
     expect(port.start).not.toHaveBeenCalled();
   });
+
+  it("recovers after unavailable account resolution without starting duplicate or full-scope transport", async () => {
+    const port = controller();
+    await port.stop();
+    port.stop.mockClear();
+    const unavailable = await autoStartConfiguredDesktopMcpTunnelReadOnly({
+      controller: port,
+      resolveAccount: async () => { throw new Error("fixture-private-account-error"); },
+    });
+    expect(unavailable).toEqual({ attempted: false, ready: false, reason: "account_unavailable" });
+    expect(port.start).not.toHaveBeenCalled();
+    expect(port.stop).not.toHaveBeenCalled();
+    expect(port.getState().configured).toBe(true);
+    const resolveAccount = vi.fn(async () => ({
+      sessionId: "account_session:recovered-fixture",
+      accountType: "developer" as const,
+    }));
+    expect(await autoStartConfiguredDesktopMcpTunnelReadOnly({ controller: port, resolveAccount }))
+      .toEqual({ attempted: true, ready: true, reason: "ready" });
+    expect(await autoStartConfiguredDesktopMcpTunnelReadOnly({ controller: port, resolveAccount }))
+      .toEqual({ attempted: false, ready: true, reason: "already_running" });
+    expect(resolveAccount).toHaveBeenCalledOnce();
+    expect(port.start).toHaveBeenCalledOnce();
+    expect(port.start).toHaveBeenCalledWith(
+      "account_session:recovered-fixture", "local_supervisor_coordination_and_device_check",
+    );
+    expect(port.stop).not.toHaveBeenCalled();
+  });
 });

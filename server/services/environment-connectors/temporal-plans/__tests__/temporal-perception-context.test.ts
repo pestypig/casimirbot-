@@ -5,6 +5,7 @@ import * as probe from "../../probe/durable-broker";
 import * as database from "../../../helix-ask/realtime-room/room-store/database";
 import { resolveTemporalPerceptionContext } from "../temporal-perception-context";
 import * as actions from "../../actions/action-broker";
+import { performance } from "node:perf_hooks";
 
 const catalogFor = (identity: {
   action_authority_id: string; authority_policy_version: number; room_id: string;
@@ -73,8 +74,10 @@ it("executes the source join and rejects revoked, expired and cross-bound record
   } finally { await pool.end(); }
 });
 
-it.each(["current", "goal_denied", "source_absent", "evidence_absent", "wrong_snapshot", "action_epoch_changed", "catalog_truncated", "wrong_player"])(
+it.each(["current", "goal_denied", "source_absent", "evidence_absent", "evidence_expired", "wrong_snapshot", "action_epoch_changed", "catalog_truncated", "wrong_player"])(
   "joins exact goal and perception without substituting producer planes (%s)", async (scenario) => {
+    let clock = 100;
+    if (scenario === "evidence_expired") vi.spyOn(performance, "now").mockImplementation(() => (clock += 10));
     const identity = { environment_binding_id: "environment:test", room_id: "room:test",
       source_id: "source:test", world_id: "world:test", room_source_binding_id: "binding:source",
       subject_binding_id: "binding:player", subject_native_id: "player:test", producer_epoch_ref: "epoch:action",
@@ -93,6 +96,10 @@ it.each(["current", "goal_denied", "source_absent", "evidence_absent", "wrong_sn
       scenario === "evidence_absent" ? null : { observation: { result: {
         snapshot_schema: scenario === "wrong_snapshot" ? "wrong" : "helix.minecraft_perception_snapshot.v1",
       } } } as unknown as Awaited<ReturnType<typeof probe.readDurableEnvironmentProbeContinuationEvidence>>);
+    if (scenario === "evidence_expired") read.mockImplementation(async input => {
+      input.onExpired?.({ evidence_age_ms: 5001, max_age_ms: 5000 });
+      return null;
+    });
     const result = resolveTemporalPerceptionContext({ goalId: "goal:test", profileId: "profile:test",
       participantId: "participant:test", expectedRevision: 1, roomId: "room:test", runId: "run:test",
       turnId: "turn:new", priorTurnId: "turn:prior", probeRequestId: "probe:test" });
@@ -103,6 +110,12 @@ it.each(["current", "goal_denied", "source_absent", "evidence_absent", "wrong_sn
         expectedEnvironmentIdentity: { environmentBindingId: "environment:test", sourceId: "source:test",
           worldId: "world:test", subjectBindingId: "binding:player", subjectNativeId: "player:test",
           observationProducerEpochRef: "epoch:observation" } }));
+    } else if (scenario === "evidence_expired") {
+      await expect(result).rejects.toMatchObject({ code: "durable_goal_evidence_stale",
+        evidenceExpiry: { evidence_age_ms: 5001, max_age_ms: 5000,
+          context_stage_ms: { goal: 10, catalog: 10, perception: 10 } } });
+    } else if (["evidence_absent", "wrong_snapshot"].includes(scenario)) {
+      await expect(result).rejects.toMatchObject({ code: "durable_goal_evidence_identity_mismatch" });
     } else await expect(result).rejects.toThrow();
     if (scenario === "goal_denied") expect(query).not.toHaveBeenCalled();
     if (scenario === "goal_denied" || scenario === "source_absent") expect(read).not.toHaveBeenCalled();

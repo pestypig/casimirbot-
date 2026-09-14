@@ -1,0 +1,203 @@
+{
+  "scope": "Measured fixture process intervals; simulated environment ticks; not live capacity",
+  "identity": {
+    "run_id": "run",
+    "resident_action_request_id": "root",
+    "successor_action_request_id": "child",
+    "producer_epoch_ref": "fixture:producer_epoch"
+  },
+  "server_clock": "process.hrtime fixture-relative milliseconds",
+  "serverTiming": {
+    "root_admission_start_ms": 11.7494,
+    "root_admission_end_ms": 126.7705,
+    "root_lease_start_ms": 130.5237,
+    "root_lease_end_ms": 172.9498,
+    "successor_poll_received_ms": 24448.9412,
+    "successor_evidence_read_ms": 24451.8949,
+    "successor_admission_start_ms": 24473.7116,
+    "successor_admission_end_ms": 24609.0781,
+    "successor_lease_start_ms": 24609.1025,
+    "successor_lease_end_ms": 24668.2514
+  },
+  "production_admission_diagnostics": [
+    {
+      "action_request_id": "root",
+      "run_id": "run",
+      "plan_id": "plan:0",
+      "producer_epoch_ref": "fixture:producer_epoch",
+      "reasoning_binding_id": "fixture:binding",
+      "reasoning_binding_epoch": 1,
+      "checkpoint_id": null,
+      "clock_origin": "frontier_publication_clock:973dcef5-17b8-42c6-acef-52d3d7d6c7e9",
+      "proposal_received_ms": 3915,
+      "transaction_returned_ms": 4029,
+      "frontier_id": "fixture:root-frontier",
+      "frontier_publication_to_proposal_receipt_ms": 13,
+      "reason_code": "same_process_publication_interval",
+      "provider_sampling_latency_ms": null,
+      "execution_authority": false,
+      "live_acceptance": false,
+      "proposal_receipt_to_transaction_return_ms": 114,
+      "required_snapshot_proven": false
+    },
+    {
+      "action_request_id": "child",
+      "run_id": "run",
+      "plan_id": "plan:1",
+      "producer_epoch_ref": "fixture:producer_epoch",
+      "reasoning_binding_id": "fixture:binding",
+      "reasoning_binding_epoch": 1,
+      "checkpoint_id": "checkpoint:compiled-walk",
+      "clock_origin": "frontier_publication_clock:973dcef5-17b8-42c6-acef-52d3d7d6c7e9",
+      "proposal_received_ms": 28376,
+      "transaction_returned_ms": 28511,
+      "frontier_id": "environment_frontier:e156a7ca-ead6-492e-a3df-166ef40d0456",
+      "frontier_publication_to_proposal_receipt_ms": 21,
+      "reason_code": "same_process_publication_interval",
+      "provider_sampling_latency_ms": null,
+      "execution_authority": false,
+      "live_acceptance": false,
+      "proposal_receipt_to_transaction_return_ms": 135,
+      "required_snapshot_proven": false
+    }
+  ],
+  "production_delivery_diagnostics": [
+    {
+      "reasoning_binding_id": "fixture:binding",
+      "reasoning_binding_epoch": 1,
+      "action_request_id": "child",
+      "resident_action_request_id": "root",
+      "run_id": "run",
+      "plan_id": "plan:1",
+      "producer_epoch_ref": "fixture:producer_epoch",
+      "checkpoint_id": "checkpoint:compiled-walk",
+      "clock_origin": "frontier_publication_clock:973dcef5-17b8-42c6-acef-52d3d7d6c7e9",
+      "poll_received_ms": 28512,
+      "lease_sql_finished_ms": 28568,
+      "transaction_returned_ms": 28570,
+      "poll_to_transaction_return_ms": 58,
+      "lease_sql_to_transaction_return_ms": 2,
+      "configured_persistence_barrier_completed": true,
+      "native_pickup_proven": false,
+      "execution_authority": false,
+      "live_acceptance": false
+    }
+  ],
+  "enclosing_budget": {
+    "source": "simulated",
+    "enclosing_interval_verified": true,
+    "stage_breakdown_complete": false,
+    "server_phase_partition_complete": true,
+    "server_phase_durations_ms": {
+      "frontier_response_preparation": 21,
+      "response_ready_to_proposal_receipt": 0,
+      "proposal_receipt_to_admission_return": 135,
+      "admission_return_to_delivery_poll": 1,
+      "delivery_poll_to_lease_sql": 56,
+      "lease_sql_to_commit_and_persistence_return": 2
+    },
+    "frontier_response_correlated": true,
+    "delivery_server_return_request_relative": {
+      "available": true,
+      "reason": "bounded_request_relative_mark",
+      "lower_ms": 57,
+      "upper_ms": 236
+    },
+    "frontier_response_preparation_ms": 21,
+    "response_ready_to_proposal_receipt_ms": 0,
+    "native_phase_coverage_complete": true,
+    "native_transport_coverage_complete": true,
+    "native_transport_phases_ms": {
+      "fence_observed_to_poll": 1,
+      "http_roundtrip": 236,
+      "response_to_acceptance": 17
+    },
+    "native_phases_ms": {
+      "checkpoint_to_evidence_fence_observed": 483,
+      "evidence_fence_observed_to_acceptance": 253
+    },
+    "total_budget_ms": 746,
+    "server_nested_duration_ms": 215,
+    "margin_ms": 241,
+    "fits": true,
+    "reasons": [],
+    "execution_authority": false,
+    "live_acceptance": false
+  },
+  "server_phase_durations_ms": {
+    "poll_to_evidence_read": 2.953699999998207,
+    "fixture_frontier_preparation": 21.8166999999994,
+    "admission": 135.3665000000001,
+    "admitted_to_lease_start": 0.02440000000206055,
+    "lease_including_required_snapshot_when_enabled": 59.14890000000014
+  },
+  "timing_coverage": {
+    "frontier_response_diagnostics": [
+      {
+        "frontier_id": "environment_frontier:e156a7ca-ead6-492e-a3df-166ef40d0456",
+        "run_id": "run",
+        "goal_id": "goal",
+        "goal_revision": 1,
+        "producer_epoch_ref": "fixture:producer_epoch",
+        "observation_evidence_ref": "environment_event:5ca63822-2011-4063-9ffe-b729dd111c51",
+        "checkpoint_id": "checkpoint:compiled-walk",
+        "predecessor_plan_id": "plan:0",
+        "clock_origin": "frontier_publication_clock:973dcef5-17b8-42c6-acef-52d3d7d6c7e9",
+        "request_received_ms": 28355,
+        "response_ready_ms": 28376,
+        "provider_receipt_proven": false,
+        "execution_authority": false,
+        "live_acceptance": false
+      }
+    ],
+    "required_snapshot_enabled": false,
+    "provider_proposal": "not measured; precompiled fixture is not a provider proposal",
+    "snapshot_separate_duration": null,
+    "cross_process_clock_mapping": null,
+    "complete_five_stage_budget": false
+  },
+  "native_clock": "separate JVM monotonic origin; do not subtract from server timestamps",
+  "nativeTiming": {
+    "acceptance_to_activation_ms": 17,
+    "checkpoint_id": "checkpoint:compiled-walk",
+    "checkpoint_to_activation_ms": 752,
+    "clock_domain": "native_process_monotonic",
+    "execution_authority": false,
+    "live_acceptance": false,
+    "predecessor_plan_hash": "sha256:192c02b8d05966661f4d91a971b894ca8edc6902d922303d875bc8c1e7188aa7",
+    "predecessor_plan_id": "plan:0",
+    "producer_epoch_ref": "fixture:producer_epoch",
+    "resident_action_request_id": "root",
+    "run_id": "run",
+    "successor_action_request_id": "child",
+    "successor_plan_id": "plan:1"
+  },
+  "nativeAcceptance": {
+    "accepted_client_tick": 14,
+    "accepted_monotonic_elapsed_ms": 745,
+    "checkpoint_id": "checkpoint:compiled-walk",
+    "checkpoint_to_acceptance_ms": 736,
+    "checkpoint_to_evidence_fence_observed_ms": 483,
+    "clock_domain": "native_process_monotonic",
+    "committed_client_tick": 21,
+    "delivery_http_roundtrip_ms": 236,
+    "delivery_response_to_acceptance_ms": 17,
+    "evidence_fence_observed_to_acceptance_ms": 253,
+    "evidence_fence_observed_to_delivery_poll_ms": 1,
+    "execution_authority": false,
+    "execution_started": false,
+    "lead_ticks": 7,
+    "live_acceptance": false,
+    "predecessor_sequence_id": "plan:0",
+    "producer_epoch_ref": "fixture:producer_epoch",
+    "queue_depth": 1,
+    "resident_action_request_id": "root",
+    "run_id": "run",
+    "sequence_id": "plan:1",
+    "stop_client_tick": 20,
+    "successor_action_request_id": "child",
+    "terminal_eligible": false
+  },
+  "live_window_budget_ms": null,
+  "live_acceptance": false
+}

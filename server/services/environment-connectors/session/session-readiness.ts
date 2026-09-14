@@ -9,6 +9,7 @@ import { readEnvironmentActionAuthorities, readEnvironmentActionConnectorReadine
 import { environmentDurableGoalStore, isEnvironmentDurableGoalError } from "../goals/durable-goal-store";
 import { readBoundSessionEvidence, type BoundSessionEvidenceInput } from "./bound-session-evidence";
 import { listEnvironmentConnectorDeviceChecks } from "../devices/device-check";
+import { TEMPORAL_OBSERVATION_MAX_AGE_MS } from "../temporal-plans/temporal-observation-window";
 
 /** Server-owned readers only; not an RPC-supplied evidence bag. */
 const readers = {
@@ -169,7 +170,14 @@ export async function readEnvironmentSessionReadiness(
   } catch (error) { failure("goal", error); }
   try {
     const evidence = await dependencies.perception(input, bindingStore);
-    add("perception", "verified", evidence.context.evidence.observation.evidence_ref);
+    const observation = evidence.context.evidence.observation;
+    const observedAt = Date.parse(observation.observed_at);
+    if (!Number.isFinite(observedAt) || observedAt > Date.now()) {
+      add("perception", "blocked", observation.evidence_ref, ["session_perception_clock_invalid"]);
+    } else {
+      // Collection does not create a new observation or extend its lifetime.
+      add("perception", "verified", observation.evidence_ref, [], observedAt + TEMPORAL_OBSERVATION_MAX_AGE_MS);
+    }
   } catch (error) { failure("perception", error); }
   // Do not publish an authenticated snapshot after its binding was revoked.
   await bindingStore.verifyTaskAssociation(input.binding);

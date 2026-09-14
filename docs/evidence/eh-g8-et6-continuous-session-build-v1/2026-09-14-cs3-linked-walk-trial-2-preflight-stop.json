@@ -1,0 +1,1176 @@
+{
+  "schema": "casimirbot.cs3_linked_trial_preflight_stop.v1",
+  "recorded_at": "2026-09-14T17:18:04.698Z",
+  "trial": "cs3-linked-walk-20260914-02",
+  "reason": "Fresh southward candidate has blocked feet/head clearance",
+  "actions_submitted": 0,
+  "successors_submitted": 0,
+  "source_observation": {
+    "schema": "helix.environment_connector.probe_observation.v1",
+    "probe_request_ref": "environment_probe_request:6202e621-9b45-430b-b172-e81e94e498ef",
+    "probe_attempt_ref": "environment_probe_attempt:a7501e0f-72ea-41fe-9423-176509fedfa0",
+    "capability_id": "com.casimirbot.minecraft.perception_snapshot.read",
+    "capability_version": 2,
+    "outcome": "succeeded",
+    "summary": "Bounded same-revision Minecraft perception snapshot completed.",
+    "result": {
+      "result_summary": "Bounded same-revision Minecraft perception snapshot completed.",
+      "entities": [],
+      "snapshot_schema": "helix.minecraft_perception_snapshot.v1",
+      "observation_revision": 14698962,
+      "game_tick": 14698962,
+      "capture_duration_ms": 1.77,
+      "dimension": "minecraft:overworld",
+      "actor": {
+        "air": 300,
+        "food_level": 20,
+        "freezing": false,
+        "health": 20,
+        "max_health": 20,
+        "on_fire": false,
+        "on_ground": true,
+        "pitch": 0,
+        "position": {
+          "x": -2.1,
+          "y": 65,
+          "z": 7.7
+        },
+        "velocity": {
+          "x": 0,
+          "y": -0.08,
+          "z": 0
+        },
+        "yaw": 0
+      },
+      "focus": {
+        "aim_position": {
+          "x": -2.5,
+          "y": 66.5,
+          "z": 8.5
+        },
+        "block_id": "minecraft:smooth_stone",
+        "distance_blocks": 0.3,
+        "kind": "block",
+        "line_of_sight": true,
+        "occlusion": "none",
+        "position": {
+          "x": -3,
+          "y": 66,
+          "z": 8
+        }
+      },
+      "projectiles": [],
+      "hazards": [],
+      "movement_candidates": [
+        {
+          "cardinal_direction": "south",
+          "drop_depth_blocks": 0,
+          "drop_scan_complete": true,
+          "evidence_complete": true,
+          "feet_clear": false,
+          "head_clear": false,
+          "nearby_fluid_count": 0,
+          "nearby_hazard_count": 0,
+          "relative_direction": "forward",
+          "safe_candidate": false,
+          "support_block": "minecraft:smooth_stone",
+          "support_position": {
+            "x": -3,
+            "y": 64,
+            "z": 8
+          },
+          "target_feet_position": {
+            "x": -3,
+            "y": 65,
+            "z": 8
+          }
+        },
+        {
+          "cardinal_direction": "west",
+          "drop_depth_blocks": 0,
+          "drop_scan_complete": true,
+          "evidence_complete": true,
+          "feet_clear": true,
+          "head_clear": true,
+          "nearby_fluid_count": 0,
+          "nearby_hazard_count": 0,
+          "relative_direction": "right",
+          "safe_candidate": true,
+          "support_block": "minecraft:smooth_stone",
+          "support_position": {
+            "x": -4,
+            "y": 64,
+            "z": 7
+          },
+          "target_feet_position": {
+            "x": -4,
+            "y": 65,
+            "z": 7
+          }
+        },
+        {
+          "cardinal_direction": "north",
+          "drop_depth_blocks": 0,
+          "drop_scan_complete": true,
+          "evidence_complete": true,
+          "feet_clear": true,
+          "head_clear": true,
+          "nearby_fluid_count": 0,
+          "nearby_hazard_count": 0,
+          "relative_direction": "back",
+          "safe_candidate": true,
+          "support_block": "minecraft:smooth_stone",
+          "support_position": {
+            "x": -3,
+            "y": 64,
+            "z": 6
+          },
+          "target_feet_position": {
+            "x": -3,
+            "y": 65,
+            "z": 6
+          }
+        },
+        {
+          "cardinal_direction": "east",
+          "drop_depth_blocks": 0,
+          "drop_scan_complete": true,
+          "evidence_complete": true,
+          "feet_clear": true,
+          "head_clear": true,
+          "nearby_fluid_count": 0,
+          "nearby_hazard_count": 0,
+          "relative_direction": "left",
+          "safe_candidate": true,
+          "support_block": "minecraft:smooth_stone",
+          "support_position": {
+            "x": -2,
+            "y": 64,
+            "z": 7
+          },
+          "target_feet_position": {
+            "x": -2,
+            "y": 65,
+            "z": 7
+          }
+        }
+      ],
+      "navigation_frontier": {
+        "coverage_boundary_reached": true,
+        "evidence_complete": true,
+        "frontier_schema": "helix.minecraft_navigation_frontier.v1",
+        "horizontal_radius": 7,
+        "movement_model": [
+          "walk",
+          "diagonal",
+          "ascend",
+          "descend"
+        ],
+        "origin": {
+          "x": -3,
+          "y": 65,
+          "z": 7
+        },
+        "planner": "casimirbot_native_bounded_dijkstra",
+        "ranked_frontiers": [
+          {
+            "cost": 104,
+            "coverage_boundary": true,
+            "destination": {
+              "x": 4,
+              "y": 65,
+              "z": 0
+            },
+            "displacement_blocks": 9.9,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 1
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 1
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 4,
+                  "y": 65,
+                  "z": 0
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 94,
+            "coverage_boundary": true,
+            "destination": {
+              "x": 3,
+              "y": 65,
+              "z": 0
+            },
+            "displacement_blocks": 9.22,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 1
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 1
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 0
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 100,
+            "coverage_boundary": true,
+            "destination": {
+              "x": 4,
+              "y": 65,
+              "z": 1
+            },
+            "displacement_blocks": 9.22,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 4,
+                  "y": 65,
+                  "z": 1
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 90,
+            "coverage_boundary": true,
+            "destination": {
+              "x": -8,
+              "y": 65,
+              "z": 0
+            },
+            "displacement_blocks": 8.6,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -4,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -4,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -5,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -5,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -6,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -6,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -7,
+                  "y": 65,
+                  "z": 1
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -7,
+                  "y": 65,
+                  "z": 1
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -8,
+                  "y": 65,
+                  "z": 0
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 90,
+            "coverage_boundary": true,
+            "destination": {
+              "x": 2,
+              "y": 65,
+              "z": 0
+            },
+            "displacement_blocks": 8.6,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 1
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 1
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 0
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 96,
+            "coverage_boundary": true,
+            "destination": {
+              "x": 4,
+              "y": 65,
+              "z": 2
+            },
+            "displacement_blocks": 8.6,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 4,
+                  "y": 65,
+                  "z": 2
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 90,
+            "coverage_boundary": false,
+            "destination": {
+              "x": 3,
+              "y": 65,
+              "z": 1
+            },
+            "displacement_blocks": 8.49,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -2,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -1,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": 0,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "walk",
+                "to": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 1,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": 2,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": 3,
+                  "y": 65,
+                  "z": 1
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          },
+          {
+            "cost": 86,
+            "coverage_boundary": true,
+            "destination": {
+              "x": -7,
+              "y": 65,
+              "z": 0
+            },
+            "displacement_blocks": 8.06,
+            "steps": [
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 7
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 6
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 5
+                }
+              },
+              {
+                "cost": 10,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 5
+                },
+                "movement": "walk",
+                "to": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 4
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -3,
+                  "y": 65,
+                  "z": 4
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -4,
+                  "y": 65,
+                  "z": 3
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -4,
+                  "y": 65,
+                  "z": 3
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -5,
+                  "y": 65,
+                  "z": 2
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -5,
+                  "y": 65,
+                  "z": 2
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -6,
+                  "y": 65,
+                  "z": 1
+                }
+              },
+              {
+                "cost": 14,
+                "from": {
+                  "x": -6,
+                  "y": 65,
+                  "z": 1
+                },
+                "movement": "diagonal",
+                "to": {
+                  "x": -7,
+                  "y": 65,
+                  "z": 0
+                }
+              }
+            ],
+            "vertical_gain_blocks": 0
+          }
+        ],
+        "reachable_foothold_count": 98,
+        "route_step_limit_reached": false,
+        "selection_authority": "runtime_codex",
+        "vertical_radius": 2
+      },
+      "inventory": {
+        "item_count": 3,
+        "slots": [
+          {
+            "count": 1,
+            "item": "minecraft:iron_sword",
+            "slot": 0
+          },
+          {
+            "count": 1,
+            "item": "minecraft:golden_apple",
+            "slot": 1
+          },
+          {
+            "count": 4,
+            "item": "minecraft:rotten_flesh",
+            "slot": 2
+          }
+        ]
+      },
+      "coverage": {
+        "entities_complete": true,
+        "hazards_complete": true,
+        "horizontal_radius": 7,
+        "loaded_region_complete": true,
+        "omitted_categories": [
+          "client_screen",
+          "manual_input_attribution"
+        ],
+        "projectiles_complete": true,
+        "unknown_cell_count": 0,
+        "vertical_radius": 2
+      },
+      "ui_state": {
+        "client_screen_state": "unobserved",
+        "freshness": "unobserved",
+        "input_activity": false,
+        "input_capture_known": false,
+        "same_revision": false,
+        "server_container_open": false
+      },
+      "world_rules": {
+        "keep_inventory": true
+      },
+      "semantic_fingerprint": "sha256:f53d3173812a0f84eed07fac7226c35f7640202eb8294425933f369912a9d43d"
+    },
+    "evidence_ref": "environment_probe_evidence:86eaedbf977164507b67d8b71980abf263fb39b3",
+    "observation_revision": 1789406250231,
+    "observed_at": "2026-09-14T17:17:30.231Z",
+    "freshness_age_ms": 75,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "late_result_disposition": null,
+    "content_role": "environment_probe_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "frontier_id": "environment_frontier:50c80559-a3bb-4772-b4eb-9d2f26de0078",
+  "goal_revision": 22,
+  "trial_parameters_changed": false,
+  "live_acceptance": false
+}

@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS } from
   "@shared/helix-minecraft-player-capabilities";
+import { HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_RECEIPT_SCHEMA } from "@shared/helix-minecraft-local-lifecycle";
 import { SharedLiveRoomPlayerEmbodimentPanel } from
   "../SharedLiveRoomPlayerEmbodimentPanel";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
@@ -146,6 +147,8 @@ describe("Shared Live Room Player Embodiment controls", () => {
   it("runs one explicit finite play activation and waits for exact task acknowledgement", async () => {
     useAgiChatStore.setState({ activeId: "helix-chat:play-ui" });
     let authority: ReturnType<typeof activeAuthority> | null = null;
+    let releaseReadiness!: () => void;
+    const readinessGate = new Promise<void>(resolve => { releaseReadiness = resolve; });
     const requestListener = (event: Event): void => {
       const detail = (event as CustomEvent<HelixBoundAgentSteeringRequest>).detail;
       expect(detail.source).toBe("minecraft_play_activation");
@@ -187,10 +190,17 @@ describe("Shared Live Room Player Embodiment controls", () => {
         );
         return jsonResponse(authorityReceipt(authority));
       }
+      if (url.endsWith("/minecraft/fabric-loopback/selection")) {
+        return jsonResponse({ ok: true, address: "localhost:25565" });
+      }
       if (url.endsWith("/minecraft/fabric-loopback/launch")) {
         return jsonResponse({
           ok: true,
           receipt: {
+            schema: HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_RECEIPT_SCHEMA,
+            status: "connected", profile_id: "fixture:player", profile_version: "1.21.8",
+            isolated_game_directory: true, client_process_id: 1234, play_control_point: "fixture:play",
+            mod_loaded: true, memory_used_percent: 20, credentials_exposed: false,
             server_address: "localhost:25565",
             launcher_action: "launched_client",
             connection_action: "autojoin_staged",
@@ -205,6 +215,10 @@ describe("Shared Live Room Player Embodiment controls", () => {
         });
       }
       if (url.endsWith("/play-readiness")) {
+        // Hold the next observation until the intermediate acknowledgement has
+        // actually rendered; an immediate fixture reply can replace it in the
+        // same React batch and make this lifecycle assertion scheduler-dependent.
+        await readinessGate;
         return jsonResponse({
           schema: "helix.minecraft.play_readiness.v1",
           ok: true,
@@ -256,6 +270,7 @@ describe("Shared Live Room Player Embodiment controls", () => {
 
     expect(await screen.findByText(/acknowledged pickup and is checking/i))
       .toBeTruthy();
+    releaseReadiness();
     expect(await screen.findByText("ready")).toBeTruthy();
     expect(screen.getByText(/Minecraft action permission:.*remaining/)).toBeTruthy();
     const calls = fetchMock.mock.calls.map(([input]) => String(input));
@@ -274,6 +289,7 @@ describe("Shared Live Room Player Embodiment controls", () => {
 
   it("creates a finite exact-capability lease and a separately scoped client pairing", async () => {
     let authority: Record<string, unknown> | null = null;
+    const reviewChanges = vi.fn();
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
         const url = String(input);
@@ -372,6 +388,7 @@ describe("Shared Live Room Player Embodiment controls", () => {
         selfParticipantId={participantId}
         sourceBinding={sourceBinding}
         isOwner
+        onReviewDraftChange={reviewChanges}
       />,
     );
 
@@ -396,6 +413,8 @@ describe("Shared Live Room Player Embodiment controls", () => {
     );
     expect(screen.getByText(/Long-lived player authority remains limited/i))
       .toBeTruthy();
+    expect(reviewChanges).toHaveBeenLastCalledWith({ capabilityIds: [...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS],
+      autonomyMode: "approved_capabilities", manualOverridePolicy: "cancel", leaseMs: 30 * 24 * 60 * 60_000 });
     const save = screen.getByRole("button", { name: "Save player authority" });
     expect(save.hasAttribute("disabled")).toBe(true);
     fireEvent.click(
@@ -404,6 +423,8 @@ describe("Shared Live Room Player Embodiment controls", () => {
       ),
     );
     fireEvent.click(save);
+    await waitFor(() => expect(reviewChanges).toHaveBeenLastCalledWith(null));
+    expect(JSON.stringify(reviewChanges.mock.calls)).not.toMatch(/acknowledged|pairing_code|action_authority_id/);
 
     await waitFor(() => {
       const call = fetchMock.mock.calls.find(

@@ -1,0 +1,25 @@
+{
+  "schema": "casimirbot.onboarding_package_fixture_scan.v1",
+  "observed_at": "2026-09-12T19:11:18.213Z",
+  "exe_sha256": "6eeee7d2ecafb1d991824c703f7f7a01e33ff31d7938ea49de2540f79c1a3688",
+  "scanned_text_files": 826,
+  "fixture_markers": [
+    "fixture-browser-session",
+    "fixture_human_route_required",
+    "fixture_provider_denied",
+    "ephemeralPairingVault",
+    "onboarding-real-handlers-",
+    "STEERING_PROCESS_FIXTURE_KEY",
+    "FIXTURE_RESULT:",
+    "steering_process_fixture_failed"
+  ],
+  "fixture_path_hits": [],
+  "fixture_content_hits": [],
+  "production_positive_controls": {
+    "helix_reasoning_destination_register": true,
+    "helix_reasoning_pairing_accept": true,
+    "helix_reasoning_pairing_recover": true,
+    "steering_revision_invalid": true
+  },
+  "scope": "Known fixture exclusion only; not authentication bypass proof"
+}

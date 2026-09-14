@@ -6,6 +6,7 @@ import {
   type Response,
 } from "express";
 import { z } from "zod";
+import { readProfileOwnedMinecraftLifecycleAddress } from "../services/environment-connectors/pairing/local-minecraft-run-profile-store";
 import {
   helixEnvironmentProbeSubmissionSchema,
 } from "@shared/helix-environment-connector";
@@ -217,9 +218,11 @@ const sendError = (res: Response, error: unknown): void => {
     return;
   }
   if (error instanceof MinecraftLocalLifecycleError) {
+    const code = /^minecraft_[a-z0-9_]{1,100}$/u.test(error.code) ? error.code : "minecraft_local_lifecycle_unavailable";
     res
       .status(error.statusCode)
-      .json(errorPayload({ code: error.code, message: error.message }));
+      .json({ ...errorPayload({ code, message: `Minecraft setup did not complete: ${code}.` }),
+        ...(error.serverObservation ? { server_lifecycle: error.serverObservation } : {}) });
     return;
   }
   if (error instanceof RoomReadGrantStoreError) {
@@ -614,6 +617,28 @@ const isLoopbackRequest = (req: Request): boolean => {
     remote === "::ffff:127.0.0.1";
 };
 
+environmentConnectorBrowserRouter.get(
+  "/environment-connectors/local/minecraft/fabric-loopback/selection",
+  route(async (req, res) => {
+    const account = await resolveWorkstationGatewayAccountContext(readHelixSessionCookie(req.headers.cookie));
+    if (!isLoopbackRequest(req) || !account.trusted_account_session ||
+        account.account_policy.account_type !== "developer" || !account.profile_id) {
+      res.status(403).json(errorPayload({ code: "minecraft_local_lifecycle_account_policy_blocked",
+        message: "A signed-in developer account on the local Helix service is required." }));
+      return;
+    }
+    browserBoundary.enforceAccountRateLimit(res, account.profile_id);
+    const address = await readProfileOwnedMinecraftLifecycleAddress({
+      ownerProfileId: account.profile_id, appDataPath: process.env.APPDATA,
+    });
+    res.status(address ? 200 : 409).json(address ? { ok: true, address,
+      assistant_answer: false, terminal_eligible: false } : errorPayload({
+      code: "minecraft_saved_loopback_selection_required",
+      message: "Select a prepared local server and player profile with a loopback address in desktop setup.",
+    }));
+  }),
+);
+
 environmentConnectorBrowserRouter.post(
   "/environment-connectors/local/minecraft/fabric-loopback/launch",
   route(async (req, res) => {
@@ -665,6 +690,8 @@ environmentConnectorBrowserRouter.post(
     );
     const receipt = await executeMinecraftFabricLoopbackLifecycle({
       request: { address: parsed.data.address },
+      ownerProfileId: accountContext.profile_id!,
+      allowServerStartup: true,
     });
     res.json({
       schema: HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_OBSERVATION_SCHEMA,

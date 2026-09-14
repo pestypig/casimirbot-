@@ -8,6 +8,8 @@ import { startDesktopProviderCredentialBroker } from "../../../apps/desktop/src/
 import { createPairingLedgerRow, pairingApprovalSchema, acceptPairingLedgerRow } from "../../services/local-supervisor/pairing-ledger-contract";
 import { encryptProviderCredential, decryptProviderCredential } from "../../services/brokerage/provider-credential-vault";
 import { PairingDestinationRegistrationStore, PAIRING_DESTINATIONS_TABLE } from "../../services/local-supervisor/pairing-destination-registration";
+import { createNativeDurableSteeringRepository, DURABLE_STEERING_TABLE } from "../../services/local-supervisor/durable-steering-repository";
+import { DurableSteeringService } from "../../services/local-supervisor/durable-steering-service";
 
 vi.mock("../../services/runtime/runtime-memory-governor", () => ({ scheduleRuntimeIdleMemorySettle: () => undefined }));
 
@@ -92,6 +94,23 @@ it("uses the actual desktop broker and restores across database/broker restart a
         environment: null, scope: "exact_chat_steering", policyRevision: 1 }),
     }, new Date("2026-09-08T12:00:00Z"));
     expect(await repository.insert(original)).toBe(true);
+    const eventTime = new Date("2026-09-08T12:00:01Z");
+    const accepted = acceptPairingLedgerRow(original, original.approval.destination, eventTime);
+    expect(await repository.compareAndSwap(accepted, original.revision)).toBe(true);
+    const service = new DurableSteeringService(await createNativeDurableSteeringRepository(), async () => {
+      const row = await repository.read("fixture-native-owner", original.id);
+      if (!row) throw new Error("fixture-grant-missing");
+      return row;
+    }, () => eventTime);
+    const prompt = { clientEventRef: "fixture-native-steering", origin: "typed" as const, instructionText: "Private native snapshot instruction" };
+    const event = await service.submit(prompt);
+    const acknowledged = await service.acknowledge(event.id);
+    const pendingPrompt = { ...prompt, clientEventRef: "fixture-native-pending" };
+    const pending = await service.submit(pendingPrompt);
+    const eventSnapshot = JSON.parse(readFileSync(snapshotPath, "utf8")).tables[DURABLE_STEERING_TABLE];
+    expect(eventSnapshot).toHaveLength(2);
+    expect(eventSnapshot[0].encrypted_payload).toMatch(/^v2:/u);
+    expect(JSON.stringify(eventSnapshot)).not.toContain(prompt.instructionText);
     const stored = JSON.parse(readFileSync(snapshotPath, "utf8")).tables[PAIRING_LEDGER_TABLE][0];
     expect(stored.encrypted_payload).toMatch(/^v2:/u);
     expect(stored.encryption_key_id).toMatch(/^native:/u);
@@ -102,14 +121,30 @@ it("uses the actual desktop broker and restores across database/broker restart a
     broker = await startDesktopProviderCredentialBroker({ keyring: { activeKey: nextKey, retiredKeys: [firstKey] } });
     configureBroker();
     repository = await createNativePairingLedgerRepository();
-    expect(await repository.read("fixture-native-owner", original.id)).toEqual(original);
+    expect(await repository.read("fixture-native-owner", original.id)).toEqual(accepted);
+    const restoredSteering = await createNativeDurableSteeringRepository();
+    const restoredService = new DurableSteeringService(restoredSteering, async () => {
+      const row = await repository.read("fixture-native-owner", original.id);
+      if (!row) throw new Error("fixture-grant-missing");
+      return row;
+    }, () => eventTime);
+    expect(await restoredService.list()).toEqual([acknowledged, pending]);
+    expect(await restoredService.submit(pendingPrompt)).toEqual(pending);
+    expect(await restoredService.submit(prompt)).toEqual(acknowledged);
+    expect(await restoredService.acknowledge(event.id)).toEqual(acknowledged);
+    expect((await db.getPool().query("SELECT * FROM helix_durable_steering")).rows).toHaveLength(2);
     // Missing retired key must fail decryption; it cannot manufacture a new grant.
     await broker.close();
     broker = await startDesktopProviderCredentialBroker({ keyring: { activeKey: nextKey, retiredKeys: [] } });
     configureBroker();
-    await expect(repository.read("fixture-native-owner", original.id)).rejects.toThrow();
+    await expect(repository.read("fixture-native-owner", original.id)).rejects.toMatchObject({
+      code: "pairing_storage_unreadable", status: 503, message: "pairing_storage_unreadable",
+    });
+    await expect(restoredSteering.read("fixture-native-owner", original.id, event.id)).rejects.toThrow("pairing_storage_unreadable");
     vi.stubEnv("HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN", randomBytes(32).toString("base64url"));
-    await expect(repository.read("fixture-native-owner", original.id)).rejects.toThrow();
+    await expect(repository.read("fixture-native-owner", original.id)).rejects.toMatchObject({
+      code: "pairing_storage_unreadable", status: 503, message: "pairing_storage_unreadable",
+    });
     expect((await db.getPool().query("SELECT * FROM helix_pairing_ledger")).rows).toHaveLength(1);
   } finally {
     await db.resetDbClient();

@@ -1,0 +1,24 @@
+{
+  "schema": "casimirbot.trust_read_renderer_evidence.v1",
+  "observed_at": "2026-09-13T21:40:09.817Z",
+  "artifact_root": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-trust-read-recovery-20260913\\win-unpacked\\resources\\runtime\\dist\\public",
+  "manifest_encoding": "JSON sorted [relative POSIX path, SHA256] pairs",
+  "files": 635,
+  "renderer_manifest_sha256": "f0b1f99d53350c8b6575f446d312b24ad1244b1c9f0d8f49ce4bb193f1eac58d",
+  "production_control_assets": [
+    {
+      "path": "assets/AgentConnectionSetup-DYpEgjk0.js",
+      "sha256": "8a8b4c1de93bec9792b17b0f3f959557de8991ac0e4cf59f73bd6eae26ad91b6"
+    }
+  ],
+  "fixture_markers": [
+    "fixture-private-read-failure",
+    "private-transport-detail",
+    "fixture-browser-session",
+    "fixture_human_route_required",
+    "ephemeralPairingVault",
+    "onboarding-real-handlers-"
+  ],
+  "fixture_content_hits": [],
+  "scope": "Candidate renderer identity and known fixture-marker exclusion only; not native launch or live consent acceptance"
+}

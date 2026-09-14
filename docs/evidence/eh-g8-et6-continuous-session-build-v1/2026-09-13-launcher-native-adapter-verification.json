@@ -1,0 +1,52 @@
+{
+  "schema": "casimirbot.scoped_adapter_verification.v1",
+  "observed_at": "2026-09-14T02:07:32.704Z",
+  "scope": "Isolated real adapter HTTP route over measured patch telemetry; no production session or physical/live acceptance claim",
+  "installed_cli_attempt": {
+    "status": 401,
+    "error": "desktop_session_required",
+    "bypassed": false
+  },
+  "http_status": 200,
+  "result": {
+    "traceId": "cs-launcher-native-20260913",
+    "runId": "1",
+    "verdict": "PASS",
+    "pass": true,
+    "firstFail": null,
+    "failReason": "NONE",
+    "deltas": [],
+    "certificate": {
+      "certificateHash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d",
+      "certificateId": "constraint-pack:repo-convergence:d2821c7d650d",
+      "integrityOk": true,
+      "status": "GREEN"
+    },
+    "artifacts": [
+      {
+        "kind": "constraint-pack",
+        "ref": "repo-convergence"
+      },
+      {
+        "kind": "training-trace-id",
+        "ref": "1"
+      },
+      {
+        "kind": "training-trace-url",
+        "ref": "/api/agi/training-trace/1"
+      },
+      {
+        "kind": "training-trace-export",
+        "ref": "/api/agi/training-trace/export"
+      },
+      {
+        "kind": "constraint-pack-certificate-hash",
+        "ref": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d"
+      },
+      {
+        "kind": "constraint-pack-certificate-id",
+        "ref": "constraint-pack:repo-convergence:d2821c7d650d"
+      }
+    ]
+  }
+}

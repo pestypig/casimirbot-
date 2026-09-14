@@ -1,0 +1,708 @@
+{
+  "schema": "cs.human_authority_renewal_recovery.v1",
+  "recorded_at": "2026-09-14 16:13:26 UTC",
+  "scope": "Actual packaged MCP setup and explicit owner goal lifecycle after genuine human permission renewal; no gameplay or automatic Ready up acceptance.",
+  "authority_before_pairing": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 1,
+        "issued_at": "2026-09-14T07:35:00.977Z",
+        "expires_at": "2026-09-14T17:58:15.074Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "state": "stale",
+        "ready_for_actions": false,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-14T12:43:09.959Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": false,
+        "heartbeat_received_at": "2026-09-14T14:43:08.502Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "player_pairing": {
+    "operation": "environment.player_pair.local_handoff",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+    "pairing": {
+      "schema": "helix.connector_pairing.v1",
+      "pairing_id": "connector_pairing:67df7da6-3c01-4e79-bcac-1a21800c983a",
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+      "purpose": "rotate",
+      "domain_adapter": "minecraft.fabric_mod.v1",
+      "world_id": "minecraft:minehut:8fc80440-6fe",
+      "source_label": "Continuous session Fabric rehearsal",
+      "command_credential_requested": false,
+      "action_credential_requested": true,
+      "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+      "status": "pending",
+      "expires_at": "2026-09-14T16:10:13.556Z",
+      "redeemed_at": null,
+      "revoked_at": null,
+      "created_at": "2026-09-14T16:00:13.556Z",
+      "updated_at": "2026-09-14T16:00:13.556Z",
+      "code_included": false,
+      "credential_included": false,
+      "content_role": "connector_pairing_control_not_assistant_answer",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "handoff_status": "player_pairing_inbox_staged",
+    "credential_included": false,
+    "pairing_code_included": false,
+    "content_role": "environment_player_pairing_handoff_receipt_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "player_connector_verified": {
+    "operation": "environment.action_authority.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "authorities": [
+      {
+        "schema": "helix.environment_action.authority.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "adapter_profile_id": "game.minecraft.player.fabric.v1",
+        "domain_adapter": "minecraft.fabric_client.v1",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "allowed_capability_ids": [
+          "com.casimirbot.minecraft.player.jump",
+          "com.casimirbot.minecraft.player.look",
+          "com.casimirbot.minecraft.player.sequence.execute",
+          "com.casimirbot.minecraft.player.walk"
+        ],
+        "autonomy_mode": "approved_capabilities",
+        "manual_override_policy": "cancel",
+        "status": "active",
+        "policy_version": 1,
+        "issued_at": "2026-09-14T07:35:00.977Z",
+        "expires_at": "2026-09-14T17:58:15.074Z",
+        "revoked_at": null,
+        "credential_included": false,
+        "content_role": "environment_action_authority_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "connector_readiness": [
+      {
+        "schema": "helix.environment_action.connector_readiness.v1",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "state": "ready",
+        "ready_for_actions": true,
+        "manifest_admitted": true,
+        "manifest_received_at": "2026-09-14T16:00:14.790Z",
+        "declared_capability_count": 21,
+        "available_control_engines": [
+          "baritone",
+          "native_fabric"
+        ],
+        "heartbeat_status": "active",
+        "heartbeat_fresh": true,
+        "heartbeat_received_at": "2026-09-14T16:05:13.939Z",
+        "heartbeat_max_age_ms": 30000,
+        "active_workflow_count": 0,
+        "controls_asserted": false,
+        "manual_input_detected": false,
+        "emergency_stop_latched": false,
+        "blocking_reason": null,
+        "credential_included": false,
+        "content_role": "environment_action_connector_readiness_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "content_role": "environment_action_authority_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "probes": [
+    {
+      "prior_turn_id": "mcp_environment_probe_turn:f5a3339c-5c44-43c2-976d-e0e376100fb3",
+      "observation": {
+        "schema": "helix.environment_connector.probe_observation.v1",
+        "probe_request_ref": "environment_probe_request:bd987f92-a98a-4c4e-8096-2723b90f2766",
+        "probe_attempt_ref": "environment_probe_attempt:8b300a27-17ac-496b-a9c7-9b054314d1c3",
+        "capability_id": "com.casimirbot.minecraft.perception_snapshot.read",
+        "capability_version": 2,
+        "outcome": "succeeded",
+        "summary": "Bounded same-revision Minecraft perception snapshot completed.",
+        "result": {
+          "snapshot_schema": "helix.minecraft_perception_snapshot.v1",
+          "actor": {
+            "air": 300,
+            "food_level": 20,
+            "freezing": false,
+            "health": 20,
+            "max_health": 20,
+            "on_fire": false,
+            "on_ground": true,
+            "pitch": 1.35,
+            "position": {
+              "x": -2.1,
+              "y": 65,
+              "z": -1.1
+            },
+            "velocity": {
+              "x": 0,
+              "y": -0.08,
+              "z": 0
+            },
+            "yaw": 149.73
+          },
+          "hazards": [],
+          "coverage": {
+            "entities_complete": true,
+            "hazards_complete": true,
+            "horizontal_radius": 6,
+            "loaded_region_complete": true,
+            "omitted_categories": [
+              "client_screen",
+              "manual_input_attribution"
+            ],
+            "projectiles_complete": true,
+            "unknown_cell_count": 0,
+            "vertical_radius": 2
+          }
+        },
+        "evidence_ref": "environment_probe_evidence:b7139253b056eef515d7b6e057cdd2c830a327ab",
+        "observation_revision": 1789401984181,
+        "observed_at": "2026-09-14T16:06:24.181Z",
+        "freshness_age_ms": 53,
+        "provenance_valid": true,
+        "eligible_for_current_turn_reentry": true,
+        "late_result_disposition": null,
+        "content_role": "environment_probe_observation_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    },
+    {
+      "prior_turn_id": "mcp_environment_probe_turn:6ce10423-e6cd-43fa-b755-1a1a05afe979",
+      "observation": {
+        "schema": "helix.environment_connector.probe_observation.v1",
+        "probe_request_ref": "environment_probe_request:18b404d1-dd37-4977-b8f9-4919b01e8296",
+        "probe_attempt_ref": "environment_probe_attempt:849b0730-6698-41f0-af05-66eb72fecc8f",
+        "capability_id": "com.casimirbot.minecraft.perception_snapshot.read",
+        "capability_version": 2,
+        "outcome": "succeeded",
+        "summary": "Bounded same-revision Minecraft perception snapshot completed.",
+        "result": {
+          "snapshot_schema": "helix.minecraft_perception_snapshot.v1",
+          "actor": {
+            "air": 300,
+            "food_level": 20,
+            "freezing": false,
+            "health": 20,
+            "max_health": 20,
+            "on_fire": false,
+            "on_ground": true,
+            "pitch": 1.35,
+            "position": {
+              "x": -2.1,
+              "y": 65,
+              "z": -1.1
+            },
+            "velocity": {
+              "x": 0,
+              "y": -0.08,
+              "z": 0
+            },
+            "yaw": 149.73
+          },
+          "hazards": [],
+          "coverage": {
+            "entities_complete": true,
+            "hazards_complete": true,
+            "horizontal_radius": 6,
+            "loaded_region_complete": true,
+            "omitted_categories": [
+              "client_screen",
+              "manual_input_attribution"
+            ],
+            "projectiles_complete": true,
+            "unknown_cell_count": 0,
+            "vertical_radius": 2
+          }
+        },
+        "evidence_ref": "environment_probe_evidence:1cf72840295c2bc7080c7dad8b18da21ee49ba25",
+        "observation_revision": 1789402006317,
+        "observed_at": "2026-09-14T16:06:46.317Z",
+        "freshness_age_ms": 136,
+        "provenance_valid": true,
+        "eligible_for_current_turn_reentry": true,
+        "late_result_disposition": null,
+        "content_role": "environment_probe_observation_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    }
+  ],
+  "goal_lifecycle": [
+    {
+      "step": "renewalGoalExpiryRecorded20260914",
+      "ok": true,
+      "goal": {
+        "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+        "revision": 19,
+        "status": "recovery_required",
+        "identity": {
+          "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+          "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+          "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "producer_epoch_ref": "environment_action_epoch:1f6916cb-4843-4738-a6d5-f928557c6e0d",
+          "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+          "authority_policy_version": 1,
+          "authority_expires_at": "2026-09-14T15:35:00.911Z",
+          "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+          "turn_id": "cs-human-authority-renewal-20260914-01"
+        },
+        "latest_event_hash": "sha256:075ef6f5edb65434e9d1c96db266de2207a1f7e232a2c50d27a02efbf1655397",
+        "recovery": {
+          "required": true,
+          "reason": "authority_expired",
+          "rebound_event_id": null
+        },
+        "latest_checkpoint": {
+          "checkpoint_id": "checkpoint:ready-up:sha256:612a939a4ac3a8861d09feaf53aed3f23dccd302d27f2ba7bb96f01b819b34fa",
+          "event_id": "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+          "observation_revision": 1789395000809,
+          "verified_facts": {
+            "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+            "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observation_revision": 1789395000809
+          },
+          "evidence_refs": [
+            "environment_probe_evidence:4aff3cf19b3f7c06637f87416b891648b0ea8059"
+          ]
+        },
+        "attempt_count": 0,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ],
+            "completed_postcondition_ids": []
+          }
+        ],
+        "event_refs": [
+          "environment_durable_goal_event:511adc2b-ee57-4784-87f7-031b5f798185",
+          "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+          "environment_durable_goal_event:cc3e99ab-e867-4c57-876d-dc6f6703b265",
+          "environment_durable_goal_event:646b0936-ca75-485b-a43f-a60f32f08685"
+        ]
+      }
+    },
+    {
+      "step": "renewalGoalRebound20260914",
+      "ok": true,
+      "goal": {
+        "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+        "revision": 20,
+        "status": "recovery_required",
+        "identity": {
+          "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+          "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+          "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "producer_epoch_ref": "environment_action_epoch:a33d32be-5145-495c-b144-0424e167c4bd",
+          "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+          "authority_policy_version": 1,
+          "authority_expires_at": "2026-09-14T17:58:15.074Z",
+          "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+          "turn_id": "cs-human-authority-renewal-20260914-01"
+        },
+        "latest_event_hash": "sha256:887211bde180840956fc21aad4d02b72f0cc0db5efd6d328a68f2f4c4fb9856a",
+        "recovery": {
+          "required": true,
+          "reason": "authority_expired",
+          "rebound_event_id": "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944"
+        },
+        "latest_checkpoint": {
+          "checkpoint_id": "checkpoint:ready-up:sha256:612a939a4ac3a8861d09feaf53aed3f23dccd302d27f2ba7bb96f01b819b34fa",
+          "event_id": "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+          "observation_revision": 1789395000809,
+          "verified_facts": {
+            "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+            "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observation_revision": 1789395000809
+          },
+          "evidence_refs": [
+            "environment_probe_evidence:4aff3cf19b3f7c06637f87416b891648b0ea8059"
+          ]
+        },
+        "attempt_count": 0,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ],
+            "completed_postcondition_ids": []
+          }
+        ],
+        "event_refs": [
+          "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+          "environment_durable_goal_event:cc3e99ab-e867-4c57-876d-dc6f6703b265",
+          "environment_durable_goal_event:646b0936-ca75-485b-a43f-a60f32f08685",
+          "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944"
+        ]
+      }
+    },
+    {
+      "step": "renewalGoalCheckpoint20260914",
+      "ok": true,
+      "goal": {
+        "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+        "revision": 21,
+        "status": "recovery_required",
+        "identity": {
+          "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+          "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+          "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "producer_epoch_ref": "environment_action_epoch:a33d32be-5145-495c-b144-0424e167c4bd",
+          "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+          "authority_policy_version": 1,
+          "authority_expires_at": "2026-09-14T17:58:15.074Z",
+          "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+          "turn_id": "cs-human-authority-renewal-20260914-01"
+        },
+        "latest_event_hash": "sha256:46a94b7196979725fb4273198aa4282124e96bee3713a285ffb3a3f345dbae71",
+        "recovery": {
+          "required": true,
+          "reason": "authority_expired",
+          "rebound_event_id": "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944"
+        },
+        "latest_checkpoint": {
+          "checkpoint_id": "checkpoint:human-authority-renewal-20260914-01",
+          "event_id": "environment_durable_goal_event:2d0b84b1-fa6b-4771-8a06-f9ba06936d16",
+          "observation_revision": 1789402006317,
+          "verified_facts": {
+            "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+            "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observation_revision": 1789402006317,
+            "actor_position": {
+              "x": -2.1,
+              "y": 65,
+              "z": -1.1
+            },
+            "actor_health": 20,
+            "actor_on_ground": true,
+            "observed_hazard_count": 0
+          },
+          "evidence_refs": [
+            "environment_probe_evidence:1cf72840295c2bc7080c7dad8b18da21ee49ba25"
+          ]
+        },
+        "attempt_count": 0,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ],
+            "completed_postcondition_ids": []
+          }
+        ],
+        "event_refs": [
+          "environment_durable_goal_event:cc3e99ab-e867-4c57-876d-dc6f6703b265",
+          "environment_durable_goal_event:646b0936-ca75-485b-a43f-a60f32f08685",
+          "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944",
+          "environment_durable_goal_event:2d0b84b1-fa6b-4771-8a06-f9ba06936d16"
+        ]
+      }
+    },
+    {
+      "step": "renewalGoalResumed20260914",
+      "ok": true,
+      "goal": {
+        "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+        "revision": 22,
+        "status": "active",
+        "identity": {
+          "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+          "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+          "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "producer_epoch_ref": "environment_action_epoch:a33d32be-5145-495c-b144-0424e167c4bd",
+          "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+          "authority_policy_version": 1,
+          "authority_expires_at": "2026-09-14T17:58:15.074Z",
+          "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+          "turn_id": "cs-human-authority-renewal-20260914-01"
+        },
+        "latest_event_hash": "sha256:c8e659eae1561c42b0031de895fbf2b075cd3c69068ec93eb63086bebe3f1eb4",
+        "recovery": {
+          "required": false,
+          "reason": null,
+          "rebound_event_id": "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944"
+        },
+        "latest_checkpoint": {
+          "checkpoint_id": "checkpoint:human-authority-renewal-20260914-01",
+          "event_id": "environment_durable_goal_event:2d0b84b1-fa6b-4771-8a06-f9ba06936d16",
+          "observation_revision": 1789402006317,
+          "verified_facts": {
+            "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+            "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observation_revision": 1789402006317,
+            "actor_position": {
+              "x": -2.1,
+              "y": 65,
+              "z": -1.1
+            },
+            "actor_health": 20,
+            "actor_on_ground": true,
+            "observed_hazard_count": 0
+          },
+          "evidence_refs": [
+            "environment_probe_evidence:1cf72840295c2bc7080c7dad8b18da21ee49ba25"
+          ]
+        },
+        "attempt_count": 0,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ],
+            "completed_postcondition_ids": []
+          }
+        ],
+        "event_refs": [
+          "environment_durable_goal_event:646b0936-ca75-485b-a43f-a60f32f08685",
+          "environment_durable_goal_event:8934ee3f-cf66-42dc-8262-a39cadfa3944",
+          "environment_durable_goal_event:2d0b84b1-fa6b-4771-8a06-f9ba06936d16",
+          "environment_durable_goal_event:bb0dc50f-bb87-4544-806e-1ce86b0bd69d"
+        ]
+      }
+    }
+  ],
+  "automatic_ready_up": {
+    "request": {
+      "client_continuation_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "reasoning_binding_id": "reasoning_binding:e150d448ec72c99c5f96176b099f48f3",
+      "binding_epoch": 1,
+      "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "mission_id": null,
+      "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+      "request_id": "human-renewal-ready-20260914-01"
+    },
+    "result": {
+      "schema": "helix.agent_api.error.v1",
+      "error": "internal_error",
+      "message": "The Helix agent tool could not complete the request.",
+      "request_id": null,
+      "retryable": true,
+      "error_code": "INVALID_ARGUMENT"
+    }
+  },
+  "full_stages_complete": false,
+  "et6_passed": false,
+  "nav_eq_qualified": false
+}

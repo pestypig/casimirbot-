@@ -142,19 +142,27 @@ export function HelixWorkstationShell({
     return { activePanelId, recentPanelIds, favoritePanelIds };
   }, [activeGroupId, pinnedPanels, workstationGroups]);
 
-  const handleOpenConversation = useCallback(
-    (_sessionId: string) => {
-      onOpenPanel(HELIX_CONVERSATION_TRACE_PANEL_ID);
+  const handleOpenPanel = useCallback(
+    (panelId: PanelDefinition["id"]) => {
+      onOpenPanel(panelId);
+      setSessionListOpen(false);
     },
     [onOpenPanel],
   );
 
+  const handleOpenConversation = useCallback(
+    (_sessionId: string) => {
+      handleOpenPanel(HELIX_CONVERSATION_TRACE_PANEL_ID);
+    },
+    [handleOpenPanel],
+  );
+
   const handleMobileOpenPanel = useCallback(
     (panelId: PanelDefinition["id"]) => {
-      onOpenPanel(panelId);
+      handleOpenPanel(panelId);
       setMobileSurface("workstation");
     },
-    [onOpenPanel],
+    [handleOpenPanel],
   );
 
   const handleMobileOpenConversation = useCallback(
@@ -684,7 +692,7 @@ export function HelixWorkstationShell({
           widthPx={visibleWidth}
           collapsed={chatDock.collapsed}
           contextId={activeContextId}
-          onOpenPanel={onOpenPanel}
+          onOpenPanel={handleOpenPanel}
           onOpenConversation={handleOpenConversation}
         />
       </div>
@@ -692,7 +700,7 @@ export function HelixWorkstationShell({
     <CasimirGuideOverlay
       open={guideOpen}
       onClose={() => setGuideOpen(false)}
-      onOpenPanel={onOpenPanel}
+      onOpenPanel={handleOpenPanel}
       context={guideContext}
     />
     </>

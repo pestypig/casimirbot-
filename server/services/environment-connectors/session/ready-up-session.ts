@@ -53,8 +53,10 @@ export async function readyUpEnvironmentSession(
       }
     }
   }
-  // Always inspect again; repairs are not readiness or execution proof.
-  let readiness = await dependencies.inspect(input, bindingStore);
+  // The first collection already revalidates the binding and all deadlines.
+  // Recollect after an attempted repair, but do not consume the same probe's
+  // freshness window with a duplicate unchanged pre-repair collection.
+  let readiness = repairs.length ? await dependencies.inspect(input, bindingStore) : before;
   if (readiness.checks.some(check => check.layer === "goal" && check.state !== "verified") &&
       ["source", "subject", "authority", "controller"].every(layer =>
         readiness.checks.some(check => check.layer === layer && check.state === "verified"))) {

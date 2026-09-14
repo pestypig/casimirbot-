@@ -1,0 +1,44 @@
+{
+  "live_acceptance": false,
+  "verification": [
+    {
+      "variant": "positive",
+      "success": true,
+      "cases": [
+        {
+          "title": "stores unchanged native-temporal-publication and acknowledges exact replay [requires native build]",
+          "status": "skipped",
+          "duration_ms": null
+        },
+        {
+          "title": "stores unchanged native-compiled-publication and acknowledges exact replay [requires native build]",
+          "status": "passed",
+          "duration_ms": 36430
+        }
+      ]
+    },
+    {
+      "variant": "lost-third",
+      "success": true,
+      "cases": [
+        {
+          "title": "stores unchanged native-temporal-publication and acknowledges exact replay [requires native build]",
+          "status": "skipped",
+          "duration_ms": null
+        },
+        {
+          "title": "stores unchanged native-compiled-publication and acknowledges exact replay [requires native build]",
+          "status": "passed",
+          "duration_ms": 33898
+        }
+      ]
+    }
+  ],
+  "native_lost_third": {
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "timestamp": "2026-09-13T09:52:42.735Z"
+  }
+}

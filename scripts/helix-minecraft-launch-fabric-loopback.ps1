@@ -1,6 +1,7 @@
 param(
   [string]$Address = "localhost:25565",
   [string]$MinecraftRoot = (Join-Path $env:APPDATA ".minecraft"),
+  [string]$PlayerGameDirectory = "",
   [string]$RequiredGameVersion = "1.21.8",
   [string]$ProfileId = "",
   [int]$LaunchTimeoutSeconds = 90,
@@ -17,6 +18,7 @@ if ($PSVersionTable.PSEdition -eq "Core") {
   }
   $forwardedArguments = @(
     "-NoProfile"
+    "-Mta"
     "-ExecutionPolicy"
     "Bypass"
     "-File"
@@ -25,6 +27,8 @@ if ($PSVersionTable.PSEdition -eq "Core") {
     $Address
     "-MinecraftRoot"
     $MinecraftRoot
+    "-PlayerGameDirectory"
+    $PlayerGameDirectory
     "-RequiredGameVersion"
     $RequiredGameVersion
     "-ProfileId"
@@ -62,6 +66,125 @@ function Get-OptionalProfileProperty(
   $property = $Profile.PSObject.Properties[$PropertyName]
   if ($null -eq $property) { return $null }
   return $property.Value
+}
+
+# Read the public selected-profile button from the exact Launcher window. A
+# historical lastUsed timestamp is not evidence of the current UI selection.
+function Get-HelixLauncherProfileObservation([IntPtr]$WindowHandle) {
+  if (-not ('HelixLauncherProfileUia' -as [type])) {
+    # Use the Windows COM client. The Framework managed client on this host
+    # projects even standard buttons as panes and cannot load its old proxies.
+    # ABI declarations follow Windows SDK UIAutomationClient.h. Unused slots
+    # retain their order; this private adapter exposes only bounded reads.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+public static class HelixLauncherProfileUia {
+    [ComImport, Guid("352ffba8-0973-437c-a61f-f64cafd81df9"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ICondition { }
+    [ComImport, Guid("14314595-b4bc-4055-95f2-58f2e42c9855"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IElementArray {
+        int GetLength();
+        IElement GetElement(int index);
+    }
+    [ComImport, Guid("d22108aa-8ac5-49a5-837b-37bbb3d7591e"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IElement {
+        void UnusedSetFocus(); void UnusedGetRuntimeId(); void UnusedFindFirst();
+        IElementArray FindAll(int scope, ICondition condition);
+        void UnusedFindFirstBuildCache(); void UnusedFindAllBuildCache(); void UnusedBuildUpdatedCache();
+        [return: MarshalAs(UnmanagedType.Struct)] object GetCurrentPropertyValue(int propertyId);
+    }
+    [ComImport, Guid("30cbe57d-d9d0-452a-ab13-7ac5ac4825ee"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IAutomation {
+        void UnusedCompareElements(); void UnusedCompareRuntimeIds(); void UnusedGetRootElement();
+        IElement ElementFromHandle(IntPtr window);
+        void UnusedElementFromPoint(); void UnusedGetFocusedElement(); void UnusedGetRootElementBuildCache();
+        void UnusedElementFromHandleBuildCache(); void UnusedElementFromPointBuildCache(); void UnusedGetFocusedElementBuildCache();
+        void UnusedCreateTreeWalker(); void UnusedControlViewWalker(); void UnusedContentViewWalker(); void UnusedRawViewWalker();
+        void UnusedRawViewCondition(); void UnusedControlViewCondition(); void UnusedContentViewCondition(); void UnusedCreateCacheRequest();
+        void UnusedCreateTrueCondition(); void UnusedCreateFalseCondition();
+        ICondition CreatePropertyCondition(int propertyId, [MarshalAs(UnmanagedType.Struct)] object value);
+    }
+    private static void Release(object value) {
+        if (value != null && Marshal.IsComObject(value)) Marshal.FinalReleaseComObject(value);
+    }
+    public static Hashtable Read(IntPtr window) {
+        IAutomation automation = null; IElement root = null; ICondition condition = null; IElementArray buttons = null;
+        try {
+            automation = (IAutomation)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("ff48dba4-60ef-4201-aa87-54103eef594e")));
+            root = automation.ElementFromHandle(window);
+            int processId = (int)root.GetCurrentPropertyValue(30002); // UIA_ProcessIdPropertyId
+            condition = automation.CreatePropertyCondition(30003, 50000); // ControlType = Button
+            buttons = root.FindAll(4, condition); // TreeScope_Descendants of this exact window
+            int count = buttons.GetLength();
+            if (count > 1000) throw new InvalidOperationException("minecraft_launcher_profile_observation_unavailable");
+            var names = new List<string>(); int offscreen = 0; int disabled = 0;
+            for (int i = 0; i < count; i++) {
+                IElement button = buttons.GetElement(i);
+                try {
+                    bool hidden = (bool)button.GetCurrentPropertyValue(30022); // UIA_IsOffscreenPropertyId
+                    bool enabled = (bool)button.GetCurrentPropertyValue(30010); // UIA_IsEnabledPropertyId
+                    if (hidden) offscreen++; if (!enabled) disabled++;
+                    if (!hidden && enabled) names.Add((string)button.GetCurrentPropertyValue(30005)); // UIA_NamePropertyId
+                } finally { Release(button); }
+            }
+            return new Hashtable {
+                {"process_id", processId}, {"button_names", names.ToArray()}, {"total_button_count", count},
+                {"offscreen_button_count", offscreen}, {"disabled_button_count", disabled},
+                {"apartment_state", Thread.CurrentThread.GetApartmentState().ToString()}
+            };
+        } finally { Release(buttons); Release(condition); Release(root); Release(automation); }
+    }
+}
+'@
+  }
+  return [HelixLauncherProfileUia]::Read($WindowHandle)
+}
+
+function Assert-HelixLauncherSelectedProfile(
+  [IntPtr]$WindowHandle, [int]$ExpectedProcessId, [string]$ProfileName, [string]$ProfileVersion,
+  [string]$DiagnosticPath = ''
+) {
+  try { $observation = Get-HelixLauncherProfileObservation $WindowHandle }
+  catch { throw 'minecraft_launcher_profile_observation_unavailable' }
+  if ($observation.process_id -ne $ExpectedProcessId -or $ExpectedProcessId -le 0) {
+    throw 'minecraft_launcher_profile_window_mismatch'
+  }
+  if ([string]::IsNullOrWhiteSpace($ProfileName) -or [string]::IsNullOrWhiteSpace($ProfileVersion)) {
+    throw 'minecraft_saved_player_profile_unavailable'
+  }
+  $expected = "$ProfileName $ProfileVersion"
+  $matchingButtons = @($observation.button_names | Where-Object { ([regex]::Replace([string]$_, '\s+', ' ')).Trim() -ceq $expected })
+  if ($matchingButtons.Count -ne 1) {
+    if ($DiagnosticPath) {
+      # Bounded public profile-button diagnostics only. Never capture account
+      # controls, arbitrary UI content, process command lines or credentials.
+      $candidates = @($observation.button_names | Where-Object {
+        ([string]$_).IndexOf($ProfileName, [StringComparison]::Ordinal) -ge 0 -or
+        ([string]$_).IndexOf($ProfileVersion, [StringComparison]::Ordinal) -ge 0
+      } | Select-Object -First 8 | ForEach-Object { ([string]$_).Substring(0, [Math]::Min(300, ([string]$_).Length)) })
+      try {
+        [IO.File]::WriteAllText($DiagnosticPath, (@{ schema = 'helix.minecraft.launcher_profile_diagnostic.v1';
+          observed_at = [DateTime]::UtcNow.ToString('o'); expected_profile = $ProfileName; expected_version = $ProfileVersion;
+          visible_button_count = @($observation.button_names).Count; matching_button_count = $matchingButtons.Count;
+          total_button_count = $observation.total_button_count; offscreen_button_count = $observation.offscreen_button_count;
+          disabled_button_count = $observation.disabled_button_count; apartment_state = $observation.apartment_state;
+          candidate_profile_buttons = $candidates; credential_included = $false } | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+      } catch { }
+    }
+    if (@($observation.button_names).Count -eq 0) { throw 'minecraft_launcher_profile_observation_unavailable' }
+    # A newly opened launcher may expose only its window frame while the
+    # installation page loads. This is no profile evidence and cannot admit
+    # Play; re-observe within the existing launch deadline.
+    $contentButtons = @($observation.button_names | Where-Object {
+      ([string]$_).Trim() -cnotin @('Minimize', 'Maximize', 'Restore', 'Close')
+    })
+    if ($contentButtons.Count -eq 0) { throw 'minecraft_launcher_profile_loading' }
+    throw 'minecraft_fabric_profile_selection_required'
+  }
 }
 
 $addressMatch = [regex]::Match(
@@ -162,6 +285,14 @@ $fabricProfiles = @(
     Sort-Object lastUsed -Descending
 )
 if ($fabricProfiles.Count -eq 0) { Fail-Typed "minecraft_fabric_profile_missing" }
+if (-not [string]::IsNullOrWhiteSpace($PlayerGameDirectory)) {
+  $selectedGameRoot = [IO.Path]::GetFullPath($PlayerGameDirectory)
+  $fabricProfiles = @($fabricProfiles | Where-Object {
+    $candidateGameRoot = if ([string]::IsNullOrWhiteSpace($_.gameDir)) { $root } else { [IO.Path]::GetFullPath($_.gameDir) }
+    $candidateGameRoot -eq $selectedGameRoot
+  })
+  if ($fabricProfiles.Count -ne 1) { Fail-Typed "minecraft_saved_player_profile_unavailable" }
+}
 $selectedProfile = if ([string]::IsNullOrWhiteSpace($ProfileId)) {
   $fabricProfiles[0]
 } else {
@@ -183,7 +314,7 @@ $mostRecentProfile = @(
     } |
     Sort-Object lastUsed -Descending
 )[0]
-if ($mostRecentProfile.id -ne $selectedProfile.id) {
+if ($existingMinecraftClient -and $mostRecentProfile.id -ne $selectedProfile.id) {
   Fail-Typed "minecraft_fabric_profile_selection_required"
 }
 $gameRoot = if ([string]::IsNullOrWhiteSpace($selectedProfile.gameDir)) {
@@ -645,6 +776,9 @@ if ($existingMinecraftClient) {
       Select-Object -First 1
     if ($currentLauncher) { $launcher = $currentLauncher }
     try {
+      Assert-HelixLauncherSelectedProfile -WindowHandle $launcher.MainWindowHandle `
+        -ExpectedProcessId $launcher.Id -ProfileName $selectedProfile.name -ProfileVersion $selectedProfile.version `
+        -DiagnosticPath (Join-Path $root 'logs\helix-launcher-profile-diagnostic.json')
       $candidatePoint = [HelixMinecraftLauncherAutomation]::ClickRenderedPlay(
         $launcher.MainWindowHandle,
         [uint32]$launcher.Id,
@@ -658,7 +792,7 @@ if ($existingMinecraftClient) {
       }
       $clickPoint = $candidatePoint
     } catch {
-      $launchFailure = [string]$_.Exception.InnerException.Message
+      $launchFailure = if ($_.Exception.InnerException) { [string]$_.Exception.InnerException.Message } else { [string]$_.Exception.Message }
       $lastLaunchFailure = $launchFailure
       if ($launchFailure -match '^minecraft_launcher_click_target_occluded:([0-9]+)$') {
         $occludingProcess = Get-Process -Id ([int]$Matches[1]) -ErrorAction SilentlyContinue
@@ -672,6 +806,7 @@ if ($existingMinecraftClient) {
         }
       }
       if ($launchFailure -notin @(
+        "minecraft_launcher_profile_loading",
         "minecraft_launcher_play_control_not_found",
         "minecraft_launcher_foreground_activation_failed",
         "minecraft_launcher_click_delivery_failed",

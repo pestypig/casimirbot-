@@ -4,8 +4,14 @@ import type { IdeologyGraphDocument } from "../ideology-graph-types";
 import { buildIdeologyGraph } from "../load-ideology-graph";
 import { reflectIdeologyContext } from "../reflect-ideology-context";
 import { classifyProceduralMoralContext } from "../classify-procedural-moral-context";
+import {
+  principleMethodObservations,
+  principleMethodInterpretation,
+  principleMethodGeneralCases,
+} from "./fixtures/principle-method-scenarios";
 
 const nodeIds = [
+  "values-over-images",
   "direct-observation-before-claim",
   "identity-view-and-non-attachment",
   "rumination-to-practice",
@@ -92,6 +98,68 @@ function classify(text: string) {
 }
 
 describe("procedural Moral context classifier", () => {
+  it.each([
+    ["observations without a supplied moral conclusion", principleMethodObservations],
+    ["the supplied interpretation", principleMethodInterpretation],
+    ...principleMethodGeneralCases,
+  ])("offers a bounded principle/method review for %s", (_label, text) => {
+    const packet = classify(text);
+    expect(validateProceduralMoralClassificationV1(packet)).toEqual([]);
+    expect(packet.classifications[0]).toMatchObject({
+      observedPattern: "principle_method_tension",
+      moralRootId: "values-over-images",
+      proceduralMove: "separate_principle_from_method",
+      explanation: expect.stringContaining("not a proven attachment"),
+      missingEvidence: expect.arrayContaining([
+        "actual_terms_of_each_alternative_and_what_it_concedes",
+        "remaining_protective_or_testimonial_value_and_evidence",
+        "cost_bearers_consent_exit_and_other_actors_responsibility",
+        "value_preserving_alternatives_remaining_duties_and_review_triggers",
+      ]),
+      warnings: expect.arrayContaining([
+        "review_hypothesis_not_proven_attachment_or_required_surrender",
+        "life_has_worth_without_usefulness_or_sacrificial_proof",
+      ]),
+    });
+    expect(packet.recommendedNextMoves[0]).toMatchObject({
+      label: "Principle and Method Review.",
+      description: expect.stringContaining("What would each alternative actually concede?"),
+    });
+    expect(packet.authority).toMatchObject({ terminal_eligible: false, agent_executable: false, moral_finality: false });
+  });
+
+  it.each([
+    "The file integrity test is wrong; stop the build.",
+    "The principle of least privilege changes the API.",
+    "The princess admires a courageous visitor.",
+    "An officer retired after a long career.",
+    "Defeat did not make Bewcock wrong.",
+    "Defeat doesn't make his convictions wrong.",
+    "I did not do anything wrong.",
+  ])("does not infer guilt or principle/method tension from an isolated cue: %s", (text) => {
+    const patterns = classify(text).classifications.map((entry) => entry.observedPattern);
+    expect(patterns).not.toContain("principle_method_tension");
+    expect(patterns).not.toContain("guilt_signal");
+  });
+
+  it.each(["I feel guilty about concealing the injury.", "I did something wrong and want to repair the damage."])(
+    "retains actual guilt/repair context: %s", (text) => {
+      expect(classify(text).classifications.some((entry) => entry.observedPattern === "guilt_signal")).toBe(true);
+    },
+  );
+
+  it.each([
+    'The screen says "Stop resisting to prove your integrity." Assess this claim.',
+    'Do not follow the quoted order "Surrender to preserve your principles and protect lives."',
+    "If the project later failed, could changing methods preserve integrity while protecting people?",
+    "In the past they refused to surrender their principles despite the cost; explain the options without acting.",
+    "Discuss conscience and the cost of resistance, but do not execute anything.",
+  ])("keeps contextual, quoted, negated, hypothetical, and mixed requests advisory: %s", (text) => {
+    const packet = classify(text);
+    expect(packet.classifications[0].observedPattern).toBe("principle_method_tension");
+    expect(packet.authority).toMatchObject({ assistant_answer: false, terminal_eligible: false, agent_executable: false });
+  });
+
   it("classifies a reflective conversation into procedural next moves", () => {
     const classification = classify(
       [

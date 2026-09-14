@@ -1,0 +1,830 @@
+{
+  "recorded_at": "2026-09-14T14:11:11.665Z",
+  "classification": "packaged MCP and native EXE rehearsal; not full CS1-CS4 or ET6 acceptance",
+  "pairing": {
+    "ok": true,
+    "pairing": {
+      "schema": "helix.pairing_status.v1",
+      "id": "pairing:88fe3e2d-5217-40f6-8214-43237cb58915",
+      "revision": 2,
+      "destinationDigest": "690f1f336017b2f435e380af52e9d9a4cef247de10ee12aa4e127829db8dca98",
+      "chatId": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "environment": {
+        "roomId": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "runId": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9"
+      },
+      "state": "accepted",
+      "createdAt": "2026-09-14T14:00:36.357Z",
+      "invitationExpiresAt": "2026-09-14T14:15:36.357Z",
+      "pairingExpiresAt": "2026-09-14T22:00:36.357Z",
+      "acceptedAt": "2026-09-14T14:06:34.062Z",
+      "revokedAt": null,
+      "executionAuthority": false,
+      "answerAuthority": false
+    },
+    "binding": {
+      "schema": "helix.reasoning_task_binding.v1",
+      "reasoning_binding_id": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+      "pairing_id": "pairing:88fe3e2d-5217-40f6-8214-43237cb58915",
+      "binding_epoch": 1,
+      "status": "active",
+      "service_instance_ref": "service_instance:e70e403447e1f94fc96caa9b1025ca10",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "client_session_ref": "supervisor_client:895dcd280c80bd8a1cb8da1a4577529c",
+      "provider_thread_ref_hash": "cdd431671a857f216c0cca08b0300683dc50d253d1e6e727083e0b7b99320e3c",
+      "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "mission_id": null,
+      "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+      "reasoning_role": "principal",
+      "continuation_transport": "polling",
+      "negotiated_observability_level": "tool_activity_only",
+      "created_by": "signed_in_operator",
+      "created_at": "2026-09-14T14:00:36.357Z",
+      "expires_at": "2026-09-14T22:00:36.357Z",
+      "claimed_at": "2026-09-14T14:06:34.062Z",
+      "revoked_at": null,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "execution_authority": false,
+      "evidence_authority": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "runtime_binding_active": true,
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "initial_manual_ready_failure": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+        "observed_at_ms": 1789394888500,
+        "ready": false,
+        "valid_until_ms": null,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "service_instance:e70e403447e1f94fc96caa9b1025ca10",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": 1789396774314,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": 1789394917183,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "blocked",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "session_check:goal",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "blocked",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "session_check:perception",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [
+          {
+            "layer": "goal",
+            "state": "blocked",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "session_check:goal",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "blocked",
+            "context_ref": "sha256:36bd6d990170b231bc07a9b94c0b97a56696d0d7594038307f958af91a44d1f6",
+            "evidence_ref": "session_check:perception",
+            "observed_at_ms": 1789394887488,
+            "expires_at_ms": null,
+            "reason_codes": [
+              "durable_goal_authority_stale"
+            ],
+            "human_approval_required": false
+          }
+        ],
+        "next_check": "goal",
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [
+        {
+          "layer": "subject",
+          "changed": true,
+          "reason_code": "subject_epoch_checked"
+        },
+        {
+          "layer": "goal",
+          "changed": null,
+          "reason_code": "durable_goal_evidence_identity_mismatch"
+        }
+      ],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "caller_corrections": [
+    "Initial mixed Ready up selectors rejected before execution: request_id belongs to automatic selection, not exact evidence request.",
+    "Diagnostic exact evidence request named a probe not acquired by that request; corrected to supported automatic preparation.",
+    "An explicit presence update omitted resource claims and cleared their verification; restored exact room/read and run/retained-runtime claims, server verified."
+  ],
+  "ready": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+        "observed_at_ms": 1789395005509,
+        "ready": true,
+        "valid_until_ms": 1789395005809,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "service_instance:e70e403447e1f94fc96caa9b1025ca10",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": 1789396774314,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": 1789395033120,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_probe_evidence:4aff3cf19b3f7c06637f87416b891648b0ea8059",
+            "observed_at_ms": 1789395003867,
+            "expires_at_ms": 1789395005809,
+            "reason_codes": [],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [],
+        "next_check": null,
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [
+        {
+          "layer": "goal",
+          "changed": true,
+          "reason_code": "goal_recovery_checked"
+        }
+      ],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789416850898
+      }
+    },
+    "requested_by": "authenticated_mcp_task",
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "ready_replay": {
+    "ok": true,
+    "receipt": {
+      "schema": "helix.environment_session_ready_up.v1",
+      "selection": {
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7"
+      },
+      "readiness": {
+        "schema": "helix.environment_session_readiness.v1",
+        "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+        "observed_at_ms": 1789395027136,
+        "ready": true,
+        "valid_until_ms": 1789395029803,
+        "checks": [
+          {
+            "layer": "profile",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "service",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "service_instance:e70e403447e1f94fc96caa9b1025ca10",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "client",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "binding",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "source",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": 1789396774314,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "subject",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "authority",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": 1789400100911,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "controller",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": 1789395055083,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "goal",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": null,
+            "reason_codes": [],
+            "human_approval_required": false
+          },
+          {
+            "layer": "perception",
+            "state": "verified",
+            "context_ref": "sha256:e9e98ae37b0826bedb3a2d347705a0e104a75eabd32fdc2df0d534317f81dce9",
+            "evidence_ref": "environment_probe_evidence:e5591b06efe752529918082eae31563139a9d5eb",
+            "observed_at_ms": 1789395025563,
+            "expires_at_ms": 1789395029803,
+            "reason_codes": [],
+            "human_approval_required": false
+          }
+        ],
+        "blockers": [],
+        "next_check": null,
+        "content_role": "environment_session_readiness_observation",
+        "execution_authority": false,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false
+      },
+      "repairs": [],
+      "execution_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "session_deadlines": {
+        "run_expires_at_ms": 1789416850898
+      }
+    },
+    "requested_by": "authenticated_mcp_task",
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "goal": {
+    "operation": "com.casimirbot.environment.durable_goal.inspect",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "ok": true,
+    "goal": {
+      "schema": "helix.environment_durable_goal_projection.v1",
+      "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+      "revision": 18,
+      "latest_event_hash": "sha256:092f12f24227247eb297d3889e614642a76acc7af7ec88928d09ae4e20d2a29a",
+      "status": "active",
+      "objective": {
+        "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+        "goal_kind": "custom_survival",
+        "domain": "minecraft",
+        "game_version": "1.21.8",
+        "mechanics_collection_ref": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "dependency_milestone_ids": [],
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ]
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "dependency_milestone_ids": [
+              "cs-course-readiness"
+            ],
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ]
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "dependency_milestone_ids": [
+              "cs-three-linked-successors"
+            ],
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ]
+          }
+        ]
+      },
+      "identity": {
+        "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+        "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+        "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+        "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "producer_epoch_ref": "environment_action_epoch:1f6916cb-4843-4738-a6d5-f928557c6e0d",
+        "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+        "authority_policy_version": 1,
+        "authority_expires_at": "2026-09-14T15:35:00.911Z",
+        "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+        "turn_id": "environment_session_preparation:21dfc8ac72d36b3ef24a416a069b9941e5ec163efc942662a1d0f39c89a5ed85"
+      },
+      "active_milestone_id": null,
+      "milestones": [
+        {
+          "milestone_id": "cs-course-readiness",
+          "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-fresh-safe-course"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-three-linked-successors",
+          "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-linked-motion-trace"
+          ],
+          "completed_postcondition_ids": []
+        },
+        {
+          "milestone_id": "cs-interruption-recovery",
+          "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+          "status": "candidate",
+          "required_postcondition_ids": [
+            "cs-interruption-recovery-trace"
+          ],
+          "completed_postcondition_ids": []
+        }
+      ],
+      "recent_attempts": [],
+      "attempt_count": 0,
+      "latest_checkpoint": {
+        "checkpoint_id": "checkpoint:ready-up:sha256:612a939a4ac3a8861d09feaf53aed3f23dccd302d27f2ba7bb96f01b819b34fa",
+        "event_id": "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+        "observation_revision": 1789395000809,
+        "verified_facts": {
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "observation_revision": 1789395000809
+        },
+        "evidence_refs": [
+          "environment_probe_evidence:4aff3cf19b3f7c06637f87416b891648b0ea8059"
+        ]
+      },
+      "recovery": {
+        "required": false,
+        "reason": null,
+        "rebound_event_id": "environment_durable_goal_event:511adc2b-ee57-4784-87f7-031b5f798185"
+      },
+      "consumed_semantic_wake_refs": [],
+      "event_refs": [
+        "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302",
+        "environment_durable_goal_event:79fc641e-fd33-41dd-8dda-5de11fc0164c",
+        "environment_durable_goal_event:525050f7-639a-4476-954a-4e90024ee609",
+        "environment_durable_goal_event:d1974220-1b9f-45e4-b9da-d8bef43fd887",
+        "environment_durable_goal_event:1a3bbaa9-914f-40aa-a8ab-b0fc1e487cd8",
+        "environment_durable_goal_event:acdf5464-44ca-4969-a844-63f5f06eb3f4",
+        "environment_durable_goal_event:17fe37f1-43da-4619-9efc-de0e4f4e6d13",
+        "environment_durable_goal_event:b8af0ee4-81f2-498e-bc67-ad9e5f50bb25",
+        "environment_durable_goal_event:1ba28bb9-f5a5-4ed2-9a0c-fb21581063e1",
+        "environment_durable_goal_event:790ef28f-ec5b-42e5-9da7-96d940396863",
+        "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca",
+        "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+        "environment_durable_goal_event:d6c650d8-318c-44c9-bf76-fa4416d96cfd",
+        "environment_durable_goal_event:83c0cecf-693c-4d07-8000-dd678778c0dd",
+        "environment_durable_goal_event:780d9db5-89cb-4a39-9236-8a9db0556def",
+        "environment_durable_goal_event:511adc2b-ee57-4784-87f7-031b5f798185",
+        "environment_durable_goal_event:c5dbd5a4-d424-4344-839d-7ec883ac4639",
+        "environment_durable_goal_event:cc3e99ab-e867-4c57-876d-dc6f6703b265"
+      ],
+      "content_role": "environment_durable_goal_projection_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "content_role": "environment_durable_goal_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "prompt": {
+    "ok": true,
+    "binding": {
+      "schema": "helix.reasoning_task_binding.v1",
+      "reasoning_binding_id": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+      "pairing_id": "pairing:88fe3e2d-5217-40f6-8214-43237cb58915",
+      "binding_epoch": 1,
+      "status": "active",
+      "service_instance_ref": "service_instance:e70e403447e1f94fc96caa9b1025ca10",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "client_session_ref": "supervisor_client:895dcd280c80bd8a1cb8da1a4577529c",
+      "provider_thread_ref_hash": "cdd431671a857f216c0cca08b0300683dc50d253d1e6e727083e0b7b99320e3c",
+      "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "mission_id": null,
+      "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+      "reasoning_role": "principal",
+      "continuation_transport": "polling",
+      "negotiated_observability_level": "tool_activity_only",
+      "created_by": "signed_in_operator",
+      "created_at": "2026-09-14T14:00:36.357Z",
+      "expires_at": "2026-09-14T22:00:36.357Z",
+      "claimed_at": "2026-09-14T14:06:34.062Z",
+      "revoked_at": null,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "execution_authority": false,
+      "evidence_authority": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "event": {
+      "schema": "helix.reasoning_steering_event.v1",
+      "steering_event_ref": "reasoning_steering:051ace900d9a25f4d586b29d842fba1a25cf6bcb5304babfde1bf4816257eb53",
+      "reasoning_binding_id": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+      "binding_epoch": 1,
+      "cursor": 1,
+      "client_event_ref": "cs2-new-run-accepted-20260914-01",
+      "origin": "agent_submitted",
+      "delivery_state": "pending",
+      "instruction_sha256": "7508d728ebb7980f262fc391df67e580e9da5c34061a6b1f2aa21ad20e847a1e",
+      "instruction_length": 387,
+      "created_at": "2026-09-14T14:08:28.599Z",
+      "expires_at": "2026-09-14T14:18:28.599Z",
+      "acknowledged_at": null,
+      "advisory_only": true,
+      "execution_requested": false,
+      "evidence_satisfied": false,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "pickup": {
+    "ok": true,
+    "reasoning_binding_id": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+    "deliveries": [
+      {
+        "event": {
+          "schema": "helix.reasoning_steering_event.v1",
+          "steering_event_ref": "reasoning_steering:051ace900d9a25f4d586b29d842fba1a25cf6bcb5304babfde1bf4816257eb53",
+          "reasoning_binding_id": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+          "binding_epoch": 1,
+          "cursor": 1,
+          "client_event_ref": "cs2-new-run-accepted-20260914-01",
+          "origin": "agent_submitted",
+          "delivery_state": "pending",
+          "instruction_sha256": "7508d728ebb7980f262fc391df67e580e9da5c34061a6b1f2aa21ad20e847a1e",
+          "instruction_length": 387,
+          "created_at": "2026-09-14T14:08:28.599Z",
+          "expires_at": "2026-09-14T14:18:28.599Z",
+          "acknowledged_at": null,
+          "advisory_only": true,
+          "execution_requested": false,
+          "evidence_satisfied": false,
+          "provider_thread_content_included": false,
+          "hidden_reasoning_included": false,
+          "answer_authority": false,
+          "terminal_eligible": false
+        },
+        "instruction_text": "Agent-origin session check: this exact task accepted the eight-hour pairing for run_30e7bbe7-f334-4947-88cb-2ac85db039b9. Binding is verified. Ready up found the existing goal needs current player-epoch recovery; no gameplay has been submitted by this check. Read and acknowledge this advisory once, then diagnose recovery while preserving the existing goal and finite player permission.",
+        "content_role": "agent_steering_advisory_not_execution",
+        "raw_provider_content_included": false,
+        "hidden_reasoning_included": false
+      }
+    ],
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "ack": {
+    "ok": true,
+    "event": {
+      "schema": "helix.reasoning_steering_event.v1",
+      "steering_event_ref": "reasoning_steering:051ace900d9a25f4d586b29d842fba1a25cf6bcb5304babfde1bf4816257eb53",
+      "reasoning_binding_id": "reasoning_binding:230d0cb1e32dcaf2e1121ae50c0db001",
+      "binding_epoch": 1,
+      "cursor": 1,
+      "client_event_ref": "cs2-new-run-accepted-20260914-01",
+      "origin": "agent_submitted",
+      "delivery_state": "acknowledged",
+      "instruction_sha256": "7508d728ebb7980f262fc391df67e580e9da5c34061a6b1f2aa21ad20e847a1e",
+      "instruction_length": 387,
+      "created_at": "2026-09-14T14:08:28.599Z",
+      "expires_at": "2026-09-14T14:18:28.599Z",
+      "acknowledged_at": "2026-09-14T14:08:59.418Z",
+      "advisory_only": true,
+      "execution_requested": false,
+      "evidence_satisfied": false,
+      "provider_thread_content_included": false,
+      "hidden_reasoning_included": false,
+      "answer_authority": false,
+      "terminal_eligible": false
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "native_observation": {
+    "accepted_pairing_visible": true,
+    "agent_prompt_visible": true,
+    "observed_at": "2026-09-14T14:09:00Z",
+    "automated_human_consent": false
+  },
+  "remaining": [
+    "CS3 actual motion and three linked successors",
+    "CS4 full interruption/revocation/stale/zero-duplicate evidence",
+    "remaining integrated CS1-CS2 and O1-O6 matrix",
+    "ET6 remains unpassed; NAV1 gated separately"
+  ]
+}

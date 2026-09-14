@@ -6437,6 +6437,7 @@ export function HelixAskPill({
     activeId: activeChatSessionId,
     ensureContextSession,
     addMessage,
+    appendMessageOnce,
     setActive,
   } = useAgiChatStore();
   const helixChatSessions = useAgiChatStore((state) => state.sessions);
@@ -7540,7 +7541,8 @@ export function HelixAskPill({
       setAskStatus("Steering queued for exact agent pickup. Provider delivery is not claimed until acknowledgement.");
       if (helixChatSessions[sessionId]) {
         setActive(sessionId);
-        addMessage(sessionId, { role: "user", content: text, traceId: clientEventRef });
+        appendMessageOnce(sessionId, { id: dispatched.event.steering_event_ref,
+          at: dispatched.event.created_at, role: "user", content: text, traceId: clientEventRef });
       }
       const eventRef = dispatched.event.steering_event_ref;
       if (eventRef) {
@@ -7592,7 +7594,7 @@ export function HelixAskPill({
       setAskStatus("The bound agent steering request was rejected or became stale.");
       return false;
     }
-  }, [activeChatSessionId, addMessage, getHelixAskSessionId, helixChatSessions, setActive]);
+  }, [activeChatSessionId, appendMessageOnce, getHelixAskSessionId, helixChatSessions, setActive]);
 
   useEffect(() => {
     return subscribeBoundAgentSteeringRequests(dispatchBoundAgentSteering);

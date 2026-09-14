@@ -146,6 +146,38 @@ const pendingEnvironmentId = (roomSourceBindingId: string): string =>
     .digest("hex")
     .slice(0, 40)}`;
 
+/** Workstation startup only; a pending source is never an admitted environment. */
+export const assertPendingFabricWorkstationSource = async (input: {
+  roomId: string;
+  profileId: string;
+  environmentBindingId: string;
+}): Promise<void> => {
+  const db = await readSharedRealtimeRoomDatabase();
+  // Read current ownership, room/source lifecycle and absence of a connector
+  // together. The caller's pending ID is matched against stored source identity,
+  // never admitted by prefix or by a cached client/environment projection.
+  const { rows } = await db.query<{ binding_id: string }>(
+    `SELECT rs.binding_id
+     FROM helix_room_source_bindings rs
+     JOIN helix_shared_realtime_rooms r ON r.room_id = rs.room_id
+     JOIN helix_shared_realtime_room_members m ON m.room_id = r.room_id
+     LEFT JOIN helix_environment_connector_bindings b
+       ON b.room_source_binding_id = rs.binding_id
+     WHERE r.room_id = $1 AND r.owner_profile_id = $2
+       AND r.status <> 'closed' AND rs.owner_profile_id = $2
+       AND m.profile_id = $2 AND m.member_role = 'owner' AND m.presence <> 'left'
+       AND rs.status = 'active' AND rs.domain_adapter = 'minecraft.fabric_mod.v1'
+       AND b.environment_binding_id IS NULL;`,
+    [input.roomId, input.profileId],
+  );
+  if (!rows.some((row) => pendingEnvironmentId(row.binding_id) === input.environmentBindingId)) {
+    throw new RoomEnvironmentSubjectError(
+      "environment_not_ready", 409,
+      "The exact pending Fabric source is not available to this room owner. Refresh environment status before starting the workstation lifecycle.",
+    );
+  }
+};
+
 const nativeSubjects = (input: {
   environmentBindingId: string;
   heartbeat: HelixEnvironmentSourceHeartbeat | null;

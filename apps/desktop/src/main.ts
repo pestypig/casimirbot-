@@ -1,3 +1,4 @@
+import { appendOAuthDiagnostic } from "./oauth-diagnostic-journal";
 import {
   spawn,
   type ChildProcessByStdio,
@@ -12,7 +13,6 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { createServer } from "node:net";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import {
@@ -94,6 +94,7 @@ import {
 import { DesktopUpdateController } from "./updater";
 import { installDesktopSessionSecurity } from "./security";
 import { clearDesktopEphemeralWebCaches } from "./web-cache-lifecycle";
+import { readPreferredDesktopPort, rememberHealthyDesktopPort, reserveDesktopLoopbackPort } from "./loopback-origin";
 import { DesktopMcpTunnelController } from "./mcp-tunnel";
 import {
   startDesktopMcpTunnelScopeRouter,
@@ -172,6 +173,7 @@ type DesktopRuntime = {
   child: ChildProcessByStdio<null, Readable, Readable>;
   origin: string;
   secret: string;
+  startupJournal: StartupJournal;
   port: number;
   providerCredentialBroker: DesktopProviderCredentialBroker;
   friendsPartiesCoordinationBroker: DesktopFriendsPartiesCoordinationBroker | null;
@@ -229,26 +231,6 @@ if (configuredUserDataPath) {
 
 const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
-
-const reserveLoopbackPort = (): Promise<number> =>
-  new Promise((resolve, reject) => {
-    const reservation = createServer();
-    reservation.unref();
-    reservation.once("error", reject);
-    reservation.listen(0, "127.0.0.1", () => {
-      const address = reservation.address();
-      if (!address || typeof address === "string") {
-        reservation.close();
-        reject(new Error("Unable to reserve a desktop loopback port"));
-        return;
-      }
-      const port = address.port;
-      reservation.close((error) => {
-        if (error) reject(error);
-        else resolve(port);
-      });
-    });
-  });
 
 const resolveRepoRoot = (): string =>
   path.resolve(__dirname, "..", "..", "..");
@@ -563,8 +545,9 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
     : null;
   const startupJournal = createStartupJournal(userDataPath);
   const readyReceiptPath = resolveReadyReceiptPath(userDataPath);
+  const preferredPort = readPreferredDesktopPort(userDataPath);
   clearReadyReceipt(readyReceiptPath);
-  const port = await reserveLoopbackPort();
+  const port = await reserveDesktopLoopbackPort(preferredPort);
   const origin = `http://127.0.0.1:${port}`;
   const secret = randomBytes(32).toString("base64url");
   const mcpTransitionBroker = await startDesktopMcpTunnelTransitionBroker({
@@ -760,6 +743,7 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   });
 
   const runtime = {
+    startupJournal,
     child,
     origin,
     secret,
@@ -772,6 +756,11 @@ const startDesktopService = async (): Promise<DesktopRuntime> => {
   try {
     await waitForServiceReady(runtime);
     writeReadyReceipt(readyReceiptPath, runtime);
+    try { rememberHealthyDesktopPort(userDataPath, port); }
+    catch {
+      // Address continuity is optional; it must not stop a healthy keyed service.
+      appendStartupJournal(startupJournal, "host", "loopback address preference could not be saved", secret);
+    }
     appendStartupJournal(
       startupJournal,
       "host",
@@ -1030,9 +1019,14 @@ const completeDesktopAuth0Callback = async (
   runtime: DesktopRuntime,
   callbackUrl: string,
 ): Promise<void> => {
+  // Fixed lifecycle markers only: never journal callback URLs, codes or state.
+  appendOAuthDiagnostic(path.join(path.dirname(runtime.startupJournal.filePath), "desktop-oauth-diagnostic.log"), "received");
   try {
     const stepUp = await tryCompleteDesktopAuth0StepUp(runtime, callbackUrl);
-    if (stepUp === "handled") return;
+    if (stepUp === "handled") {
+      appendOAuthDiagnostic(path.join(path.dirname(runtime.startupJournal.filePath), "desktop-oauth-diagnostic.log"), "step_up_handled");
+      return;
+    }
     const response = await fetch(
       `${runtime.origin}${DESKTOP_AUTH0_ACCOUNT_LINK_CALLBACK_PATH}`,
       {
@@ -1050,6 +1044,7 @@ const completeDesktopAuth0Callback = async (
       | Record<string, unknown>
       | null;
     if (!response.ok || body?.ok !== true) {
+      appendOAuthDiagnostic(path.join(path.dirname(runtime.startupJournal.filePath), "desktop-oauth-diagnostic.log"), "rejected");
       const error =
         typeof body?.error === "string" &&
         /^[a-z][a-z0-9_]{0,63}$/u.test(body.error)
@@ -1059,7 +1054,9 @@ const completeDesktopAuth0Callback = async (
       return;
     }
     publishAuth0AccountLinkCompletion({ ok: true });
+    appendOAuthDiagnostic(path.join(path.dirname(runtime.startupJournal.filePath), "desktop-oauth-diagnostic.log"), "completion_published");
   } catch {
+    appendOAuthDiagnostic(path.join(path.dirname(runtime.startupJournal.filePath), "desktop-oauth-diagnostic.log"), "transport_failed");
     publishAuth0AccountLinkCompletion({
       ok: false,
       error: "account_link_failed",
@@ -1172,18 +1169,18 @@ const registerDesktopIpc = (
     pendingWorkstationGuidance = null;
     if (!pending || pending.expiresAt < Date.now()) {
       appendStartupJournal(
-        startupJournal,
+        runtime.startupJournal,
         "host",
         "workstation pending guidance unavailable",
-        secret,
+        runtime.secret,
       );
       return null;
     }
     appendStartupJournal(
-      startupJournal,
+      runtime.startupJournal,
       "host",
       "workstation pending guidance consumed by target renderer",
-      secret,
+      runtime.secret,
     );
     return pending.payload;
   });
@@ -1488,12 +1485,17 @@ const stopDesktopService = (): void => {
   if (runtime.child.exitCode === null) runtime.child.kill();
 };
 
+const protocolDiagnosticPath = path.join(app.getPath("userData"), "logs", "desktop-oauth-diagnostic.log");
+// Fixed labels locate dispatch loss without exposing argv, OAuth state or codes.
+appendOAuthDiagnostic(protocolDiagnosticPath, "process_entry");
 const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance) {
   app.quit();
 } else {
   app.on("second-instance", (_event, commandLine) => {
+    appendOAuthDiagnostic(protocolDiagnosticPath, "second_instance");
     const callbackUrl = extractDesktopAuth0Callback(commandLine);
+    if (!callbackUrl) appendOAuthDiagnostic(protocolDiagnosticPath, "callback_unrecognized");
     if (callbackUrl) {
       if (desktopRuntime) {
         void completeDesktopAuth0Callback(desktopRuntime, callbackUrl);
@@ -1605,3 +1607,4 @@ if (!singleInstance) {
     }
   });
 }
+

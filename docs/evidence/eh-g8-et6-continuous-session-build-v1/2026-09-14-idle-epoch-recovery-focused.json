@@ -1,0 +1,71 @@
+{
+  "schema": "casimirbot.idle_epoch_recovery_component_evidence.v1",
+  "recorded_at": "2026-09-14 08:58:19 UTC",
+  "packet": "docs/work-packets/eh-g8-cs-idle-epoch-recovery-v1.md",
+  "classification": "evidence re-entry",
+  "baseline_evidence": "2026-09-14-ready-up-retry-native.json",
+  "red": {
+    "command": "npx vitest run server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts -t 'Ready up recovers' --pool=forks --maxWorkers=1",
+    "exit_code": 1,
+    "passed": 1,
+    "failed": 1,
+    "failure": "durable_goal_authority_stale for active ledger with unrecorded epoch-only drift",
+    "log": ".tmp/idle-epoch-recovery-red-20260914.log",
+    "log_sha256": "4c9b63e165e4e94d26293a7b84b81dcaf2c1b2eb539a9ae702adaf9ff1dab712"
+  },
+  "green": {
+    "exit_code": 0,
+    "files": 5,
+    "tests": 143,
+    "groups": {
+      "real_goal_ledger": 58,
+      "preparation": 31,
+      "readiness": 29,
+      "ready_up": 12,
+      "recovery_composition": 13
+    },
+    "log": ".tmp/idle-epoch-recovery-focused-final-20260914.log",
+    "log_sha256": "c5919426a41202debd8f92728d2110a4b4daecafd4adb712603ac1278ec86ef1",
+    "command": "npx vitest run server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts server/services/environment-connectors/session/__tests__/recover-session-goal.test.ts server/services/environment-connectors/session/__tests__/ready-up-session.test.ts server/services/environment-connectors/session/__tests__/session-readiness.test.ts server/services/environment-connectors/session/__tests__/prepare-browser-session.test.ts --pool=forks --maxWorkers=1"
+  },
+  "scorecard": {
+    "basis": "Deterministic assertions on the enumerated fixtures, not an estimated real-world success probability.",
+    "recovery_scenarios_passed": 2,
+    "healthy_repeats_each": 3,
+    "rejected_variants_passed": 31,
+    "covered": "Authority ID/version/deadline; profile/host/installation/device; source binding/world/player/subject/participants/source/environment/room/run; expired evidence, revoked binding, unavailable authority; identity race before each of four writes; manual/emergency/revocation/death/pause/cancel.",
+    "real_components": [
+      "pg-mem durable ledger",
+      "goal reducer",
+      "evidence hash and identity validation",
+      "optimistic revision checks",
+      "recovery orchestration"
+    ],
+    "fixture_ports": [
+      "current connector identity",
+      "perception payload",
+      "exact task association"
+    ],
+    "physical_sensing_proved": false,
+    "live_movement_proved": false
+  },
+  "implementation": {
+    "recovery_sha256": "aafdc640a96f646219c42ec4851811a6846676e79d4db5227116a98cbfe54d25",
+    "ledger_sha256": "539fad652ff9a855f4fe86196e68b1f130124b27cc20dc32b2ffd389c6953527",
+    "tests_sha256": "4ced416bbb8e65337cb9027307b85344f908341929044a147865208198510033",
+    "contract": "Record one recovery marker only for same-authority epoch-only drift after exact fresh evidence. Check current identity inside every ledger append transaction. Reuse rebound/checkpoint/resume; no milestone progress or gameplay."
+  },
+  "full_discipline": "running separately; no PASS claim yet",
+  "docs_audit": {
+    "exit_code": 0,
+    "log": ".tmp/idle-epoch-recovery-docs-audit-20260914.log"
+  },
+  "package_rebuilt": false,
+  "native_repair_verified": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false
+}

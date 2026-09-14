@@ -1,0 +1,35 @@
+{
+  "schema": "casimirbot.nav1o.deterministic_acceptance.v1",
+  "date": "2026-09-13",
+  "capability": "NAV1-O opt-in admitted collision observation",
+  "maturity": "deterministically verified",
+  "source_commit": "0ecb9650f110aa62b2293760b15380f0766a3e04",
+  "worktree_note": "Shared dirty checkout; routing fixture isolation/profiling and documentation are additional uncommitted changes. No claim that the entire checkout equals this commit.",
+  "bounds": { "cells": 125, "dimensions": [5, 5, 5], "extension_max_bytes": 65536, "native_cooperative_discard_ms": 20, "hard_preemption_proven": false },
+  "requirements": {
+    "existing_admitted_path": "Optional MCP/probe flag forwarded by durable broker to FabricProbeExecutor; both broker result representations share normalization.",
+    "identity": "Replay selected-player UUID is checked against frozen admitted subject, never payload-supplied authority; dimension and actor-relative origin checked.",
+    "clock": "Snapshot revision, snapshot tick and replay tick agree; native changed-tick capture discarded.",
+    "size_and_coverage": "64 KiB envelope, exact 125 unique in-bounds cells, fixed dimensions, safe coordinates and unknown terrain retained.",
+    "default_compatibility": "No capture unless explicitly requested; unsolicited extension rejected; old sensors return typed unavailability; failed base probes remain failed.",
+    "no_movement": "No game action, mod deployment, pairing, or game authority change during this acceptance.",
+    "conditional_live_qualification": "Deferred: MCP Device Check returned Session terminated; matching running sensor/source not established. No live acceptance claimed."
+  },
+  "verification": {
+    "focused_typescript": { "passed": 144, "failed": 0, "groups": { "broker": 25, "mcp": 16, "normalizer": 30, "topology": 37, "native_replay": 13, "legacy": 15, "catalog": 8 } },
+    "native": { "passed": 26, "failed": 0, "groups": { "capture": 13, "facts": 8, "wrapper": 5 }, "xml_timestamp_utc": "2026-09-13T08:00:47Z" },
+    "full_discipline": { "command": "npm run helix:ask:discipline:full", "exit_code": 0, "passed": 101, "failed": 0, "groups": { "prelude": 4, "adversarial": 31, "api_parity": 31, "continuation": 26, "identity": 9 }, "isolation": "Unique persistent test ledger; original assertions and timeouts retained." },
+    "server_build": { "passed": true, "warnings_outside_nav": 4 },
+    "targeted_typecheck": "Zero diagnostics recorded in the original integration checkpoint; normalizer source hash unchanged.",
+    "dependency_coherence": "Manifest/lockfile root differences zero; npm ls --all --json --package-lock-only exited 0 with no problems.",
+    "adapter": { "run_id": "2691", "verdict": "PASS", "certificate_status": "GREEN", "integrity_ok": true, "certificate_hash": "d2821c7d650d8d4c86f5270c2510b94ed7cd8c45b12d807e0420613f9fe7ce5d" }
+  },
+  "source_hashes_sha256": {
+    "normalizer": "6E82D034722C7EAAAD878108AD08F2B0804065409819804CC94FED93E285C94B",
+    "broker_test": "9AE395BD63E152CFBA7DB6158A22FA03B396F984617FDF21F67229F3E0989C55",
+    "mcp_test": "E43B354DE3B17D9B2A1C3AB1DCD71E72383802592023834892FBF8B3149DF4D1"
+  },
+  "remaining": ["Matching-runtime read-only live capture and latency qualification", "Production ledger scan scalability", "Windows host-memory sampler compatibility without WMIC", "NAV-EQ and full NAV1 remain open"],
+  "public_movement_authority": false,
+  "live_accepted": false
+}

@@ -207,14 +207,25 @@ export function AgentAccountBindingReadiness() {
     bindings: EMPTY_BINDINGS,
   });
   const [linkBusy, setLinkBusy] = useState(false);
+  const [awaitingCallback, setAwaitingCallback] = useState(false);
+  const [linkDeadline, setLinkDeadline] = useState<number | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
   const activeRequest = useRef<AbortController | null>(null);
+  const linkWaitGeneration = useRef(0);
+  const linkStartRequest = useRef<AbortController | null>(null);
 
   const refresh = useCallback((): void => {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
     setState({ kind: "loading", bindings: EMPTY_BINDINGS });
+    const deadline = window.setTimeout(() => {
+      if (activeRequest.current !== controller) return;
+      controller.abort();
+      activeRequest.current = null;
+      setState({ kind: "unavailable", bindings: EMPTY_BINDINGS });
+    }, 15_000);
+    controller.signal.addEventListener("abort", () => window.clearTimeout(deadline), { once: true });
 
     void fetch(AGENT_ACCOUNT_BINDINGS_ENDPOINT, {
       method: "GET",
@@ -236,6 +247,7 @@ export function AgentAccountBindingReadiness() {
           return;
         }
         const parsed = parseAgentAccountBindingReadiness(await response.json());
+        if (controller.signal.aborted || activeRequest.current !== controller) return;
         setState(parsed ?? { kind: "unavailable", bindings: EMPTY_BINDINGS });
       })
       .catch((error: unknown) => {
@@ -248,6 +260,7 @@ export function AgentAccountBindingReadiness() {
         setState({ kind: "unavailable", bindings: EMPTY_BINDINGS });
       })
       .finally(() => {
+        window.clearTimeout(deadline);
         if (activeRequest.current === controller) {
           activeRequest.current = null;
         }
@@ -257,17 +270,35 @@ export function AgentAccountBindingReadiness() {
   useEffect(() => {
     refresh();
     return () => {
+      linkWaitGeneration.current += 1;
+      linkStartRequest.current?.abort();
       activeRequest.current?.abort();
       activeRequest.current = null;
     };
   }, [refresh]);
 
   useEffect(() => {
+    if (!linkBusy || !awaitingCallback || linkDeadline === null) return;
+    const timer = window.setTimeout(() => {
+      linkWaitGeneration.current += 1;
+      linkStartRequest.current?.abort();
+      setLinkBusy(false);
+      setAwaitingCallback(false);
+      setLinkError("The authorization wait reached its deadline on this device. Checking account status; close the old authorization page before retrying. No access has been inferred.");
+      refresh();
+    }, Math.max(0, Math.min(600_000, linkDeadline - Date.now())));
+    return () => window.clearTimeout(timer);
+  }, [linkBusy, awaitingCallback, linkDeadline, refresh]);
+
+  useEffect(() => {
     const subscribe = window.casimirDesktop?.onAuth0AccountLinkCompletion;
     if (!subscribe) return;
     return subscribe((candidate) => {
       const completion = parseDesktopAuth0AccountLinkCompletion(candidate);
+      linkWaitGeneration.current += 1;
+      linkStartRequest.current?.abort();
       setLinkBusy(false);
+      setAwaitingCallback(false);
       if (!completion) {
         setLinkError(
           "The desktop host returned an invalid account-link receipt.",
@@ -296,7 +327,14 @@ export function AgentAccountBindingReadiness() {
   const startAccountLink = useCallback(async (): Promise<void> => {
     const open = window.casimirDesktop?.openAuth0AccountLink;
     if (!open) return;
+    const generation = ++linkWaitGeneration.current;
+    linkStartRequest.current?.abort();
+    const startController = new AbortController();
+    linkStartRequest.current = startController;
     setLinkBusy(true);
+    // Bound preparation as well as the later browser callback wait.
+    setLinkDeadline(Date.now() + 15_000);
+    setAwaitingCallback(true);
     setLinkError(null);
     try {
       const response = await fetch(DESKTOP_AUTH0_ACCOUNT_LINK_START_PATH, {
@@ -304,21 +342,30 @@ export function AgentAccountBindingReadiness() {
         credentials: "same-origin",
         cache: "no-store",
         headers: { Accept: "application/json" },
+        signal: startController.signal,
       });
       const body = await response.json().catch(() => null);
+      if (generation !== linkWaitGeneration.current) return;
       if (!response.ok) {
         throw new Error("start failed");
       }
       const receipt = parseDesktopAuth0AccountLinkStartReceipt(body);
       if (!receipt) throw new Error("invalid receipt");
+      setLinkDeadline(Date.parse(receipt.expires_at));
+      // The native bridge may never settle. Recovery must cover that wait too.
+      setAwaitingCallback(true);
       await open(receipt.authorization_url);
       // Remain busy until the protocol callback is completed or the user
       // explicitly retries. No OAuth credential is returned to this renderer.
     } catch {
+      if (generation !== linkWaitGeneration.current) return;
       setLinkBusy(false);
+      setAwaitingCallback(false);
       setLinkError(
         "Auth0 account linking is unavailable or not configured in this desktop build.",
       );
+    } finally {
+      if (linkStartRequest.current === startController) linkStartRequest.current = null;
     }
   }, []);
 
@@ -404,6 +451,22 @@ export function AgentAccountBindingReadiness() {
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               )}
               {linkBusy ? "Waiting for Auth0" : "Link Auth0"}
+            </button>
+          ) : null}
+          {linkBusy && awaitingCallback ? (
+            <button
+              type="button"
+              onClick={() => {
+                linkWaitGeneration.current += 1;
+                linkStartRequest.current?.abort();
+                setAwaitingCallback(false);
+                setLinkBusy(false);
+                setLinkError("Stopped waiting here. Close the previous authorization page before choosing Link Auth0 again. This does not cancel an authorization already submitted.");
+                refresh();
+              }}
+              className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-slate-200"
+            >
+              Stop waiting
             </button>
           ) : null}
         </div>

@@ -1,0 +1,272 @@
+{
+  "scope": "Deterministic pairing-core tests with isolated principals/storage; not PostgreSQL contention, packaged consent, or live host acceptance",
+  "live_acceptance": false,
+  "success": true,
+  "suites": [
+    {
+      "file": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/server/db/__tests__/pairing-atomic-snapshot.test.ts",
+      "cases": [
+        {
+          "title": " O2/O5 atomic encrypted ledger pair rejects partial conflict and restores both committed rows from disk",
+          "status": "passed",
+          "duration_ms": 2498
+        }
+      ]
+    },
+    {
+      "file": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/server/db/__tests__/pairing-ledger-snapshot.test.ts",
+      "cases": [
+        {
+          "title": " restores an encrypted accepted pairing from the real migrated snapshot after database reconstruction",
+          "status": "passed",
+          "duration_ms": 1934
+        },
+        {
+          "title": " uses the actual desktop broker and restores across database/broker restart and key rotation",
+          "status": "passed",
+          "duration_ms": 1321
+        },
+        {
+          "title": " refuses a durability acknowledgement on a volatile-only database",
+          "status": "passed",
+          "duration_ms": 344
+        }
+      ]
+    },
+    {
+      "file": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/server/services/local-supervisor/__tests__/durable-reasoning-binding-access.test.ts",
+      "cases": [
+        {
+          "title": " rechecks the encrypted grant for dispatch, pickup, acknowledgement and browser display",
+          "status": "passed",
+          "duration_ms": 328
+        },
+        {
+          "title": " rejects storage failure, foreign owner and wrong task without cached authority",
+          "status": "passed",
+          "duration_ms": 29
+        },
+        {
+          "title": " preserves typed conflicts, missing events and expiry on durable steering",
+          "status": "passed",
+          "duration_ms": 94
+        },
+        {
+          "title": " rejects superseded cached bindings before dispatch, pickup, acknowledgement or restoration",
+          "status": "passed",
+          "duration_ms": 55
+        },
+        {
+          "title": " persists owner revocation despite lost device trust and reconciles a lost commit reply",
+          "status": "passed",
+          "duration_ms": 31
+        }
+      ]
+    },
+    {
+      "file": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/server/services/local-supervisor/__tests__/pairing-ledger-repository.test.ts",
+      "cases": [
+        {
+          "title": " human-approved invitation issuance through encrypted persistence issues once under concurrency and recovers the same copyable secret without renewal",
+          "status": "passed",
+          "duration_ms": 184
+        },
+        {
+          "title": " human-approved invitation issuance through encrypted persistence rejects non-human issuance and changed reviewed scope without replacing an existing invitation",
+          "status": "passed",
+          "duration_ms": 43
+        },
+        {
+          "title": " human-approved invitation issuance through encrypted persistence reconciles a lost durability reply and accepts the recovered secret exactly once",
+          "status": "passed",
+          "duration_ms": 67
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence keeps the predecessor until acceptance, then rejects its replay and recovery permanently",
+          "status": "passed",
+          "duration_ms": 91
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence issues the exact human-reviewed replacement without consuming the predecessor and reconciles after acceptance",
+          "status": "passed",
+          "duration_ms": 84
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence allows exactly one of two concurrent replacements to consume the reviewed revision",
+          "status": "passed",
+          "duration_ms": 86
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence reconciles simultaneous retries of the same replacement without another revision",
+          "status": "passed",
+          "duration_ms": 59
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence loses cleanly to predecessor revocation between policy validation and commit",
+          "status": "passed",
+          "duration_ms": 56
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence reconciles a retry that reads pending just before the same replacement commits",
+          "status": "passed",
+          "duration_ms": 57
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence reconciles a failed durability reply with the same two committed records and deadlines",
+          "status": "passed",
+          "duration_ms": 47
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence preserves both rows when encryption fails before the atomic write",
+          "status": "passed",
+          "duration_ms": 30
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence withholds acceptance if the replacement is revoked during its durability barrier",
+          "status": "passed",
+          "duration_ms": 57
+        },
+        {
+          "title": " replacement acceptance through encrypted atomic persistence does not consume an independently revoked predecessor or an expired invitation",
+          "status": "passed",
+          "duration_ms": 31
+        },
+        {
+          "title": " server-owned encrypted pairing repository reloads exact approved state through another repository without plaintext identity payload",
+          "status": "passed",
+          "duration_ms": 28
+        },
+        {
+          "title": " server-owned encrypted pairing repository deduplicates inserts and allows one concurrent transition per revision",
+          "status": "passed",
+          "duration_ms": 33
+        },
+        {
+          "title": " server-owned encrypted pairing repository does not let stale acceptance overwrite a committed revocation",
+          "status": "passed",
+          "duration_ms": 24
+        },
+        {
+          "title": " server-owned encrypted pairing repository rejects copied ciphertext and revision tampering",
+          "status": "passed",
+          "duration_ms": 30
+        },
+        {
+          "title": " server-owned encrypted pairing repository fails before a write if encryption fails and does not report success if flushing fails",
+          "status": "passed",
+          "duration_ms": 28
+        },
+        {
+          "title": " server-owned encrypted pairing repository withholds the write result until the durability barrier resolves",
+          "status": "passed",
+          "duration_ms": 12
+        },
+        {
+          "title": " server-owned encrypted pairing repository reconciles a transition whose durability reply failed without another revision",
+          "status": "passed",
+          "duration_ms": 26
+        },
+        {
+          "title": " server-owned encrypted pairing repository native factory refuses incomplete broker configuration ()",
+          "status": "passed",
+          "duration_ms": 1
+        },
+        {
+          "title": " server-owned encrypted pairing repository native factory refuses incomplete broker configuration (http://127.0.0.1:1)",
+          "status": "passed",
+          "duration_ms": 1
+        },
+        {
+          "title": " server-owned encrypted pairing repository native factory refuses incomplete broker configuration ()",
+          "status": "passed",
+          "duration_ms": 0
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities accepts concurrently after idle, replays without renewal, and independently revokes",
+          "status": "passed",
+          "duration_ms": 43
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities rejects forged credentials, wrong secrets, wrong tasks and provider-origin revocation",
+          "status": "passed",
+          "duration_ms": 16
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities reconciles acceptance after a failed durability reply and rejects expired acceptance",
+          "status": "passed",
+          "duration_ms": 31
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: initial acceptance at invitation deadline offset -0.001 seconds",
+          "status": "passed",
+          "duration_ms": 22
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: initial acceptance at invitation deadline offset 0 seconds",
+          "status": "passed",
+          "duration_ms": 14
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: initial acceptance at invitation deadline offset 0.001 seconds",
+          "status": "passed",
+          "duration_ms": 14
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: recovery at pairing deadline offset -0.001 seconds",
+          "status": "passed",
+          "duration_ms": 18
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: recovery at pairing deadline offset 0 seconds",
+          "status": "passed",
+          "duration_ms": 25
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: recovery at pairing deadline offset 0.001 seconds",
+          "status": "passed",
+          "duration_ms": 22
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: expiry during acceptance durability withholds success and cannot renew on recovery",
+          "status": "passed",
+          "duration_ms": 26
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O5 timers: a backward clock cannot recover before the recorded acceptance",
+          "status": "passed",
+          "duration_ms": 22
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O2/O5: revocation during acceptance durability wins (replay=false)",
+          "status": "passed",
+          "duration_ms": 34
+        },
+        {
+          "title": " pairing transition service with isolated authenticated identities O2/O5: revocation during acceptance durability wins (replay=true)",
+          "status": "passed",
+          "duration_ms": 29
+        }
+      ]
+    },
+    {
+      "file": "C:/Users/dan/Desktop/RESEARCH 1,0/research/Alcubierre drive/casimirbot.com/versions/CasimirBot (9-3-25)/CasimirBot (9-3-25)/CasimirBot/server/services/local-supervisor/__tests__/pairing-runtime-binding.test.ts",
+      "cases": [
+        {
+          "title": " durable runtime binding preflight requires fresh admission for every operation and preserves same-session dedupe",
+          "status": "passed",
+          "duration_ms": 18
+        },
+        {
+          "title": " durable runtime binding preflight rejects wrong destinations, missing durable evidence and exact grant expiry",
+          "status": "passed",
+          "duration_ms": 4
+        },
+        {
+          "title": " durable runtime binding preflight changes the transient binding identity on service replacement without extending consent",
+          "status": "passed",
+          "duration_ms": 2
+        }
+      ]
+    }
+  ]
+}

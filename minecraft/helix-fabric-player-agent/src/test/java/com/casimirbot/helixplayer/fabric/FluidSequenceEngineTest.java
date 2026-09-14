@@ -11,6 +11,44 @@ import org.junit.jupiter.api.Test;
 
 final class FluidSequenceEngineTest {
     @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "HELIX_NATIVE_COMPILED_HANDOFF", matches = "1")
+    void continuousServerCompiledChainHasNoReleasedTickAcrossThreeHandoffs() throws Exception {
+        Object raw = com.casimirbot.helixsensor.HelixJson.parse(java.nio.file.Files.readString(
+            java.nio.file.Path.of("build", "server-compiled-continuous-chain.json")));
+        List<Map<String, Object>> plans = ((List<?>) raw).stream()
+            .map(com.casimirbot.helixsensor.HelixJson::asObject).toList();
+        assertEquals(4, plans.size());
+        List<Map<String, Object>> arguments = plans.stream().map(plan ->
+            com.casimirbot.helixsensor.HelixJson.asObject(
+                com.casimirbot.helixsensor.HelixJson.asObject(plan.get("artifact")).get("arguments"))).toList();
+        FakeBridge bridge = new FakeBridge();
+        FluidSequenceEngine engine = new FluidSequenceEngine(bridge);
+        engine.begin(arguments.get(0));
+        WorkflowStep result = null;
+        int movingTicks = 0;
+        for (int tick = 0; tick <= 84; tick++) {
+            bridge.snapshot = new PlayerSnapshot(true, tick * 0.1, 64, 65.62, 0, 0, 0, 20, true, false, false, null);
+            result = engine.step(tick + 1);
+            if (tick < 84) {
+                assertEquals(WorkflowStepStatus.RUNNING, result.status());
+                assertTrue(bridge.movement.forward(), "Released movement at tick " + tick);
+                movingTicks++;
+            }
+            if (tick == 0 || tick == 21 || tick == 42) {
+                int predecessor = tick / 21;
+                assertTrue(engine.queueAdmittedSuccessor(
+                    String.valueOf(arguments.get(predecessor).get("sequence_id")),
+                    "checkpoint:compiled-walk", arguments.get(predecessor + 1), tick + 21, tick, tick + 20, 0));
+            }
+        }
+        assertEquals(84, movingTicks);
+        assertEquals(WorkflowStepStatus.SUCCEEDED, result.status());
+        assertEquals(3, result.measurements().get("resident_handoff_count"));
+        assertTrue(bridge.released);
+        assertFalse(bridge.movement.forward());
+    }
+
+    @Test
     void scheduledCompilerWalksSeparateLaunchWaitFromThreeMovingHandoffs() throws Exception {
         Object raw;
         try (var stream = getClass().getResourceAsStream("/compiled-scheduled-handoff.json")) {

@@ -6,6 +6,7 @@ import { PairingLedgerRepository, createNativePairingLedgerRepository } from "..
 import { createPairingLedgerRow, pairingApprovalSchema, acceptPairingLedgerRow, revokePairingLedgerRow } from "../pairing-ledger-contract";
 import { PairingTransitionService } from "../pairing-transition-service";
 import { PairingInvitationService } from "../pairing-invitation-service";
+import { commitEmbeddedPairingReplacement } from "../embedded-pairing-replacement-commit";
 
 const pools: Array<{ end(): Promise<void> }> = [];
 afterEach(async () => { await Promise.all(pools.splice(0).map(pool => pool.end())); vi.unstubAllEnvs(); });
@@ -100,8 +101,179 @@ async function fixture() {
     },
   };
   const flush = vi.fn(async () => {});
-  return { pool, codec, flush, repo: new PairingLedgerRepository(pool, codec, flush) };
+  return { pool, codec, flush, repo: new PairingLedgerRepository(pool, codec, flush,
+    async writes => commitEmbeddedPairingReplacement(db, writes)) };
 }
+
+describe("replacement acceptance through encrypted atomic persistence", () => {
+  async function replacementFixture() {
+    const h = await fixture();
+    const secret = crypto.randomBytes(32).toString("base64url");
+    const initial = { ...row("fixture-predecessor"),
+      acceptanceSecretDigest: crypto.createHash("sha256").update(secret).digest("hex") };
+    const old = acceptPairingLedgerRow(initial, actor, at(1));
+    const pending = createPairingLedgerRow({
+      id: "fixture-replacement", approval: pairingApprovalSchema.parse({ ...old.approval,
+        policyRevision: 2, replacement: { pairingId: old.id, revision: old.revision } }),
+      requestDigest: "c".repeat(64), acceptanceSecretDigest: crypto.createHash("sha256").update(secret).digest("hex"),
+      consentReceiptId: "fixture-replacement-consent",
+    }, at(2));
+    await h.repo.insert(initial);
+    await h.repo.compareAndSwap(old, 1);
+    await h.repo.insert(pending);
+    let seconds = 3;
+    const service = new PairingTransitionService(h.repo, {
+      destination: async (credential: string) => {
+        if (credential !== "fixture-provider") throw new Error("fixture-provider-required");
+        return actor;
+      },
+      humanOwner: async (credential: string) => {
+        if (credential !== "fixture-human") throw new Error("fixture-human-required");
+        return actor.profileId;
+      },
+    }, () => at(seconds));
+    return { ...h, old, pending, secret, service, time: (value: number) => { seconds = value; },
+      request: { id: pending.id, secret } };
+  }
+
+  it("keeps the predecessor until acceptance, then rejects its replay and recovery permanently", async () => {
+    const h = await replacementFixture();
+    expect(await h.service.recover("fixture-provider", h.old.id)).toMatchObject({ state: "accepted" });
+    const accepted = await h.service.accept("fixture-provider", h.request);
+    expect(accepted).toMatchObject({ state: "accepted", revision: 2 });
+    expect(await h.repo.read(actor.profileId, h.old.id)).toMatchObject({ revision: 3,
+      supersession: { pairingId: h.pending.id, at: at(3).toISOString() } });
+    expect(await h.service.accept("fixture-provider", h.request)).toEqual(accepted);
+    await expect(h.service.recover("fixture-provider", h.old.id)).rejects.toThrow("pairing_superseded");
+    await expect(h.service.accept("fixture-provider", { id: h.old.id, secret: h.secret }))
+      .rejects.toThrow("pairing_superseded");
+    await h.service.revoke("fixture-human", h.pending.id);
+    await expect(h.service.recover("fixture-provider", h.old.id)).rejects.toThrow("pairing_superseded");
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("pairing_revoked");
+  });
+
+  it("issues the exact human-reviewed replacement without consuming the predecessor and reconciles after acceptance", async () => {
+    const h = await replacementFixture();
+    const approval = h.pending.approval;
+    const request = { requestId: "fixture-reviewed-replacement", registrationId: "fixture-registration",
+      chatId: approval.chatId, environment: approval.environment, invitationSeconds: approval.invitationSeconds,
+      pairingSeconds: approval.pairingSeconds, replacement: approval.replacement };
+    const authorize = vi.fn(async (credential: string) => {
+      if (credential !== "fixture-human") throw new Error("fixture-human-required");
+      return { approval, consentReceiptId: "fixture-review-consent" };
+    });
+    const issuer = new PairingInvitationService(h.repo, authorize, () => at(3));
+    await expect(issuer.issue("fixture-provider", request)).rejects.toThrow("fixture-human-required");
+    await expect(issuer.issue("fixture-human", { ...request, replacement: undefined }))
+      .rejects.toThrow("pairing_approval_scope_mismatch");
+    const issued = await issuer.issue("fixture-human", request);
+    expect(issued.pairing.replacement).toEqual(request.replacement);
+    expect(await h.repo.read(actor.profileId, h.old.id)).toEqual(h.old);
+    expect(await issuer.issue("fixture-human", request)).toEqual(issued);
+    const accepted = await h.service.accept("fixture-provider", issued.invitation);
+    expect(await issuer.issue("fixture-human", request)).toEqual({ pairing: accepted, invitation: null });
+    await expect(issuer.issue("fixture-human", { ...request, requestId: "fixture-stale-new-request" }))
+      .rejects.toThrow("pairing_replacement_conflict");
+    authorize.mockResolvedValueOnce({ approval: { ...approval, replacement: { pairingId: h.old.id, revision: 3 } },
+      consentReceiptId: "fixture-review-consent" });
+    await expect(issuer.issue("fixture-human", { ...request, replacement: { pairingId: h.old.id, revision: 3 } }))
+      .rejects.toThrow("pairing_invitation_request_conflict");
+  });
+
+  it("allows exactly one of two concurrent replacements to consume the reviewed revision", async () => {
+    const h = await replacementFixture();
+    const competitor = { ...h.pending, id: "fixture-competing-replacement", requestDigest: "d".repeat(64) };
+    await h.repo.insert(competitor);
+    const results = await Promise.allSettled([
+      h.service.accept("fixture-provider", h.request),
+      h.service.accept("fixture-provider", { id: competitor.id, secret: h.secret }),
+    ]);
+    const successes = results.filter(result => result.status === "fulfilled");
+    expect(successes).toHaveLength(1);
+    expect(results.find(result => result.status === "rejected")).toMatchObject({
+      reason: new Error("pairing_replacement_conflict"),
+    });
+    const winner = (successes[0] as PromiseFulfilledResult<{ id: string }>).value.id;
+    expect((await h.repo.read(actor.profileId, h.old.id))?.supersession?.pairingId).toBe(winner);
+    const loser = winner === h.pending.id ? competitor.id : h.pending.id;
+    expect(await h.repo.read(actor.profileId, loser)).toMatchObject({ revision: 1, acceptedAt: null });
+    await expect(h.service.accept("fixture-provider", { id: loser, secret: h.secret }))
+      .rejects.toThrow("pairing_replacement_conflict");
+  });
+
+  it("reconciles simultaneous retries of the same replacement without another revision", async () => {
+    const h = await replacementFixture();
+    const [first, replay] = await Promise.all([
+      h.service.accept("fixture-provider", h.request), h.service.accept("fixture-provider", h.request),
+    ]);
+    expect(first).toEqual(replay);
+    expect(first.revision).toBe(2);
+    expect((await h.repo.read(actor.profileId, h.old.id))?.revision).toBe(3);
+  });
+
+  it("loses cleanly to predecessor revocation between policy validation and commit", async () => {
+    const h = await replacementFixture();
+    const commit = h.repo.compareAndSwapPair.bind(h.repo);
+    vi.spyOn(h.repo, "compareAndSwapPair").mockImplementationOnce(async (first, second) => {
+      await h.service.revoke("fixture-human", h.old.id);
+      return commit(first, second);
+    });
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("pairing_replacement_conflict");
+    expect(await h.repo.read(actor.profileId, h.pending.id)).toEqual(h.pending);
+    expect(await h.repo.read(actor.profileId, h.old.id)).toMatchObject({ revokedAt: at(3).toISOString(), revision: 3 });
+    expect((await h.repo.read(actor.profileId, h.old.id))?.supersession).toBeUndefined();
+  });
+
+  it("reconciles a retry that reads pending just before the same replacement commits", async () => {
+    const h = await replacementFixture();
+    const read = h.repo.read.bind(h.repo);
+    vi.spyOn(h.repo, "read").mockImplementationOnce(async (owner, id) => {
+      const stale = await read(owner, id);
+      await h.service.accept("fixture-provider", h.request);
+      return stale;
+    });
+    expect(await h.service.accept("fixture-provider", h.request)).toMatchObject({ state: "accepted", revision: 2 });
+    expect((await h.repo.read(actor.profileId, h.old.id))?.revision).toBe(3);
+  });
+
+  it("reconciles a failed durability reply with the same two committed records and deadlines", async () => {
+    const h = await replacementFixture();
+    h.flush.mockRejectedValueOnce(new Error("fixture-disk-reply-lost"));
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("fixture-disk-reply-lost");
+    h.time(4);
+    const replay = await h.service.accept("fixture-provider", h.request);
+    expect(replay).toMatchObject({ state: "accepted", revision: 2, acceptedAt: at(3).toISOString(),
+      pairingExpiresAt: h.pending.pairingExpiresAt });
+    expect(await h.service.recover("fixture-provider", h.pending.id)).toEqual(replay);
+    expect((await h.repo.read(actor.profileId, h.old.id))?.revision).toBe(3);
+  });
+
+  it("preserves both rows when encryption fails before the atomic write", async () => {
+    const h = await replacementFixture();
+    vi.spyOn(h.codec, "seal").mockRejectedValueOnce(new Error("fixture-seal-failed"));
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("fixture-seal-failed");
+    expect(await h.repo.read(actor.profileId, h.old.id)).toEqual(h.old);
+    expect(await h.repo.read(actor.profileId, h.pending.id)).toEqual(h.pending);
+  });
+
+  it("withholds acceptance if the replacement is revoked during its durability barrier", async () => {
+    const h = await replacementFixture();
+    h.flush.mockImplementationOnce(async () => { await h.service.revoke("fixture-human", h.pending.id); });
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("pairing_revoked");
+    await expect(h.service.recover("fixture-provider", h.old.id)).rejects.toThrow("pairing_superseded");
+  });
+
+  it("does not consume an independently revoked predecessor or an expired invitation", async () => {
+    const h = await replacementFixture();
+    h.time(1000);
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("pairing_replacement_not_pending");
+    expect(await h.repo.read(actor.profileId, h.old.id)).toEqual(h.old);
+    h.time(4);
+    await h.service.revoke("fixture-human", h.old.id);
+    await expect(h.service.accept("fixture-provider", h.request)).rejects.toThrow("pairing_replacement_conflict");
+    expect(await h.repo.read(actor.profileId, h.pending.id)).toEqual(h.pending);
+  });
+});
 
 describe("server-owned encrypted pairing repository", () => {
   it("reloads exact approved state through another repository without plaintext identity payload", async () => {
@@ -239,9 +411,50 @@ describe("pairing transition service with isolated authenticated identities", ()
     h.time(28800);
     await expect(h.service.accept("fixture-provider-session", input)).rejects.toThrow("pairing_expired");
   });
-  it("does not return accepted when revocation commits during replay reconciliation", async () => {
+  it.each([-0.001, 0, 0.001])("O5 timers: initial acceptance at invitation deadline offset %s seconds", async (offset) => {
+    const h = await serviceFixture();
+    h.time(h.original.approval.invitationSeconds + offset);
+    const result = h.service.accept("fixture-provider-session", { id: h.original.id, secret: h.secret });
+    if (offset < 0) {
+      await expect(result).resolves.toMatchObject({ state: "accepted", revision: 2,
+        pairingExpiresAt: h.original.pairingExpiresAt, executionAuthority: false });
+    } else {
+      await expect(result).rejects.toThrow("pairing_expired");
+      expect(await h.repo.read(actor.profileId, h.original.id)).toEqual(h.original);
+    }
+  });
+  it.each([-0.001, 0, 0.001])("O5 timers: recovery at pairing deadline offset %s seconds", async (offset) => {
+    const h = await serviceFixture();
+    const accepted = await h.service.accept("fixture-provider-session", { id: h.original.id, secret: h.secret });
+    const stored = await h.repo.read(actor.profileId, h.original.id);
+    h.time(h.original.approval.pairingSeconds + offset);
+    const result = h.service.recover("fixture-provider-session", h.original.id);
+    if (offset < 0) await expect(result).resolves.toEqual(accepted);
+    else await expect(result).rejects.toThrow("pairing_expired");
+    expect(await h.repo.read(actor.profileId, h.original.id)).toEqual(stored);
+  });
+  it("O5 timers: expiry during acceptance durability withholds success and cannot renew on recovery", async () => {
+    const h = await serviceFixture();
+    h.flush.mockImplementationOnce(async () => { h.time(h.original.approval.pairingSeconds); });
+    await expect(h.service.accept("fixture-provider-session", { id: h.original.id, secret: h.secret }))
+      .rejects.toThrow("pairing_expired");
+    const committed = await h.repo.read(actor.profileId, h.original.id);
+    expect(committed).toMatchObject({ revision: 2, pairingExpiresAt: h.original.pairingExpiresAt });
+    await expect(h.service.recover("fixture-provider-session", h.original.id)).rejects.toThrow("pairing_expired");
+    expect(await h.repo.read(actor.profileId, h.original.id)).toEqual(committed);
+  });
+  it("O5 timers: a backward clock cannot recover before the recorded acceptance", async () => {
+    const h = await serviceFixture();
+    await h.service.accept("fixture-provider-session", { id: h.original.id, secret: h.secret });
+    const committed = await h.repo.read(actor.profileId, h.original.id);
+    h.time(300.999);
+    await expect(h.service.recover("fixture-provider-session", h.original.id))
+      .rejects.toThrow("pairing_clock_before_transition");
+    expect(await h.repo.read(actor.profileId, h.original.id)).toEqual(committed);
+  });
+  it.each([false, true])("O2/O5: revocation during acceptance durability wins (replay=%s)", async (replay) => {
     const h = await serviceFixture(); const input = { id: h.original.id, secret: h.secret };
-    await h.service.accept("fixture-provider-session", input);
+    if (replay) await h.service.accept("fixture-provider-session", input);
     h.flush.mockImplementationOnce(async () => {
       await h.service.revoke("fixture-human-session", input.id);
     });

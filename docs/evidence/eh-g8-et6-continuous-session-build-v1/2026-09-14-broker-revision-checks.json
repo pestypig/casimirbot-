@@ -1,0 +1,53 @@
+{
+  "schema": "casimirbot.continuous_session_source_checks.v1",
+  "observed_at": "2026-09-14T10:32:35.096Z",
+  "classification": "evidence re-entry",
+  "scope": "Isolated deterministic regression, server build and documentation evidence; not packaged or live acceptance.",
+  "focused_evidence": "2026-09-14-broker-revision-focused.json",
+  "discipline": {
+    "command": "npm run helix:ask:discipline:full",
+    "exit_code": 0,
+    "passed_tests": 101,
+    "shard_pass_counts": [
+      4,
+      8,
+      8,
+      8,
+      7,
+      15,
+      4,
+      4,
+      4,
+      4,
+      26,
+      9
+    ],
+    "log": ".tmp/broker-revision-discipline-full-20260914.log",
+    "sha256": "e9e2566abf6c00894ba333b80ff778295966e105a059bcd0cb20cc003e88a413"
+  },
+  "server_build": {
+    "passed": true,
+    "existing_duplicate_key_warnings": 4,
+    "warning_scope": "Existing starsim structure-mesa and oscillation-gyre object literals"
+  },
+  "documentation": {
+    "command": "npm run helix:environment-harness:docs-audit",
+    "exit_code": 0,
+    "log": ".tmp/broker-revision-docs-20260914.log",
+    "sha256": "325c3ebd15651c8b3d94ef1d090f08dbe5103822f6c81c54a25a866f44bbc980"
+  },
+  "source_sha256": {
+    "server/services/environment-connectors/session/recover-session-goal.ts": "4969707998845aaac746f075e77e7102bb1e50a46b6a967bf2c17c1f152664a1",
+    "server/services/environment-connectors/session/ready-up-session.ts": "01323465d4b401cc26ae625a7dea359c33bd74008cca3dccfd98873571aba4ba",
+    "server/services/environment-connectors/session/session-readiness.ts": "56c88fa53893e7a7b510b1664ee9ff39473b8f7812a9d53af9525aadaf3afff3"
+  },
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "casimir_verification_run": false,
+  "credential_included": false,
+  "hidden_reasoning_included": false
+}

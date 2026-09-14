@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "controlled-stellar-composition-transport-g1-neutrino-source/1",
+  "status": "scalar_fluxes_and_conditional_conversion_policy_bound",
+  "launchAllowed": false,
+  "source": {
+    "url": "https://borex.lngs.infn.it/Thesis/Omer.Penek_PhD_Thesis.pdf",
+    "author": "Omer Penek",
+    "pdfSha256": "c9210abf660e4bbd997a3ce1d4e53a399131f0a873a89a0b9bb2b8affb3979f3",
+    "localReviewCopy": "tmp/pdfs/g1-source-review/penek-borexino-thesis.pdf",
+    "verification": "Poppler text extraction plus rendered inspection of complete PDF pages 150 and 154, Tables 28 and 31",
+    "scope": "author's pp-chain analysis tables; not the later CNO 2022 measurement",
+    "excludedTable": "Table 42 has a Be7 exponent inconsistent with Table 28 and collaboration open data; do not use Table 42 for Be7"
+  },
+  "unit": "cm^-2 s^-1",
+  "fluxes": {
+    "pp": {"central": 6.1e10, "statMinus": 0.5e10, "statPlus": 0.5e10, "sysMinus": 0.5e10, "sysPlus": 0.3e10, "table": 28},
+    "be7": {"central": 4.99e9, "statMinus": 0.11e9, "statPlus": 0.11e9, "sysMinus": 0.08e9, "sysPlus": 0.06e9, "table": 28},
+    "b8": {"central": 5.68e6, "statMinus": 0.41e6, "statPlus": 0.39e6, "sysMinus": 0.03e6, "sysPlus": 0.03e6, "table": 31, "row": "Combined"},
+    "cno": {"central": 6.6e8, "totalMinus": 0.9e8, "totalPlus": 2.0e8, "source": "https://arxiv.org/abs/2205.15975", "location": "abstract and page 4 rate-to-flux paragraph", "uncertainty": "published asymmetric total interval including systematics; do not add rate uncertainty again"}
+  },
+  "conversionPolicy": {
+    "comparison": "compare stellar production luminosity divided by 4*pi*(1 AU)^2 directly to published inferred all-flavor flux; do not multiply the model flux by electron survival probability a second time",
+    "ppChain": "Penek chapter 10.10.2 equation 10.22: R=Ne*Phi*epsilon; epsilon folds scattering response and species-dependent survival from chapter 11.2. Use the published inferred flux conditionally, not an independent refit.",
+    "ppChainParameters": {"sinSquaredTheta12": 0.297, "sinSquaredTheta12Minus": 0.017, "sinSquaredTheta12Plus": 0.016, "deltaM21SquaredEV2": 7.37e-5, "deltaM21SquaredMinusEV2": 0.17e-5, "deltaM21SquaredPlusEV2": 0.16e-5, "location": "Penek page 115, equations 11.24-11.25"},
+    "cno": "Published three-flavor MSW inference, oscillation parameters from Esteban et al. 2020, and relative N13/O15/F17 contributions from B16; not a composition-independent detector likelihood.",
+    "cnoOscillationSource": "https://arxiv.org/abs/2007.14792",
+    "limitations": "G1 is conditional on each source's conversion assumptions. Changed production profiles, CNO ratios or a later intervention require response recalculation or quantified conversion-systematic validation before observational promotion. No common oscillation-parameter likelihood is fabricated."
+  },
+  "sourceCautions": [
+    "Fluxes are conditional inferences, not direct all-flavor counts; conversion conventions and their limitations are recorded above.",
+    "These widths are not independent Gaussian likelihoods.",
+    "Primary paper DOI 10.1038/s41586-018-0624-y full text was not available through the attempted publisher endpoint; accessible author thesis and collaboration data were used explicitly instead.",
+    "Structural inversions remain required; no partial-vector admission."
+  ]
+}

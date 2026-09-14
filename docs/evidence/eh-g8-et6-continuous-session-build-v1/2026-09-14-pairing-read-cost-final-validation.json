@@ -1,0 +1,33 @@
+{
+  "schema": "cs.pairing_read_cost_final_validation.v1",
+  "recorded_at": "2026-09-14T14:45:49.168Z",
+  "focused_tests_passed": 60,
+  "real_postgresql_tests_passed": 5,
+  "documentation_audit": {
+    "command": "npm run helix:environment-harness:docs-audit",
+    "exit_code": 0,
+    "ok": true,
+    "failures": [],
+    "log": ".tmp/pairing-read-cost-final-docs-20260914.log"
+  },
+  "scoped_diff_check": {
+    "exit_code": 0,
+    "paths": [
+      "server/db/client.ts",
+      "server/services/local-supervisor/pairing-ledger-repository.ts",
+      "docs/helix-environment-harness-work-program-v1.md"
+    ],
+    "warning": "Existing repository line-ending conversion warnings only"
+  },
+  "native_post_restart_capture": "unverified due tool failure",
+  "automatic_ready_up_current_package": "unresolved internal_error",
+  "root_diagnostic": "succeeded; not three successors",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "cs5_handoff_recorded": true,
+  "goal_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

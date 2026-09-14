@@ -4,17 +4,21 @@ import { readDurableEnvironmentProbeContinuationEvidence } from "../probe/durabl
 import { readSharedRealtimeRoomDatabase } from "../../helix-ask/realtime-room/room-store/database";
 import { resolveEnvironmentTemporalActionCatalog } from "../actions/action-broker";
 import { TEMPORAL_OBSERVATION_MAX_AGE_MS } from "./temporal-observation-window";
+import { performance } from "node:perf_hooks";
 
 /** Internal frontier prerequisite, never a dispatch or an authorization receipt. */
 export const resolveTemporalPerceptionContext = async (input:
   Parameters<typeof environmentDurableGoalStore.resolveTemporalAdmissionContext>[0] & {
     probeRequestId: string; priorTurnId: string;
   }) => {
+  const startedAt = performance.now();
   const goal = await environmentDurableGoalStore.resolveTemporalAdmissionContext(input);
+  const goalReadyAt = performance.now();
   const identity = goal.identity;
   const catalog = await resolveEnvironmentTemporalActionCatalog({ profileId: input.profileId,
     roomId: identity.room_id, environmentBindingId: identity.environment_binding_id,
     participantId: identity.authority_participant_id });
+  const catalogReadyAt = performance.now();
   const current = catalog.context;
   if (current.actionAuthorityId !== identity.action_authority_id ||
       current.policyVersion !== identity.authority_policy_version ||
@@ -26,9 +30,21 @@ export const resolveTemporalPerceptionContext = async (input:
     throw new EnvironmentDurableGoalError("durable_goal_authority_stale", 409,
       "The temporal catalog no longer matches the complete goal action identity.");
   }
-  const perception = await readExactEnvironmentPerceptionEvidence({
-    identity, probeRequestId: input.probeRequestId, priorTurnId: input.priorTurnId,
-  });
+  let perception: Awaited<ReturnType<typeof readExactEnvironmentPerceptionEvidence>>;
+  try {
+    perception = await readExactEnvironmentPerceptionEvidence({
+      identity, probeRequestId: input.probeRequestId, priorTurnId: input.priorTurnId,
+    });
+  } catch (error) {
+    if (error instanceof EnvironmentDurableGoalError && error.evidenceExpiry) {
+      throw new EnvironmentDurableGoalError(error.code, error.statusCode, error.message,
+        error.evidenceRefs, error.mismatchReasons, { ...error.evidenceExpiry,
+          context_stage_ms: { goal: Math.floor(goalReadyAt - startedAt),
+            catalog: Math.floor(catalogReadyAt - goalReadyAt),
+            perception: Math.floor(performance.now() - catalogReadyAt) } });
+    }
+    throw error;
+  }
   return { goal, ...perception, catalog,
     action_producer_epoch_ref: identity.producer_epoch_ref,
     execution_authority: false as const, answer_authority: false as const,
@@ -69,17 +85,24 @@ export const readExactEnvironmentPerceptionEvidence = async (input: {
   const observationEpoch = selected.rows[0]?.producer_epoch_ref;
   if (!observationEpoch) throw new EnvironmentDurableGoalError(
     "durable_goal_identity_unavailable", 409, "The current observation producer is unavailable.");
+  let expiry: EnvironmentDurableGoalError["evidenceExpiry"];
   const evidence = await readDurableEnvironmentProbeContinuationEvidence({
     requestId: input.probeRequestId, expectedPriorTurnId: input.priorTurnId,
     expectedRoomId: identity.room_id,
     expectedCapabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
     maxAgeMs: TEMPORAL_OBSERVATION_MAX_AGE_MS,
+    onExpired: diagnostic => { expiry = diagnostic; },
     expectedEnvironmentIdentity: {
       environmentBindingId: identity.environment_binding_id, sourceId: identity.source_id,
       worldId: identity.world_id, subjectBindingId: identity.subject_binding_id,
       subjectNativeId: identity.subject_native_id, observationProducerEpochRef: observationEpoch,
     },
   });
+  if (!evidence && expiry) {
+    throw new EnvironmentDurableGoalError("durable_goal_evidence_stale", 409,
+      "The exact-player perception expired before temporal admission. Acquire fresh evidence before proposing new work.",
+      [], [], expiry);
+  }
   if (!evidence || evidence.observation.result.snapshot_schema !== "helix.minecraft_perception_snapshot.v1") {
     throw new EnvironmentDurableGoalError("durable_goal_evidence_identity_mismatch", 409,
       "A fresh exact-player perception snapshot is required for temporal planning.");

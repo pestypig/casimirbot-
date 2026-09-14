@@ -1,0 +1,39 @@
+{
+  "schema": "casimirbot.durable_review_browser_matrix.v1",
+  "observed_at": "2026-09-14T03:21:55Z",
+  "scope": "Isolated Chromium pointer/keyboard integration, actual HTTP handlers and encrypted repository over pg-mem; not production consent or live acceptance",
+  "command": "npx playwright test --config=playwright.onboarding.config.ts durable-real-handlers.spec.ts durable-pairing.spec.ts",
+  "log": ".tmp/durable-review-browser-regressions-20260913.log",
+  "exit_code": 0,
+  "passed": 22,
+  "failed": 0,
+  "duration_seconds": 37.1,
+  "actual_handler_cases": 18,
+  "mock_response_layout_cases": 4,
+  "added_cases": {
+    "count": 4,
+    "inputs": ["pointer at 375px", "keyboard at 1280px"],
+    "valid_run": "Advance browser time 181 seconds before selecting the retained run. Human fixture approval reaches the actual handler and encrypted ledger once; exact run is accepted and restored with polling, unchanged deadlines and one row.",
+    "expired_run": "Advance browser time 181 seconds, expire the isolated server run, then approve through pointer/keyboard. Actual handler returns 409 pairing_environment_unavailable; zero ledger rows and zero grants.",
+    "database_boundary": "Only the production eligibility module's database dependency is replaced in the test bundle. Its actual SQL and validation execute against isolated pg-mem tables. No production entrypoint or consent bypass is added.",
+    "limits": "Browser clock expiry models loss of the presence-derived prop; it is not a live supervisor or EXE restart. Runtime reconstruction and injected fixture provider identity are not actual provider delivery or human consent."
+  },
+  "initial_test_observation_failure": {
+    "log": ".tmp/durable-review-idle-real-handlers-20260913.log",
+    "description": "Expired-run cases observed HTTP 409 but timed out reading Chromium's error response body. The test now captures the actual handler body before forwarding its unchanged response.",
+    "focused_rerun_log": ".tmp/durable-review-idle-real-handlers-final-20260913.log",
+    "focused_passed": 4,
+    "product_admission_failure_claimed": false
+  },
+  "unresolved_recovery_boundary": "The expired-run denial shows generic reconciliation guidance and freezes the submitted selection. These tests prove rejection, not a complete path to another reviewed run. Any release of an uncertain request must prevent a late or previously committed issuance from creating duplicate authority.",
+  "production_changes_this_test_increment": false,
+  "packaged_acceptance_claimed": false,
+  "live_success_probability_inferred": false,
+  "cs5_handoff": "2026-09-13-durable-review-cs5-handoff.md",
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

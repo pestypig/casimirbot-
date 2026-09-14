@@ -70,6 +70,8 @@ export class InstalledSecurityStoreError extends Error {
     readonly code:
       | "session_required"
       | "device_not_registered"
+      | "device_trust_revision_changed"
+      | "device_trust_revision_invalid"
       | "device_not_revoked"
       | "session_not_found"
       | "current_session_revoke_forbidden",
@@ -298,8 +300,12 @@ export class InstalledSecurityStore {
     session: InstalledSecuritySession;
     deviceId: string;
     trusted: boolean;
+    expectedPolicyRevision: number;
   }): Promise<InstalledDeviceFullHarnessTrust> {
     await this.requireSession(input.session);
+    if (!Number.isSafeInteger(input.expectedPolicyRevision) || input.expectedPolicyRevision < 0) {
+      throw new InstalledSecurityStoreError(400, "device_trust_revision_invalid", "A reviewed device-trust revision is required.");
+    }
     const now = this.now().toISOString();
     const result = await (await this.pool()).query<FullHarnessTrustRow>(
       `
@@ -312,6 +318,7 @@ export class InstalledSecurityStore {
             last_seen_at = $4,
             updated_at = $4
         WHERE profile_id = $1 AND device_id = $2 AND status = 'active'
+          AND full_harness_trust_revision = $6
         RETURNING device_id, full_harness_trusted,
           full_harness_trust_revision, full_harness_trusted_at,
           full_harness_trust_revoked_at, full_harness_trusted_by_session_id;
@@ -322,10 +329,18 @@ export class InstalledSecurityStore {
         input.trusted,
         now,
         input.session.sessionId,
+        input.expectedPolicyRevision,
       ],
     );
     const row = result.rows[0];
     if (!row) {
+      const current = await (await this.pool()).query(
+        "SELECT device_id FROM helix_installed_devices WHERE profile_id = $1 AND device_id = $2 AND status = 'active' LIMIT 1",
+        [input.session.profileId, input.deviceId],
+      );
+      if (current.rows.length) {
+        throw new InstalledSecurityStoreError(409, "device_trust_revision_changed", "Device trust changed after it was reviewed. Read its current state before another decision.");
+      }
       throw new InstalledSecurityStoreError(
         404,
         "device_not_registered",

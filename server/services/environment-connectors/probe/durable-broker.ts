@@ -2761,6 +2761,9 @@ export const readDurableEnvironmentProbeContinuationEvidence = async (input: {
     observationProducerEpochRef: string;
   };
   maxAgeMs?: number;
+  // Internal diagnostics only, after exact identity and provenance passed.
+  // The observation remains rejected and is never returned to this callback.
+  onExpired?: (diagnostic: { evidence_age_ms: number; max_age_ms: number }) => void;
   now?: Date;
 }): Promise<DurableEnvironmentProbeContinuationEvidence | null> => {
   const requestId = input.requestId.trim();
@@ -2838,6 +2841,10 @@ export const readDurableEnvironmentProbeContinuationEvidence = async (input: {
     evidenceAgeMs < 0 ||
     evidenceAgeMs > maxAgeMs
   ) {
+    if (Number.isFinite(evidenceAgeMs) && evidenceAgeMs > maxAgeMs) {
+      try { input.onExpired?.({ evidence_age_ms: evidenceAgeMs, max_age_ms: maxAgeMs }); }
+      catch { /* Diagnostics cannot turn a refusal into a retry or admission. */ }
+    }
     return null;
   }
   return {

@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { readEnvironmentSessionReadiness, type EnvironmentSessionReadinessInput } from "../session-readiness";
 import { EnvironmentDurableGoalError } from "../../goals/durable-goal-store";
+import { readyUpEnvironmentSession } from "../ready-up-session";
 
 afterEach(() => vi.restoreAllMocks());
 const now = Date.parse("2026-09-08T00:00:00Z");
@@ -33,13 +34,43 @@ function fixture() {
     authorities: vi.fn().mockResolvedValue([authority]),
     controllers: vi.fn().mockResolvedValue([controller]),
     goal: vi.fn().mockResolvedValue({ goal_id: "goal:a", goal_revision: 1, identity }),
-    perception: vi.fn().mockResolvedValue({ context: { evidence: { observation: { evidence_ref: "probe:evidence" } } } }),
+    perception: vi.fn().mockResolvedValue({ context: { evidence: { observation: {
+      evidence_ref: "probe:evidence", observed_at: new Date(now).toISOString(),
+    } } } }),
   };
   const bindingStore = { verifyTaskAssociation: vi.fn().mockReturnValue({
     reasoning_binding_id: "binding:a", service_instance_ref: "service:a" }) };
   const read = () => readEnvironmentSessionReadiness(input, bindingStore, deps);
   return { input, deps, environment, authority, controller, bindingStore, read };
 }
+
+it("CS1 composition: three collected Ready up calls preserve identity and stop at authority expiry without repair", async () => {
+  const f = fixture();
+  const refreshSubject = vi.fn();
+  const recoverGoal = vi.fn();
+  const run = () => readyUpEnvironmentSession(f.input, f.bindingStore, {
+    inspect: (input, store) => readEnvironmentSessionReadiness(input, store, f.deps),
+    environments: f.deps.environments, refreshSubject, recoverGoal,
+  });
+  const originalInput = structuredClone(f.input);
+  const originalAuthority = structuredClone(f.authority);
+  const results = [];
+  for (let index = 0; index < 3; index++) results.push(await run());
+  expect(results[1]).toEqual(results[0]);
+  expect(results[2]).toEqual(results[0]);
+  expect(results[0]).toMatchObject({ readiness: { ready: true }, repairs: [], execution_authority: false });
+  expect(f.deps.goal).toHaveBeenCalledTimes(3);
+  expect(f.deps.perception).toHaveBeenCalledTimes(3);
+  expect(f.input).toEqual(originalInput);
+  expect(f.authority).toEqual(originalAuthority);
+  f.authority.expires_at = new Date(now).toISOString();
+  const expired = await run();
+  expect(expired).toMatchObject({ readiness: { ready: false, next_check: "authority" }, repairs: [] });
+  expect(expired.readiness.checks.find(check => check.layer === "authority")?.human_approval_required).toBe(true);
+  expect(refreshSubject).not.toHaveBeenCalled();
+  expect(recoverGoal).not.toHaveBeenCalled();
+  expect(f.authority.expires_at).toBe(new Date(now).toISOString());
+});
 
 it("caps readiness at the exact source credential deadline without renewing it", async () => {
   const f = fixture();
@@ -50,6 +81,24 @@ it("caps readiness at the exact source credential deadline without renewing it",
   expect(result.checks.find(check => check.layer === "source")?.expires_at_ms).toBe(now + 1_000);
   expect(f.deps.devices).toHaveBeenCalledWith({ ownerProfileId: "profile:a", roomId: "room:a" });
 });
+
+it.each(["fresh", "expired", "future", "invalid", "expired-during-final-binding"])(
+  "keeps the original perception freshness deadline (%s)", async scenario => {
+    const f = fixture();
+    const observedAt = scenario === "expired" ? now - 5000 : scenario === "future" ? now + 1 : now - 4500;
+    f.deps.perception.mockResolvedValue({ context: { evidence: { observation: {
+      evidence_ref: "probe:evidence", observed_at: scenario === "invalid" ? "invalid" : new Date(observedAt).toISOString(),
+    } } } });
+    if (scenario === "expired-during-final-binding") f.bindingStore.verifyTaskAssociation.mockImplementation(() => {
+      if (f.bindingStore.verifyTaskAssociation.mock.calls.length > 1) vi.mocked(Date.now).mockReturnValue(now + 600);
+      return { reasoning_binding_id: "binding:a", service_instance_ref: "service:a" };
+    });
+    const result = await f.read();
+    expect(result.ready).toBe(scenario === "fresh");
+    expect(result.valid_until_ms).toBe(scenario === "fresh" ? now + 500 : null);
+    if (scenario !== "fresh") expect(result.blockers.some(check => check.layer === "perception")).toBe(true);
+  },
+);
 
 it.each(["expired", "revoked", "missing", "invalid", "foreign", "ambiguous"])("rejects %s source credentials without inferring human approval", async kind => {
   const f = fixture();

@@ -7,6 +7,49 @@ import {
 } from "@shared/helix-environment-time";
 import { compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact } from "../minecraft-environment-time-compiler";
 
+it("compiles a four-plan continuous chain with movement covering each committed handoff", () => {
+  const template = JSON.parse(readFileSync(
+    "minecraft/helix-fabric-player-agent/src/test/resources/compiled-rolling-walk.json", "utf8"));
+  const { plan_hash: ignored, ...draft } = template.source;
+  const chain: Array<Record<string, any>> = [];
+  for (let index = 0; index < 4; index++) {
+    const start = index * 21;
+    const previous = chain.at(-1)?.source;
+    const source = buildHelixEnvironmentTemporalPlan({ ...draft,
+      plan_id: `plan:continuous:${index}`, previous_plan_id: previous?.plan_id ?? null,
+      previous_plan_hash: previous?.plan_hash ?? null,
+      identity: { ...draft.identity, environment_id: "env", source_id: "source", subject_id: "subject",
+        authority_id: "authority", authority_revision: 1, goal_id: "goal", goal_revision: 1,
+        observation_revision: draft.identity.observation_revision + index,
+        affordance_revision: draft.identity.affordance_revision + index },
+      // The terminal plan has no reserved successor to extend its stop window.
+      // Permit its zero-effect completion tick before the outer safety stop.
+      watermarks: { ...draft.watermarks, decision_unit: start,
+        stop_unit: start + (index === 3 ? 22 : 20), committed_through_unit: start + (index === 3 ? 23 : 21) },
+      nodes: draft.nodes.map((node: any) => node.kind === "action" ? { ...node,
+        arguments: { ...node.arguments, duration_ms: 1050 },
+        // The next tick verifies completed motion without another movement
+        // effect; it must fit the typed workflow timeout at the handoff.
+        timing: { earliest_start_unit: start, latest_start_unit: start, maximum_duration_units: 22 },
+      } : node),
+    });
+    const artifact = compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact({ plan: source,
+      mutation_scope: template.artifact.arguments.mutation_scope,
+      resource_bindings: { "resource:locomotion": "locomotion" } });
+    const { compilation_hash, ...content } = artifact;
+    expect(artifact.arguments.nodes.find(node => node.node_kind === "workflow_action"))
+      .toMatchObject({ earliest_tick: start, latest_start_tick: start, action: { duration_ms: 1050 } });
+    chain.push({ source, artifact, plan_canonical_json: serializeHelixEnvironmentPlanHashContent(source),
+      compilation_canonical_json: JSON.stringify(canonicalEnvironmentTimeValue(content)) });
+  }
+  for (let index = 1; index < chain.length; index++) {
+    expect(chain[index].source.previous_plan_hash).toBe(chain[index - 1].source.plan_hash);
+    expect(chain[index].source.watermarks.decision_unit).toBe(chain[index - 1].source.watermarks.committed_through_unit);
+  }
+  mkdirSync("minecraft/helix-fabric-player-agent/build", { recursive: true });
+  writeFileSync("minecraft/helix-fabric-player-agent/build/server-compiled-continuous-chain.json", JSON.stringify(chain));
+});
+
 it("generates four linked scheduled walks with a separate pre-motion launch window", () => {
   const template = JSON.parse(readFileSync(
     "minecraft/helix-fabric-player-agent/src/test/resources/compiled-rolling-walk.json", "utf8"));

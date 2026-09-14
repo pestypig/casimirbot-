@@ -1,0 +1,49 @@
+{
+  "schema": "casimirbot.pairing_request_cancellation_regressions.v1",
+  "observed_at": "2026-09-14T03:51:45Z",
+  "packet": "docs/work-packets/eh-g8-cs-pairing-request-cancellation-v1.md",
+  "classification": ["tool admission", "evidence re-entry", "presentation"],
+  "first_boundary": "An expired run is correctly rejected, but the submitted review was frozen with only the same failing retry. An absent-row lookup alone cannot safely release a delayed request.",
+  "red": { "log": ".tmp/pairing-request-cancellation-red-20260913.log", "failed": 3, "reason": "Cancellation operation missing" },
+  "focused_regressions": {
+    "log": ".tmp/pairing-request-cancellation-regressions-20260913.log",
+    "exit_code": 0,
+    "passed": 168,
+    "failed": 0,
+    "files": 8,
+    "duration_seconds": 29.33,
+    "counts": { "mcp_coordination": 35, "browser_routes": 25, "encrypted_repository": 36, "delivery_repository": 25, "runtime_binding": 4, "browser_transport": 10, "cancellation_races": 5, "rendered_component": 28 }
+  },
+  "browser_integration": {
+    "command": "npx playwright test --config=playwright.onboarding.config.ts durable-real-handlers.spec.ts durable-pairing.spec.ts",
+    "log": ".tmp/pairing-request-cancellation-browser-regressions-20260913.log",
+    "exit_code": 0,
+    "passed": 22,
+    "failed": 0,
+    "duration_seconds": 59.1,
+    "actual_handler_cases": 18,
+    "mock_response_layout_cases": 4,
+    "production_css": true,
+    "expired_run_recovery": "Real handler rejects the expired fixture run. Pointer and keyboard each cancel the exact request, obtain an unchecked new review, select a fresh fixture run, and accept exactly one new pairing. Retrying the cancelled request after its old fixture run becomes eligible still rejects.",
+    "storage_counts": "Recovery leaves one encrypted cancellation record and one pairing; only that one pairing is accepted. Valid original-run cases retain one pairing and one issuance.",
+    "limits": "Fixture browser identities, isolated pg-mem and fixture provider acceptance; not actual native human consent, real PostgreSQL concurrency, automatic host delivery or live gameplay."
+  },
+  "preserved_invariants": [
+    "The existing encrypted ledger owner/request unique slot arbitrates cancellation versus late issuance.",
+    "Cancellation records contain no destination, consent assertion, acceptance secret or authority.",
+    "An existing pairing is revoked through owner-authenticated CAS and durability checks, with original deadlines retained.",
+    "Lost cancellation replies keep the original request through reload; foreign owner and late owner/chat UI responses cannot affect another review.",
+    "Model-origin assertions do not authenticate the browser cancellation route.",
+    "No live approval, action lease, player assignment, source credential or run budget is created by cancellation."
+  ],
+  "quick_discipline": { "log": ".tmp/pairing-request-cancellation-quick-20260913.log", "exit_code": 0 },
+  "empirical_selected_pass_fraction": 1,
+  "live_success_probability_inferred": false,
+  "packaged_acceptance_claimed": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

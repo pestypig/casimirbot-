@@ -1,5 +1,11 @@
 # Star-Sim MESA/GYRE Worker
 
+Future convection work is scoped in the
+[three-dimensional convection plan](../research/controlled-stellar-composition-transport-3d-convection-plan.md).
+It proposes an independently validated flow lane using a calibrated MESA
+background, transport diagnostics, and subsequent stellar/GYRE comparisons.
+That planning packet does not add a supported runtime lane to this worker.
+
 `star-sim-v1` now supports two heavy lanes behind an async worker path:
 
 - `structure_mesa`

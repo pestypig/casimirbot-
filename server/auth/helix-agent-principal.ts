@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { desktopMcpClientRef, HELIX_DESKTOP_MCP_ISSUER } from "./helix-desktop-mcp-identity";
 import type { Request } from "express";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import {
@@ -555,17 +556,14 @@ export const resolveHelixDesktopMcpPrincipal = async (
       "The native desktop MCP client identity is unavailable.",
     );
   }
-  const nativeMcpClientRef = `mcp_client:native_desktop:${crypto
-    .createHash("sha256")
-    .update(`${desktopDeviceId}\n${profileId}\n${session.session_id}`)
-    .digest("hex")}`;
+  const nativeMcpClientRef = desktopMcpClientRef(desktopDeviceId, profileId, session.session_id);
   return {
     tenantId: `desktop:${crypto
       .createHash("sha256")
       .update(profileId)
       .digest("hex")
       .slice(0, 24)}`,
-    issuer: "urn:casimirbot:desktop-session",
+    issuer: HELIX_DESKTOP_MCP_ISSUER,
     subjectId: profileId,
     accountProfileId: profileId,
     accountType,

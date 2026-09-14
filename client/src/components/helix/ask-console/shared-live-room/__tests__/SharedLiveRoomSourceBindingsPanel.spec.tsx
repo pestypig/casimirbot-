@@ -99,6 +99,55 @@ afterEach(() => {
 });
 
 describe("Shared Live Room environment panel", () => {
+  it("retains the narrowed same-player draft through stale observation re-entry, without retaining consent", async () => {
+    vi.useFakeTimers();
+    let status = "active";
+    let subjectRef = "environment_subject:alice";
+    const identityOverrides: Record<string, string> = {};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      if (String(input).endsWith("/environments")) return jsonResponse(environmentReceipt([{
+        ...environment, ...identityOverrides, self_subject_binding: { status, subject_ref: subjectRef,
+          subject_label: "Alice", subject_binding_id: `binding:${status}` },
+        identity_assignment: status === "active" ? "supported" : "reverification_required",
+      }] as never));
+      return jsonResponse({ ok: true, authority: null, authorities: [], bindings: [], pairings: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(<SharedLiveRoomSourceBindingsPanel roomId={environment.room_id} roomClosed={false}
+      isOwner selfParticipantId="participant:self" />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    fireEvent.click(screen.getByLabelText("Navigate", { exact: true }));
+    fireEvent.change(screen.getByLabelText(/Player action lease duration/), { target: { value: String(8 * 3600000) } });
+    fireEvent.click(screen.getByLabelText(/Acknowledge Minecraft player control/));
+    expect(screen.getByLabelText("Navigate", { exact: true })).not.toBeChecked();
+    status = "stale";
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(screen.queryByLabelText("Navigate", { exact: true })).toBeNull();
+    status = "active";
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(screen.getByLabelText("Navigate", { exact: true })).not.toBeChecked();
+    expect(screen.getByLabelText(/Player action lease duration/)).toHaveValue(String(8 * 3600000));
+    expect(screen.getByLabelText(/Acknowledge Minecraft player control/)).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Save player authority", exact: true })).toBeDisabled();
+    subjectRef = "environment_subject:bob";
+    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+    expect(screen.getByLabelText("Navigate", { exact: true })).toBeChecked();
+    expect(screen.getByLabelText(/Acknowledge Minecraft player control/)).not.toBeChecked();
+    for (const field of ["source_id", "world_id", "room_source_binding_id", "environment_binding_id"]) {
+      fireEvent.click(screen.getByLabelText("Navigate", { exact: true }));
+      identityOverrides[field] = `fixture:changed-${field}`;
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(screen.getByLabelText("Navigate", { exact: true })).toBeChecked();
+      expect(screen.getByLabelText(/Acknowledge Minecraft player control/)).not.toBeChecked();
+    }
+    fireEvent.click(screen.getByLabelText("Navigate", { exact: true }));
+    view.rerender(<SharedLiveRoomSourceBindingsPanel roomId={environment.room_id} roomClosed={false}
+      isOwner selfParticipantId="participant:other" />);
+    expect(screen.getByLabelText("Navigate", { exact: true })).toBeChecked();
+    expect(screen.getByLabelText(/Acknowledge Minecraft player control/)).not.toBeChecked();
+    expect(fetchMock.mock.calls.every(call => !call[1]?.method || call[1].method === "GET")).toBe(true);
+  });
+
   it("gives the owner a one-time in-game Fabric pairing command without exposing a credential", async () => {
     const pairing = {
       schema: "helix.connector_pairing.v1",

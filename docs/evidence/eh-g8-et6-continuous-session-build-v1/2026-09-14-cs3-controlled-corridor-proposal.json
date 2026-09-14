@@ -1,0 +1,138 @@
+{
+  "schema": "casimirbot.cs3_controlled_corridor_proposal.v1",
+  "recorded_at": "2026-09-14T17:27:39.903Z",
+  "packet": "docs/work-packets/eh-g8-cs3-controlled-corridor-preparation-v1.md",
+  "proposed_bounds": {
+    "min": {
+      "x": -5,
+      "y": 64,
+      "z": 8
+    },
+    "max": {
+      "x": 1,
+      "y": 67,
+      "z": 208
+    }
+  },
+  "dimension": "minecraft:overworld",
+  "unique_positions": 5628,
+  "commands": [
+    {
+      "min": [
+        -5,
+        64,
+        8
+      ],
+      "max": [
+        1,
+        64,
+        208
+      ],
+      "block": "minecraft:smooth_stone",
+      "purpose": "floor",
+      "volume": 1407,
+      "command": "execute in minecraft:overworld run fill -5 64 8 1 64 208 minecraft:smooth_stone",
+      "risk": {
+        "category": "world_build",
+        "effect": "world_mutation"
+      }
+    },
+    {
+      "min": [
+        -4,
+        65,
+        8
+      ],
+      "max": [
+        0,
+        67,
+        207
+      ],
+      "block": "minecraft:air",
+      "purpose": "clear interior and five-block doorway",
+      "volume": 3000,
+      "command": "execute in minecraft:overworld run fill -4 65 8 0 67 207 minecraft:air",
+      "risk": {
+        "category": "world_build",
+        "effect": "world_mutation"
+      }
+    },
+    {
+      "min": [
+        -5,
+        65,
+        8
+      ],
+      "max": [
+        -5,
+        67,
+        208
+      ],
+      "block": "minecraft:smooth_stone",
+      "purpose": "west guard wall",
+      "volume": 603,
+      "command": "execute in minecraft:overworld run fill -5 65 8 -5 67 208 minecraft:smooth_stone",
+      "risk": {
+        "category": "world_build",
+        "effect": "world_mutation"
+      }
+    },
+    {
+      "min": [
+        1,
+        65,
+        8
+      ],
+      "max": [
+        1,
+        67,
+        208
+      ],
+      "block": "minecraft:smooth_stone",
+      "purpose": "east guard wall",
+      "volume": 603,
+      "command": "execute in minecraft:overworld run fill 1 65 8 1 67 208 minecraft:smooth_stone",
+      "risk": {
+        "category": "world_build",
+        "effect": "world_mutation"
+      }
+    },
+    {
+      "min": [
+        -4,
+        65,
+        208
+      ],
+      "max": [
+        0,
+        67,
+        208
+      ],
+      "block": "minecraft:smooth_stone",
+      "purpose": "closed far end",
+      "volume": 15,
+      "command": "execute in minecraft:overworld run fill -4 65 208 0 67 208 minecraft:smooth_stone",
+      "risk": {
+        "category": "world_build",
+        "effect": "world_mutation"
+      }
+    }
+  ],
+  "static_validation_passed": true,
+  "scope": "Exact volume/nonoverlap and existing local risk classifier only; not live Brigadier parsing, geometry, permission or execution",
+  "current_player_grant_allows_setup": false,
+  "human_setup_consent_received": false,
+  "world_mutation_performed": false,
+  "snapshot_verified": false,
+  "governed_execution_path_verified": false,
+  "setup_blockers": [
+    "callable_room_command_execution_disabled",
+    "region_checkpoint_exceeds_current_player_32_block_limit",
+    "unsurveyed_box_contents_unknown",
+    "separate_human_world_authority_consent_required_after_path_preparation"
+  ],
+  "et6_passed": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "nav1_unlocked": false
+}

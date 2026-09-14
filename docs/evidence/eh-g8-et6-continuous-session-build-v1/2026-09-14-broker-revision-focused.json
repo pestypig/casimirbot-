@@ -1,0 +1,75 @@
+{
+  "schema": "casimirbot.cs_recovery_component_evidence.v1",
+  "recorded_at": "2026-09-14T09:59:51.695507+00:00",
+  "classification": "evidence re-entry",
+  "scope": "Deterministic component regressions only; source repaired after retained packaged failure.",
+  "regression": {
+    "broker_to_ledger_red": {
+      "passed": 1,
+      "failed": 1,
+      "failure": "durable_goal_evidence_identity_mismatch"
+    },
+    "broker_to_ledger_green": {
+      "passed": 2,
+      "failed": 0
+    },
+    "readiness_deadline_red": {
+      "failed": 8,
+      "passed": 0
+    },
+    "final_focused": {
+      "passed": 183,
+      "failed": 0,
+      "files": 7
+    }
+  },
+  "changes": [
+    "Recovery uses the broker observation revision required by the ledger; sensor revision remains distinct in normalized result.",
+    "Readiness is bounded by the original broker observation timestamp plus the unchanged five-second limit, including final binding delay.",
+    "A healthy preparation uses its first complete collection; attempted subject repair and goal recovery are still followed by reinspection."
+  ],
+  "evidence_strength": {
+    "real_components": [
+      "probe dispatch, lease, normalization, retained evidence validation",
+      "durable goal ledger, reducer, production evidence resolver",
+      "recovery composition and repeated goal identity/revision checks"
+    ],
+    "fixtures": [
+      "authenticated account/task and current authority reader",
+      "sensor payloads",
+      "selected source and subject setup",
+      "clock and reader projections in readiness edge cases"
+    ],
+    "not_proven": [
+      "new native packaged recovery",
+      "PostgreSQL concurrent revocation transactions",
+      "three live moving successors",
+      "live interruption or revocation",
+      "duplicate gameplay effects",
+      "ET6 or NAV1 acceptance"
+    ]
+  },
+  "checks": {
+    "focused": "passed",
+    "diff_check": "passed; CRLF notices only",
+    "full_discipline": "running",
+    "documentation_audit": "queued after discipline",
+    "new_package": "queued after gates"
+  },
+  "sha256": {
+    ".tmp/idle-epoch-broker-revision-red-20260914.log": "b0fea0097ea7983624d11ea3458bfb9e315d44d16ca081ed3c1d4ed076fede05",
+    ".tmp/idle-epoch-broker-revision-green-20260914.log": "a1c1e3336f39763e5e65744250726417158147d0c78626574f78488e7ac952f2",
+    ".tmp/idle-epoch-readiness-deadline-red-20260914.log": "65f8aa38cf98d0396f72ddeafacc493e52f13aca77681f85fe4d2b49a8950717",
+    ".tmp/idle-epoch-broker-revision-focused-20260914.log": "5f32c2388d0b625e5f8d06eeddcceabb9f69c04650f5f4796ff11daaff08982f",
+    "server/services/environment-connectors/session/recover-session-goal.ts": "4969707998845aaac746f075e77e7102bb1e50a46b6a967bf2c17c1f152664a1",
+    "server/services/environment-connectors/session/ready-up-session.ts": "01323465d4b401cc26ae625a7dea359c33bd74008cca3dccfd98873571aba4ba",
+    "server/services/environment-connectors/session/session-readiness.ts": "56c88fa53893e7a7b510b1664ee9ff39473b8f7812a9d53af9525aadaf3afff3",
+    "server/services/environment-connectors/probe/__tests__/durable-broker.test.ts": "0b2d654a78a49ad7be0c69db768e07d0436bd23361c6f4876a32475190ffec4b",
+    "server/services/environment-connectors/session/__tests__/session-readiness.test.ts": "993f4b9d019c1a2343e2ffdac7b036e6f390afa4f34772ce805bb765584358fd",
+    "server/services/environment-connectors/session/__tests__/ready-up-session.test.ts": "096e7b5de8d6ac53d546bc757cf35e6b2d81b35f7a1d5e5393c27568d6521cea",
+    "server/services/environment-connectors/session/__tests__/recover-session-goal.test.ts": "31cb782c1a98d42e24f9964fed94b898fdd9050eca9ba19637f47f88cf26e668",
+    "server/services/environment-connectors/session/__tests__/prepare-browser-session.test.ts": "249c03dca29c94f45728352e84fd58ee3343a6505e6707ba2a36745978c7bc2c",
+    "server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts": "9b597ce4ce0184be69e9afcdb36c095cf8b082da25581dbba58be4af12129fcc"
+  },
+  "goal_complete": false
+}

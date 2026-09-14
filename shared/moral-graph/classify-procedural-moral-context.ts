@@ -8,6 +8,7 @@ import type { IdeologyGraph } from "./ideology-graph-types";
 import { CIVIC_ORDER_PROCEDURAL_RULES } from "./procedural-rules/civic-order-rules";
 import { PROVISIONING_PROCEDURAL_RULES } from "./procedural-rules/provisioning-rules";
 import type { ProceduralMoralPatternRule } from "./procedural-rules/procedural-rule-types";
+import { PRINCIPLE_METHOD_RULE, PRINCIPLE_METHOD_NEXT_MOVE } from "./procedural-rules/principle-method-rule";
 
 export type ClassifyProceduralMoralContextInput = {
   graph: IdeologyGraph;
@@ -18,6 +19,7 @@ export type ClassifyProceduralMoralContextInput = {
 };
 
 const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
+  PRINCIPLE_METHOD_RULE,
   {
     id: "comparison-pressure",
     cues: [/\b(?:lost|behind|past|used to be|world moved on|where have you been|where have u been)\b/i],
@@ -162,7 +164,11 @@ const PROCEDURAL_MORAL_PATTERN_RULES: readonly ProceduralMoralPatternRule[] = [
   },
   {
     id: "guilt-signal",
-    cues: [/\b(?:guilt|guilty|moral guilt|shame|blame|wrongdoing|wrong)\b/i],
+    cues: [
+      /\b(?:guilt|guilty|moral guilt|shame|blame|wrongdoing)\b/i,
+      // Bare "wrong" may describe an error or deny that defeat refutes a value.
+      /\b(?:i|we|he|she|they|you)\s+(?:did|have done|has done)\s+(?:something\s+)?wrong\b/i,
+    ],
     observedPattern: "guilt_signal",
     moralRootId: "guilt-to-repair",
     proceduralMove: "separate_guilt_from_repair",
@@ -463,6 +469,7 @@ function confidenceFor(rule: ProceduralMoralPatternRule, text: string, reflectio
 function proceduralRuleMatches(rule: ProceduralMoralPatternRule, text: string): boolean {
   const cueMatched = rule.cues.some((cue) => cue.test(text));
   if (!cueMatched) return false;
+  if (rule.matches && !rule.matches(text)) return false;
   if (rule.id !== "retaliatory-affect-loop") return true;
   const negatedRetaliation = /\b(?:not|never|haven't|hasn't|didn't|have not|has not|did not)\s+(?:\w+\s+){0,2}(?:retaliat\w*|take\w*\s+(?:it|anger|frustration|pain)\s+out)\b/i.test(text);
   const affirmativeLoop = /\b(?:spite|spiteful|spite-driven|resentment|revenge|vengeance|ill will|hostility)\b|\b(?:reaffirm|reinforc|self[-\s]?perpetuat|possess)\w*\b/i.test(text);
@@ -484,6 +491,10 @@ function buildRecommendedNextMoves(classifications: readonly ProceduralMoralClas
 
   const moves = new Map<string, { label: string; description: string; reasonCodes: string[] }>();
   for (const classification of classifications) {
+    if (classification.proceduralMove === "separate_principle_from_method") {
+      const { id, ...move } = PRINCIPLE_METHOD_NEXT_MOVE;
+      moves.set(id, move);
+    }
     if (classification.proceduralMove === "convert_reflection_to_experiment") {
       moves.set("procedural-moral-action:choose-small-experiment", {
         label: "Choose one bounded experiment.",

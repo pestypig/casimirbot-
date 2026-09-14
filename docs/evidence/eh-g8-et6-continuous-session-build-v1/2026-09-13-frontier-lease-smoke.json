@@ -1,0 +1,13 @@
+{
+  "Verdict": "PASS",
+  "Processes": 5,
+  "LoopbackListeners": 4,
+  "FriendsCoordinationBroker": "NOT_CONFIGURED",
+  "IsolatedUserDataFiles": 81,
+  "FullReadinessReceipt": "PASS",
+  "ServiceListenerReceipt": "PASS",
+  "ProviderCredentialKeyVault": "PASS",
+  "ProtocolRegistrationPreserved": "PASS",
+  "MinFreePhysicalGiB": 4.34,
+  "MaxCommitPercent": 47.2
+}

@@ -1,0 +1,31 @@
+{
+  "schema": "casimirbot.onboarding_browser_evidence.v1",
+  "recorded_at": "2026-09-14T12:59:00Z",
+  "classification": "isolated deterministic browser integration, not live acceptance",
+  "command": "npx playwright test --config=playwright.onboarding.config.ts client/e2e/onboarding-isolated/durable-real-handlers.spec.ts",
+  "log": ".tmp/pairing-review-polling-real-browser-20260914.log",
+  "exit_code": 0,
+  "tests_passed": 20,
+  "tests_failed": 0,
+  "workers": 1,
+  "reported_duration": "2.5m",
+  "input_methods": ["pointer", "keyboard"],
+  "scenarios_per_input": ["normal", "lost reply", "chat switch", "account switch", "automatic fixture delivery", "automatic fixture delivery lost reply", "client clock ahead", "idle run", "expired idle run", "native run identity"],
+  "real_components": ["rendered production pairing controls", "production styles", "HTTP handlers", "database queries and migrations", "encrypted pairing persistence", "runtime binding transitions"],
+  "isolated_dependencies": ["fixture human and provider principals", "fixture device trust", "ephemeral encryption vault", "in-memory PostgreSQL-compatible database", "fixture provider delivery", "fixture environment run records"],
+  "warnings": ["Browserslist dataset age", "import.meta unavailable in isolated IIFE bundle", "NO_COLOR overridden by FORCE_COLOR"],
+  "production_observation": {
+    "observed_at": "2026-09-14T12:57:58Z",
+    "package": "apps/desktop/release-pairing-review-polling-20260914/win-unpacked",
+    "service_instance_ref": "service_instance:676ea2e6457b5c77588f0308647ccc58",
+    "exact_task": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+    "new_run": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+    "visible_review": "exact task selected; both boxes unchecked; issue button disabled; no new invitation displayed",
+    "user_report": "User reported clicking; resulting invitation not observed. Clarification pending. No reset cause established.",
+    "agent_activated_consent": false,
+    "new_pairing_accepted": false,
+    "gameplay_submitted": false
+  },
+  "limits": ["No production automatic provider delivery proof", "No PostgreSQL concurrency qualification", "No native human consent or integrated session acceptance inferred from fixtures", "No full CS1-CS4, O1-O6, original ET6 or NAV1 exit closed"],
+  "requirement_handoff": "2026-09-14-pairing-review-polling-cs5-handoff.md"
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "casimirbot.onboarding_package_fixture_scan.v1",
+  "observed_at": "2026-09-14T01:49:25.645Z",
+  "exe_sha256": "6ef13aa466b0242680cd104b20edd3221ba9e316a96dbb6341b2dd9dab6f5e97",
+  "scanned_text_files": 827,
+  "fixture_markers": [
+    "minecraft_launcher_profile_fixture.v1",
+    "fixture_private_observation_failure",
+    "fixture-private-property",
+    "minecraft_server_lifecycle_fixture.v1",
+    "fixture_lost_start_reply",
+    "inert fixture; never executed",
+    "fixture_mutex_ready",
+    "minecraft-pending-bootstrap-fixture",
+    "pending-bootstrap-owner",
+    "fixture-browser-session",
+    "fixture_human_route_required",
+    "fixture_provider_denied",
+    "ephemeralPairingVault",
+    "onboarding-real-handlers-",
+    "STEERING_PROCESS_FIXTURE_KEY",
+    "FIXTURE_RESULT:",
+    "steering_process_fixture_failed",
+    "CASIMIR_ONBOARDING_POSTGRES_TEST_URL",
+    "onboarding_fixture",
+    "fixture-human-consent"
+  ],
+  "fixture_path_hits": [],
+  "fixture_content_hits": [],
+  "production_positive_controls": {
+    "helix_reasoning_destination_register": true,
+    "helix_reasoning_pairing_accept": true,
+    "helix_reasoning_pairing_recover": true,
+    "steering_revision_invalid": true
+  },
+  "scope": "Known fixture exclusion only; not authentication bypass proof"
+}

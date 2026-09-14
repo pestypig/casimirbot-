@@ -1,0 +1,38 @@
+{
+  "schema": "casimirbot.companion_installed_artifact_boundary.v1",
+  "recorded_at": "2026-09-14 09:17:17 UTC",
+  "scope": "Read-only preparation for CS3/CS4. No source change, installation, restart or gameplay.",
+  "installed_jar": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/HelixFabricPlayerAgent-0.4.12.jar",
+  "installed_sha256": "bd5b8eb7e0a89a34415d14a97b58722590ab1264bd5d33989b7dcb88f77c550e",
+  "repository_jar": "minecraft/helix-fabric-player-agent/build/libs/HelixFabricPlayerAgent-0.4.12.jar",
+  "repository_sha256": "9e9b6a83cee0f995fc9f0a44b4b35196d32f5d54bffcf4e12de47b38c7ea3b29",
+  "archive_entry_count": 142,
+  "different_entries": [
+    "META-INF/jars/HelixMinecraftConnectorCore-0.2.0.jar",
+    "com/casimirbot/helixplayer/fabric/ResidentEffectMeasurements.class",
+    "com/casimirbot/helixplayer/fabric/PlayerActionController$1.class",
+    "com/casimirbot/helixplayer/fabric/PlayerActionController.class"
+  ],
+  "extra_installed_entries": [],
+  "semantic_comparison": {
+    "method": "JDK 21 javap -c -p, exact installed and repository JARs",
+    "installed": "handleManualOverride replaces lastMeasurements with Map.of(manual reason, ticks). Effect measurement merge returns Map.copyOf, which cannot preserve null optional fields.",
+    "repository": "handleManualOverride merges prior measurements before recording manual input. Effect measurement merge returns Collections.unmodifiableMap, retaining optional null observations.",
+    "observed_source_changes_preexisted_this_repair": true,
+    "loaded_class_attestation": false,
+    "core_nested_archive_comparison": "not yet performed"
+  },
+  "component_regression_validation": "Fresh focused companion validation remains required before installing the existing fixes.",
+  "controller_before_inspection": {
+    "manifest_received_at": "2026-09-14T08:39:08.194Z",
+    "heartbeat_received_at": "2026-09-14T08:59:15.297Z",
+    "active_workflow_count": 0,
+    "controls_asserted": false
+  },
+  "gameplay_actions_submitted": 0,
+  "cs3_qualified": false,
+  "cs4_qualified": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "next": "Finish and verify the first goal-recovery repair in the EXE, then qualify the existing companion fixes, compare nested archive content, update only the exact prepared client through the supported development workflow and verify the loaded artifact before interruption acceptance."
+}

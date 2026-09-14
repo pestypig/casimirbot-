@@ -1,0 +1,46 @@
+{
+  "version": "0.1.0-alpha.11",
+  "name": "@casimirbot/desktop",
+  "dependencies": {
+    "@types/semver": {
+      "version": "7.8.0",
+      "resolved": "https://registry.npmjs.org/@types/semver/-/semver-7.8.0.tgz",
+      "overridden": false
+    },
+    "electron-builder": {
+      "version": "26.15.3",
+      "resolved": "https://registry.npmjs.org/electron-builder/-/electron-builder-26.15.3.tgz",
+      "overridden": false
+    },
+    "electron-updater": {
+      "version": "6.8.9",
+      "resolved": "https://registry.npmjs.org/electron-updater/-/electron-updater-6.8.9.tgz",
+      "overridden": false
+    },
+    "electron": {
+      "version": "43.4.0",
+      "resolved": "https://registry.npmjs.org/electron/-/electron-43.4.0.tgz",
+      "overridden": false
+    },
+    "esbuild": {
+      "version": "0.27.2",
+      "resolved": "https://registry.npmjs.org/esbuild/-/esbuild-0.27.2.tgz",
+      "overridden": false
+    },
+    "sharp": {
+      "version": "0.34.3",
+      "resolved": "https://registry.npmjs.org/sharp/-/sharp-0.34.3.tgz",
+      "overridden": false
+    },
+    "typescript": {
+      "version": "5.6.3",
+      "resolved": "https://registry.npmjs.org/typescript/-/typescript-5.6.3.tgz",
+      "overridden": false
+    },
+    "yaml": {
+      "version": "2.9.0",
+      "resolved": "https://registry.npmjs.org/yaml/-/yaml-2.9.0.tgz",
+      "overridden": false
+    }
+  }
+}

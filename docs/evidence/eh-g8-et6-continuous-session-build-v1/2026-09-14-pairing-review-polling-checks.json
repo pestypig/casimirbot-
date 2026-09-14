@@ -1,0 +1,57 @@
+{
+  "schema": "casimirbot.pairing_review_polling_checks.v1",
+  "classification": "presentation",
+  "red": {
+    "log": ".tmp/pairing-review-polling-red-20260914.log",
+    "failed": 2,
+    "filtered": 33,
+    "reasons": [
+      "Poll disabled editable review controls.",
+      "New-run review action absent."
+    ]
+  },
+  "focused": {
+    "log": ".tmp/pairing-review-polling-lifecycle-20260914.log",
+    "passed": 49,
+    "files": 3
+  },
+  "isolated_browser": {
+    "log": ".tmp/pairing-review-polling-browser-20260914.log",
+    "passed": 6,
+    "workers": 1,
+    "scope": "Actual production component and styles; isolated route fixtures for browser input timing, separate from real rendered-handler tests.",
+    "cases": [
+      "pointer delayed status poll",
+      "keyboard delayed status poll",
+      "pointer 375px idle/reload",
+      "pointer 1280px idle/reload",
+      "keyboard 375px idle/reload",
+      "keyboard 1280px idle/reload"
+    ]
+  },
+  "build": {
+    "client": "PASS",
+    "host_package": "PASS",
+    "client_log": ".tmp/pairing-review-polling-client-20260914.log",
+    "package_log": ".tmp/pairing-review-polling-package-20260914.log",
+    "warnings": "Existing browser externalization/chunk-size/Browserslist warnings and four existing host warnings; none changed to bypass the build."
+  },
+  "discipline": {
+    "quick": "PASS",
+    "log": ".tmp/pairing-review-polling-quick-20260914.log",
+    "scope": "Broad dirty-worktree classifier; this patch is presentation. Full identity/continuation discipline not rerun for unchanged identity semantics."
+  },
+  "docs_audit": {
+    "result": "PASS",
+    "log": ".tmp/pairing-review-polling-final-docs-20260914.log"
+  },
+  "production_consent_automated": false,
+  "new_run_pairing_accepted": false,
+  "gameplay_admitted": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

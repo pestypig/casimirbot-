@@ -1,0 +1,34 @@
+{
+  "schema": "cs.read_cost_checks.v1",
+  "recorded_at": "2026-09-14T14:42:46.828Z",
+  "classification": "deterministic components and real PostgreSQL transaction tests; not full session acceptance",
+  "focused": {
+    "passed": 59,
+    "files": 7,
+    "logs": [
+      ".tmp/pairing-read-cost-focused-20260914.log",
+      ".tmp/pairing-read-cost-regressions-20260914.log"
+    ]
+  },
+  "postgres": {
+    "passed": 5,
+    "log": ".tmp/pairing-read-cost-postgres-20260914.log",
+    "scope": "real row contention and interrupted transaction; no database-server restart or power-loss claim"
+  },
+  "additional_investigation": {
+    "passed": 1,
+    "log": ".tmp/ready-up-association-reconstruction-20260914.log",
+    "scope": "actual fully migrated pg-mem run association, snapshot reconstruction and revoked binding negative; automatic Ready up failure remains unexplained"
+  },
+  "red": {
+    "failed": 1,
+    "expected": 0,
+    "actual": 8,
+    "measurement": "atomic snapshot renames during eight unchanged native encrypted pairing reads",
+    "log": ".tmp/pairing-read-cost-red-20260914.log"
+  },
+  "discipline_quick": "PASS",
+  "documentation_audit": "PASS before final handoff addition; final audit recorded separately",
+  "casimir_verification": "Not applicable: non-physics persistence/read-cost application patch; no certificate or adapter integrity claim",
+  "full_stages_complete": false
+}

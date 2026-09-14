@@ -6,14 +6,20 @@ import type {
 } from "@shared/helix-workspace-memory-registry";
 import type {
   HelixProfileStorageEntry,
+  HelixProfileStorageHttpWriteRequest,
   HelixProfileStorageSnapshot,
   HelixProfileStorageWriteReceipt,
 } from "@shared/helix-profile-storage";
 import { AGI_CHAT_STORAGE_KEY, useAgiChatStore, type ChatSession } from "@/store/useAgiChatStore";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
+import { HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT } from "./accountCapabilityPolicy";
+import { pairingRecoveryValueAllowed } from "../agent-access/pairingRecoveryStorage";
 
 const PROFILE_SYNC_INTERVAL_MS = 12000;
 const PROFILE_SYNC_DEBOUNCE_MS = 1200;
+const PROFILE_RESTORE_TIMEOUT_MS = 8000;
+const PROFILE_RESTORE_FAILURE_MESSAGE =
+  "Profile restore is unavailable. Backup is paused while recovery retries.";
 const DESKTOP_LAYOUT_STORAGE_KEY = "desktop-windows-v2";
 const LIVE_SOURCE_ENDPOINT_STORAGE_KEY = "helix.worldEventSourceEndpoint";
 const LIVE_SOURCE_LABEL_STORAGE_KEY = "helix.worldEventSourceLabel";
@@ -380,10 +386,27 @@ function syntheticHelixAskChatArtifacts(profileId: string): HelixWorkspaceMemory
   }];
 }
 
+function excludedProfileStorageKeys(
+  artifacts: HelixWorkspaceMemoryArtifact[],
+  profileId: string,
+): Set<string> {
+  // Entries upload entire storage values. One foreign owner blocks the whole
+  // key, including synthetic or duplicate registrations of those same bytes.
+  return new Set(artifacts
+    .filter((artifact) => artifact.storage_backend === "localStorage")
+    .filter((artifact) =>
+      (artifact.profile_id !== null && artifact.profile_id !== profileId) ||
+      (artifact.owner_scope === "profile" && artifact.profile_id !== profileId) ||
+      artifact.owner_scope === "surface_session_only",
+    )
+    .map((artifact) => artifact.storage_key));
+}
+
 function profileEligibleArtifacts(
   registry: HelixWorkspaceMemoryRegistrySnapshot,
   profileId: string,
 ): HelixWorkspaceMemoryArtifact[] {
+  const excludedStorageKeys = excludedProfileStorageKeys(registry.artifacts, profileId);
   const artifacts = registry.artifacts
     .filter((artifact) => artifact.storage_backend === "localStorage")
     .filter((artifact) =>
@@ -404,7 +427,8 @@ function profileEligibleArtifacts(
     ...syntheticHelixAskChatArtifacts(profileId),
     ...syntheticLinkedSourceArtifacts(profileId),
     ...syntheticRememberedProcedureArtifacts(profileId),
-  ];
+  ].filter((artifact) => !excludedStorageKeys.has(artifact.storage_key) &&
+    pairingRecoveryValueAllowed(profileId, artifact.storage_key, safeLocalStorageGet(artifact.storage_key) ?? ""));
 }
 
 export function buildProfileStoragePayload(
@@ -449,7 +473,7 @@ async function saveProfileStorageSnapshot(
   const response = await fetch("/api/account/profile-storage/snapshot", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, expected_profile_id: profileId } satisfies HelixProfileStorageHttpWriteRequest),
     signal,
   });
   const body = await response.json();
@@ -462,9 +486,36 @@ async function flushPendingProfileStorageSync(
 ): Promise<{ ok: boolean; comparable: string | null }> {
   const pending = readPendingSync(profileId);
   if (!pending) return { ok: true, comparable: null };
+  const ownershipMatches = () => {
+    const excluded = excludedProfileStorageKeys([
+      ...useWorkspaceMemoryRegistryStore.getState().buildRegistrySnapshot().artifacts,
+      ...pending.payload.artifacts,
+    ], profileId);
+    return pending.profileId === profileId &&
+      pending.payload.entries.every((entry) => pairingRecoveryValueAllowed(profileId, entry.storage_key, entry.value)) &&
+      !pending.payload.entries.some((entry) => excluded.has(entry.storage_key)) &&
+      !pending.payload.artifacts.some((artifact) => excluded.has(artifact.storage_key));
+  };
+  const stillOwnsQueue = () => {
+    const current = readPendingSync(profileId);
+    return !signal?.aborted && current?.profileId === profileId &&
+      current.comparable === pending.comparable &&
+      JSON.stringify(current.payload) === JSON.stringify(pending.payload);
+  };
+  if (!ownershipMatches()) {
+    markSyncFailure(profileId, "Profile backup is paused because queued storage ownership changed.");
+    return { ok: false, comparable: pending.comparable };
+  }
   markSyncAttempt(profileId, pending);
   try {
     const receipt = await saveProfileStorageSnapshot(pending.payload, profileId, signal);
+    // A receipt settles only the payload sent, never a replacement queued while
+    // the request was in flight. Aborted responses cannot mutate local state.
+    if (!stillOwnsQueue()) return { ok: false, comparable: pending.comparable };
+    if (!ownershipMatches()) {
+      markSyncFailure(profileId, "Profile backup is paused because queued storage ownership changed.");
+      return { ok: false, comparable: pending.comparable };
+    }
     if (!receipt?.ok) {
       markSyncFailure(profileId, receipt?.message ?? "Profile backup did not complete.");
       return { ok: false, comparable: pending.comparable };
@@ -480,7 +531,7 @@ async function flushPendingProfileStorageSync(
     }
     return { ok: true, comparable: pending.comparable };
   } catch (err) {
-    if (!signal?.aborted) {
+    if (stillOwnsQueue()) {
       markSyncFailure(profileId, err instanceof Error ? err.message : "Profile backup failed.");
     }
     return { ok: false, comparable: pending.comparable };
@@ -498,6 +549,7 @@ function applyProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): num
   const registry = useWorkspaceMemoryRegistryStore.getState();
   for (const entry of snapshot.entries) {
     if (entry.storage_backend !== "localStorage") continue;
+    if (!snapshot.profile_id || !pairingRecoveryValueAllowed(snapshot.profile_id, entry.storage_key, entry.value)) continue;
     const existing = safeLocalStorageGet(entry.storage_key);
     if (existing === entry.value) continue;
     if (safeLocalStorageSet(entry.storage_key, entry.value)) {
@@ -508,6 +560,8 @@ function applyProfileStorageSnapshot(snapshot: HelixProfileStorageSnapshot): num
     }
   }
   for (const artifact of snapshot.artifacts) {
+    if (!snapshot.profile_id || !pairingRecoveryValueAllowed(snapshot.profile_id, artifact.storage_key,
+      safeLocalStorageGet(artifact.storage_key) ?? "")) continue;
     registry.upsertArtifact({
       ...artifact,
       owner_scope: "profile",
@@ -576,26 +630,42 @@ export function useProfileStorageSync(): void {
   );
   const [profileId, setProfileId] = React.useState<string | null>(null);
   const [attachConsentTick, setAttachConsentTick] = React.useState(0);
-  const loadedProfileRef = React.useRef<string | null>(null);
   const restoredProfilesRef = React.useRef<Set<string>>(new Set());
   const lastPayloadRef = React.useRef<string>("");
   const [restoreTick, setRestoreTick] = React.useState(0);
 
   React.useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
+    let generation = 0;
+    let controller: AbortController | undefined;
     const refresh = async () => {
+      const requestGeneration = ++generation;
+      controller?.abort();
+      const attempt = new AbortController();
+      controller = attempt;
       try {
-        const status = await fetchAccountStatus(controller.signal);
+        const status = await fetchAccountStatus(attempt.signal);
+        if (!active || requestGeneration !== generation || attempt.signal.aborted) return;
         setProfileId(status?.session?.profile.profile_id ?? null);
       } catch {
+        if (!active || requestGeneration !== generation || attempt.signal.aborted) return;
         setProfileId(null);
       }
     };
+    const accountChanged = () => {
+      // Events invalidate prior work; only the authenticated read selects an owner.
+      setProfileId(null);
+      void refresh();
+    };
     void refresh();
+    window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, accountChanged);
     const timer = window.setInterval(refresh, PROFILE_SYNC_INTERVAL_MS);
     return () => {
-      controller.abort();
+      active = false;
+      generation++;
+      controller?.abort();
       window.clearInterval(timer);
+      window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, accountChanged);
     };
   }, []);
 
@@ -612,20 +682,59 @@ export function useProfileStorageSync(): void {
   }, [profileId]);
 
   React.useEffect(() => {
-    if (!profileId || loadedProfileRef.current === profileId) return;
-    const controller = new AbortController();
-    loadedProfileRef.current = profileId;
-    void loadProfileStorageSnapshot(controller.signal).then((snapshot) => {
-      if (!snapshot || snapshot.profile_id !== profileId) return;
-      const appliedCount = applyProfileStorageSnapshot(snapshot);
-      maybeReloadAfterRestore(profileId, appliedCount);
-    }).catch(() => {
-      // Restore is best-effort; browser-local state remains authoritative until sync succeeds.
-    }).finally(() => {
-      restoredProfilesRef.current.add(profileId);
-      setRestoreTick((tick) => tick + 1);
-    });
-    return () => controller.abort();
+    if (!profileId) return;
+    let active = true;
+    let controller: AbortController | undefined;
+    let timeout: number | undefined;
+    let retry: number | undefined;
+    restoredProfilesRef.current.delete(profileId);
+    const restore = async () => {
+      controller = new AbortController();
+      const attempt = controller;
+      try {
+        const snapshot = await Promise.race([
+          loadProfileStorageSnapshot(attempt.signal),
+          new Promise<never>((_, reject) => {
+            timeout = window.setTimeout(() => {
+              attempt.abort();
+              reject(new Error("profile_restore_timeout"));
+            }, PROFILE_RESTORE_TIMEOUT_MS);
+          }),
+        ]);
+        if (!active || attempt.signal.aborted) return;
+        if (!snapshot || snapshot.profile_id !== profileId) {
+          throw new Error("profile_restore_unavailable");
+        }
+        const appliedCount = applyProfileStorageSnapshot(snapshot);
+        const previousStatus = getProfileStorageSyncStatus(profileId);
+        if (previousStatus?.lastError === PROFILE_RESTORE_FAILURE_MESSAGE) {
+          const pending = readPendingSync(profileId);
+          writeSyncStatus({ ...previousStatus, pending: Boolean(pending),
+            pendingEntryCount: pending?.payload.entries.length ?? 0,
+            pendingArtifactCount: pending?.payload.artifacts.length ?? 0,
+            lastError: null, lastErrorAt: null });
+        }
+        restoredProfilesRef.current.add(profileId);
+        setRestoreTick((tick) => tick + 1);
+        maybeReloadAfterRestore(profileId, appliedCount);
+      } catch {
+        if (!active) return;
+        // A fresh origin is not an empty server profile. Do not overwrite the
+        // durable snapshot until its current contents have actually been read.
+        markSyncFailure(profileId, PROFILE_RESTORE_FAILURE_MESSAGE);
+        retry = window.setTimeout(() => { void restore(); }, PROFILE_SYNC_INTERVAL_MS);
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    };
+    void restore();
+    return () => {
+      active = false;
+      controller?.abort();
+      window.clearTimeout(timeout);
+      window.clearTimeout(retry);
+      restoredProfilesRef.current.delete(profileId);
+    };
   }, [profileId]);
 
   React.useEffect(() => {
@@ -677,6 +786,7 @@ export function useProfileStorageSync(): void {
     if (!profileId) return;
     const controller = new AbortController();
     const retryPending = () => {
+      if (!restoredProfilesRef.current.has(profileId)) return;
       if (!readPendingSync(profileId)) return;
       void flushPendingProfileStorageSync(profileId, controller.signal).then((result) => {
         if (result.ok && result.comparable) {

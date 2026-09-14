@@ -139,6 +139,19 @@ connection and permission infrastructure; the external client owns reasoning.
 Independent developer onboarding and a non-Minecraft integration must prove
 this generality before it becomes a release claim.
 
+## Platform development focus
+
+The owner's 2026-09-14 direction assigns this product task to the harness
+platform: personal use, accounts and installed connections, hosted
+collaboration, developer integration and delivery. The
+[platform build plan](../work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md)
+connects those journeys to existing components and CFP owners. Minecraft
+remains an evolving proof of concept under its existing NAV/CS/ET work; its
+current primitives do not define the final personal product. Refine operations
+in bounded implementation slices and freeze the selected release's claims
+before evaluation. Platform specification may progress while gameplay details
+are still being developed; runtime admission and acceptance remain unchanged.
+
 ## Enabled capability baseline
 
 The labels below are deliberately strict:

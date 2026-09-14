@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { startDesktopProviderCredentialBroker } from '../../../../apps/desktop/src/provider-credential-broker';
 import { resetAccountSessionStore } from '../account-session-store';
-import { readProfileStorageSnapshot, writeProfileStorageSnapshot } from '../profile-storage-store';
+import { getProfileStorageUsage, readProfileStorageSnapshot, writeProfileStorageSnapshot } from '../profile-storage-store';
 import { decryptNativeProfileSnapshot, encryptNativeProfileSnapshot } from '../profile-storage-native-encryption';
 import { getPool } from '../../../db/client';
 
@@ -46,6 +46,15 @@ it('backs up an exact empty chat through the native broker without a profile mas
     expect(metadata.entries[0].value).toBe('');
     expect(rows[0].encrypted_snapshot).toMatch(/^native-profile-v1:/u);
     expect(rows[0].encrypted_snapshot).not.toContain(value);
+    expect((await readProfileStorageSnapshot('local:admin')).entries[0]?.value).toBe(value);
+    // O5: the public store must preserve a protection failure; an empty
+    // successful snapshot would authorize the renderer to overwrite this data.
+    vi.stubEnv('HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN', 'fixture-invalid');
+    await expect(readProfileStorageSnapshot('local:admin')).rejects.toThrow('profile_storage_restore_unavailable');
+    expect(await getProfileStorageUsage('local:admin')).toMatchObject({
+      snapshot_count: 1, size_bytes: Buffer.byteLength(value),
+    });
+    vi.stubEnv('HELIX_PROVIDER_CREDENTIAL_BROKER_TOKEN', broker.token);
     expect((await readProfileStorageSnapshot('local:admin')).entries[0]?.value).toBe(value);
   } finally { await broker.close(); }
 }, 20000);

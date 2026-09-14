@@ -17,6 +17,7 @@ import {
 } from "../profileStorageSync";
 import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT } from "../accountCapabilityPolicy";
 
 const profileId = "user:test-profile";
 const emptyRegistry = (): HelixWorkspaceMemoryRegistrySnapshot => ({
@@ -60,6 +61,309 @@ function ProfileStorageSyncHarness() {
   useProfileStorageSync();
   return null;
 }
+
+describe("O5 profile recovery before backup", () => {
+  it.each(["success", "failure", "network failure"])("O5 recovery: an older interval upload %s cannot change a newer failed backup", async (olderOutcome) => {
+    vi.useFakeTimers();
+    const candidate = { ...registryWithProfileCandidate().artifacts[0], storage_key: "fixture:inflight" };
+    localStorage.setItem(candidate.storage_key, "first");
+    useWorkspaceMemoryRegistryStore.getState().upsertArtifact(candidate);
+    let posts = 0;
+    let finishOlder!: (response: Response) => void;
+    let rejectOlder!: (error: Error) => void;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/account/session") return new Response(JSON.stringify({ session: { profile: { profile_id: profileId } } }));
+      if (init?.method === "POST") {
+        if (++posts === 2) return new Promise<Response>((resolve, reject) => { finishOlder = resolve; rejectOlder = reject; });
+        return new Response(JSON.stringify({ ok: false, message: "fixture offline" }), { status: 503 });
+      }
+      return new Response(JSON.stringify({ profile_id: profileId, entries: [], artifacts: [] }));
+    }));
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+    expect(posts).toBe(2);
+    await act(async () => {
+      localStorage.setItem(candidate.storage_key, "second");
+      useWorkspaceMemoryRegistryStore.getState().upsertArtifact({ ...candidate, title: "newer metadata" });
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(posts).toBe(3);
+    const queueKey = `helix.profileStorage.pendingSync:${profileId}`;
+    const newerQueue = localStorage.getItem(queueKey);
+    expect(newerQueue).toContain("second");
+    await act(async () => {
+      if (olderOutcome === "network failure") rejectOlder(new Error("stale network failure"));
+      else finishOlder(new Response(JSON.stringify({ ok: olderOutcome === "success", message: "stale response" })));
+    });
+    expect(localStorage.getItem(queueKey)).toBe(newerQueue);
+    expect(getProfileStorageSyncStatus(profileId)).toMatchObject({ pending: true, lastError: "fixture offline" });
+    expect(useWorkspaceMemoryRegistryStore.getState().buildRegistrySnapshot().artifacts
+      .find(artifact => artifact.artifact_id === candidate.artifact_id)?.title).toBe("newer metadata");
+  });
+
+  it("O5 recovery: account events invalidate an old restore before authenticated identity returns", async () => {
+    vi.useFakeTimers();
+    let accountReads = 0;
+    let finishAccount!: (response: Response) => void;
+    let finishOldRestore!: (response: Response) => void;
+    let restoreSignal: AbortSignal | undefined;
+    const newProfile = "profile:next-account";
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/account/session") {
+        if (++accountReads === 1) return new Response(JSON.stringify({ session: { profile: { profile_id: profileId } } }));
+        return new Promise<Response>(resolve => { finishAccount = resolve; });
+      }
+      if (!restoreSignal) {
+        restoreSignal = init?.signal ?? undefined;
+        return new Promise<Response>(resolve => { finishOldRestore = resolve; });
+      }
+      return new Response(JSON.stringify({ profile_id: newProfile, entries: [], artifacts: [] }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await Promise.resolve(); });
+    expect(restoreSignal?.aborted).toBe(false);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT,
+        { detail: { profileId: "profile:forged-event" } }));
+    });
+    expect(accountReads).toBe(2);
+    expect(restoreSignal?.aborted).toBe(true);
+    await act(async () => {
+      finishOldRestore(new Response(JSON.stringify({ profile_id: profileId,
+        entries: [{ storage_backend: "localStorage", storage_key: "fixture:stale-account", value: "old" }], artifacts: [] })));
+      finishAccount(new Response(JSON.stringify({ session: { profile: { profile_id: newProfile } } })));
+    });
+    expect(localStorage.getItem("fixture:stale-account")).toBeNull();
+    expect(isProfileStorageAttachConsentGranted("profile:forged-event")).toBe(false);
+    expect(isProfileStorageAttachConsentGranted(newProfile)).toBe(true);
+    view.unmount();
+    const before = fetchMock.mock.calls.length;
+    window.dispatchEvent(new Event(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT));
+    expect(fetchMock).toHaveBeenCalledTimes(before);
+  });
+
+  it("O5 identity: retains a queued backup without sending it after its storage owner changes", async () => {
+    vi.useFakeTimers();
+    const candidate = { ...registryWithProfileCandidate().artifacts[0], storage_key: "fixture:queued-preferences" };
+    localStorage.setItem(candidate.storage_key, "retained fixture content");
+    useWorkspaceMemoryRegistryStore.getState().upsertArtifact(candidate);
+    const posts: unknown[] = [];
+    let offline = true;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/account/session") return new Response(JSON.stringify({ session: { profile: { profile_id: profileId } } }));
+      if (init?.method === "POST") {
+        posts.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ ok: !offline, message: offline ? "fixture offline" : "saved" }), { status: offline ? 503 : 200 });
+      }
+      return new Response(JSON.stringify({ profile_id: profileId, entries: [], artifacts: [] }));
+    }));
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(posts).toHaveLength(1);
+    await act(async () => {
+      useWorkspaceMemoryRegistryStore.getState().upsertArtifact({ ...candidate,
+        owner_scope: "profile", profile_id: "profile:other", sync_status: "profile_synced" });
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(24_000); });
+    expect(posts).toHaveLength(1);
+    expect(getProfileStorageSyncStatus(profileId)).toMatchObject({ pending: true,
+      lastError: "Profile backup is paused because queued storage ownership changed." });
+    expect(localStorage.getItem(candidate.storage_key)).toBe("retained fixture content");
+    offline = false;
+    await act(async () => {
+      useWorkspaceMemoryRegistryStore.getState().upsertArtifact({ ...candidate,
+        owner_scope: "profile", profile_id: profileId, sync_status: "profile_synced" });
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(posts).toHaveLength(2);
+    expect(getProfileStorageSyncStatus(profileId)).toMatchObject({ pending: false, lastError: null });
+  });
+
+  it("O5 identity: keeps guest and current-owner candidates but excludes unresolved and session-only ownership", () => {
+    const registry = registryWithProfileCandidate();
+    const base = registry.artifacts[0];
+    registry.artifacts = [
+      { ...base, artifact_id: "guest", storage_key: "fixture:guest" },
+      { ...base, artifact_id: "current", storage_key: "fixture:current", owner_scope: "profile", profile_id: profileId },
+      { ...base, artifact_id: "unresolved", storage_key: "fixture:unresolved", owner_scope: "profile" },
+      { ...base, artifact_id: "session", storage_key: "fixture:session", owner_scope: "surface_session_only" },
+    ];
+    for (const artifact of registry.artifacts) localStorage.setItem(artifact.storage_key, artifact.artifact_id);
+    const payload = buildProfileStoragePayload(registry, profileId);
+    expect(payload.entries.map(entry => entry.storage_key).sort()).toEqual(["fixture:current", "fixture:guest"]);
+    expect(payload.artifacts.every(artifact => artifact.profile_id === profileId)).toBe(true);
+  });
+
+  for (const storageKey of ["fixture:agent-preferences", "agi-chat-sessions-v1"]) {
+    it(`O5 identity: excludes another profile's ${storageKey} without relabeling or deleting it`, () => {
+      const registry = registryWithProfileCandidate();
+      registry.artifacts[0] = { ...registry.artifacts[0], storage_key: storageKey,
+        owner_scope: "profile", profile_id: "profile:other", sync_status: "profile_synced" };
+      localStorage.setItem(storageKey, JSON.stringify({ fixture: "other profile content" }));
+      const original = JSON.stringify(registry);
+      const payload = buildProfileStoragePayload(registry, profileId);
+      expect(payload.entries.some(entry => entry.storage_key === storageKey)).toBe(false);
+      expect(payload.artifacts.some(artifact => artifact.storage_key === storageKey)).toBe(false);
+      expect(JSON.stringify(registry)).toBe(original);
+      expect(localStorage.getItem(storageKey)).toContain("other profile content");
+
+      // A second registration for the same bytes cannot make their ownership safe.
+      registry.artifacts.push({ ...registry.artifacts[0], artifact_id: "artifact:current",
+        profile_id: profileId });
+      expect(buildProfileStoragePayload(registry, profileId).entries
+        .some(entry => entry.storage_key === storageKey)).toBe(false);
+    });
+  }
+
+  for (const lateResult of ["success", "failure"] as const) {
+  it(`ignores an old account ${lateResult} after a newer account has been observed`, async () => {
+    vi.useFakeTimers();
+    let finishOldAccount!: (value: Response) => void;
+    let rejectOldAccount!: (error: Error) => void;
+    const oldAccount = new Promise<Response>((resolve, reject) => { finishOldAccount = resolve; rejectOldAccount = reject; });
+    let oldSignal: AbortSignal | undefined;
+    let accountReads = 0;
+    let snapshotReads = 0;
+    const currentOwner = "profile:new-account";
+    const staleOwner = "profile:old-account";
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/account/session") {
+        if (++accountReads === 1) { oldSignal = init?.signal ?? undefined; return oldAccount; }
+        return new Response(JSON.stringify({ session: { profile: { profile_id: currentOwner } } }));
+      }
+      snapshotReads++;
+      return new Response(JSON.stringify({ profile_id: currentOwner, entries: [], artifacts: [] }));
+    }));
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+    await act(async () => { await Promise.resolve(); });
+    expect(snapshotReads).toBe(1);
+    expect(oldSignal?.aborted).toBe(true);
+    expect(isProfileStorageAttachConsentGranted(currentOwner)).toBe(true);
+    await act(async () => {
+      if (lateResult === "success") finishOldAccount(new Response(JSON.stringify({ session: { profile: { profile_id: staleOwner } } })));
+      else rejectOldAccount(new Error("fixture old response failed"));
+      await Promise.resolve();
+    });
+    expect(snapshotReads).toBe(1);
+    expect(isProfileStorageAttachConsentGranted(staleOwner)).toBe(false);
+    await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+    await act(async () => { await Promise.resolve(); });
+    expect(snapshotReads).toBe(1);
+  });
+  }
+
+  for (const failure of ["unavailable", "wrong_profile", "hung_body"] as const) {
+    it(`blocks backup after ${failure}, then retries restoration before saving`, async () => {
+      vi.useFakeTimers();
+      useAgiChatStore.getState().newSession("Fresh unsynced chat");
+      let failRestore = true;
+      let restoreReads = 0;
+      let finishLateBody: ((value: unknown) => void) | undefined;
+      const posts: unknown[] = [];
+      const snapshot = (owner = profileId) => ({
+        schema: "helix.profile_storage_snapshot.v1", profile_id: owner,
+        storage_backend: "profile_server", entries: [], artifacts: [],
+        total_entry_bytes: 0, quota_bytes: 1024, updated_at: null,
+        raw_profile_content_included: true,
+      });
+      vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === "/api/account/session") {
+          return new Response(JSON.stringify({ session: { profile: { profile_id: profileId } } }));
+        }
+        if (init?.method === "POST") {
+          posts.push(JSON.parse(String(init.body)));
+          return new Response(JSON.stringify({ ok: true }));
+        }
+        restoreReads++;
+        if (failRestore && failure === "hung_body") {
+          return { ok: true, json: () => new Promise(resolve => { finishLateBody = resolve; }) };
+        }
+        if (failRestore && failure === "unavailable") return new Response("Unavailable", { status: 503 });
+        return new Response(JSON.stringify(snapshot(failRestore ? "user:other-profile" : profileId)));
+      }));
+      render(React.createElement(ProfileStorageSyncHarness));
+      await act(async () => { await Promise.resolve(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+      expect(posts).toEqual([]);
+      expect(restoreReads).toBe(1);
+      failRestore = false;
+      await act(async () => { await vi.advanceTimersByTimeAsync(14_000); });
+      expect(restoreReads).toBe(2);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+      expect(posts).toHaveLength(1);
+      expect(posts[0]).toMatchObject({ expected_profile_id: profileId });
+      const readsAfterRecovery = restoreReads;
+      await act(async () => {
+        finishLateBody?.({ ...snapshot(), entries: [{ storage_backend: "localStorage",
+          storage_key: "fixture-late-restore", value: "must-not-apply" }] });
+        await vi.advanceTimersByTimeAsync(14_000);
+      });
+      expect(localStorage.getItem("fixture-late-restore")).toBeNull();
+      expect(restoreReads).toBe(readsAfterRecovery);
+      expect(posts).toHaveLength(1);
+    });
+  }
+
+  it("does not apply or retry a restore body that arrives after unmount", async () => {
+    vi.useFakeTimers();
+    let finish: ((value: unknown) => void) | undefined;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/account/session") {
+        return new Response(JSON.stringify({ session: { profile: { profile_id: profileId } } }));
+      }
+      return { ok: true, json: () => new Promise(resolve => { finish = resolve; }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const view = render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await Promise.resolve(); });
+    expect(finish).toBeTypeOf("function");
+    view.unmount();
+    const calls = fetchMock.mock.calls.length;
+    await act(async () => {
+      finish?.({ profile_id: profileId, artifacts: [], entries: [{
+        storage_backend: "localStorage", storage_key: "fixture-unmounted", value: "must-not-apply",
+      }] });
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(localStorage.getItem("fixture-unmounted")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(calls);
+  });
+
+  it("also pauses an existing backup queue when a remount cannot restore the profile", async () => {
+    vi.useFakeTimers();
+    useAgiChatStore.getState().newSession("Queued fixture chat");
+    let restoreUnavailable = false;
+    let posts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/account/session") {
+        return new Response(JSON.stringify({ session: { profile: { profile_id: profileId } } }));
+      }
+      if (init?.method === "POST") {
+        posts++;
+        return new Response(JSON.stringify({ ok: false, message: "Fixture backup unavailable" }), { status: 503 });
+      }
+      return restoreUnavailable ? new Response("Unavailable", { status: 503 }) : new Response(JSON.stringify({
+        schema: "helix.profile_storage_snapshot.v1", profile_id: profileId, entries: [], artifacts: [],
+      }));
+    }));
+    const first = render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(posts).toBe(1);
+    expect(getProfileStorageSyncStatus(profileId)?.pendingEntryCount).toBe(1);
+    first.unmount();
+    restoreUnavailable = true;
+    render(React.createElement(ProfileStorageSyncHarness));
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(posts).toBe(1);
+    expect(getProfileStorageSyncStatus(profileId)?.lastError).toContain("Backup is paused");
+  });
+});
 
 describe("profile storage sync consent", () => {
   it("does not save browser-local profile candidates until attach consent is granted", () => {

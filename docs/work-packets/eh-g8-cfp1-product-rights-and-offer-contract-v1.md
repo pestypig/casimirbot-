@@ -139,6 +139,23 @@ records source references, deployment differences, component test failures and
 the ordered reuse/build direction. It supersedes stale implementation
 assumptions, not owner decisions or existing gate prerequisites.
 
+## Platform focus for this task — 2026-09-14
+
+The owner directed this task to develop the harness platform plan while the
+Minecraft proof of concept advances through its existing owners. The
+[platform build plan](eh-g8-cfp1-harness-platform-build-plan-v1.md) is the working
+handoff for personal/hosted journeys, account and permission continuity,
+developer integrations and delivery. It reuses the domain and developer
+contracts above and introduces no new runtime authority or stage ledger.
+
+Prepare those platform contracts without requiring the final Minecraft
+experience to be fixed now. The capability set is refined as bounded slices
+produce evidence; each implementation/evaluation slice and the selected
+release still need their exact scope and acceptance frozen. The technical
+pilot is neither the platform's entire feature list nor evidence that all
+planned features work. Existing NAV/CS/ET tasks keep their implementation and
+acceptance ownership; CFP-1 closure requirements remain in force.
+
 ## Current specification and review inputs
 
 Change classification: `presentation` and documentation of future admission

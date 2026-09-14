@@ -29,17 +29,27 @@ export async function recoverEnvironmentSessionGoal(
   await bindingStore.verifyTaskAssociation(input.binding);
   let goal = await dependencies.goals.inspect(input.context);
   const prior = goal.identity;
+  let unrecordedEpochChange = false;
   if (prior.run_id !== input.context.runId || prior.room_id !== input.context.roomId ||
       prior.environment_binding_id !== input.environmentBindingId || prior.source_id !== input.sourceId ||
       prior.world_id !== input.worldId || prior.subject_binding_id !== input.subjectBindingId) throw fail();
   if (goal.status === "active" && !goal.recovery.required) {
-    await dependencies.goals.resolveTemporalAdmissionContext({ ...input.context, expectedRevision: goal.revision });
-    await bindingStore.verifyTaskAssociation(input.binding);
-    return { goal, changed: false, execution_authority: false as const,
-      answer_authority: false as const, terminal_eligible: false as const };
+    try {
+      await dependencies.goals.resolveTemporalAdmissionContext({ ...input.context, expectedRevision: goal.revision });
+    } catch (error) {
+      if (!(error instanceof EnvironmentDurableGoalError) || error.code !== "durable_goal_authority_stale") throw error;
+      // An idle credential can rotate without a workflow recording disconnect.
+      // Confirm epoch-only drift below before entering the recovery lifecycle.
+      unrecordedEpochChange = true;
+    }
+    if (!unrecordedEpochChange) {
+      await bindingStore.verifyTaskAssociation(input.binding);
+      return { goal, changed: false, execution_authority: false as const,
+        answer_authority: false as const, terminal_eligible: false as const };
+    }
   }
-  if (goal.status !== "recovery_required" || !goal.recovery.required ||
-      !["disconnect", "fabric_restart", "helix_restart", "connector_epoch_changed"].includes(goal.recovery.reason ?? "")) {
+  if (!unrecordedEpochChange && (goal.status !== "recovery_required" || !goal.recovery.required ||
+      !["disconnect", "fabric_restart", "helix_restart", "connector_epoch_changed"].includes(goal.recovery.reason ?? ""))) {
     throw new EnvironmentDurableGoalError("durable_goal_authority_stale", 409,
       "This recovery reason requires explicit operator intent; Ready up will not resume it.");
   }
@@ -55,10 +65,15 @@ export async function recoverEnvironmentSessionGoal(
   if (identity.subject_binding_id !== input.subjectBindingId || identity.source_id !== input.sourceId ||
       identity.world_id !== input.worldId || identity.environment_binding_id !== input.environmentBindingId ||
       identity.subject_native_id !== prior.subject_native_id) throw fail();
+  if (unrecordedEpochChange && (identity.producer_epoch_ref === prior.producer_epoch_ref ||
+      helixEnvironmentDurableGoalSha256({ ...identity, producer_epoch_ref: prior.producer_epoch_ref,
+        turn_id: prior.turn_id }) !== helixEnvironmentDurableGoalSha256(prior))) throw fail();
   const readEvidence = () => dependencies.perception({ identity,
     probeRequestId: input.context.probeRequestId, priorTurnId: input.context.priorTurnId });
   const { evidence } = await readEvidence();
-  const revision = evidence.observation.result.observation_revision;
+  // The durable ledger resolves the broker observation revision. The snapshot's
+  // result.observation_revision is a separate sensor/world-tick coordinate.
+  const revision = evidence.observation.observation_revision;
   if (typeof revision !== "number" || !Number.isSafeInteger(revision) || revision < 0) throw new EnvironmentDurableGoalError(
     "durable_goal_evidence_identity_mismatch", 409, "Recovery requires an exact observation revision.");
   const refs = [evidence.observation.evidence_ref];
@@ -66,11 +81,16 @@ export async function recoverEnvironmentSessionGoal(
     // Recheck freshness/identity and exact binding at each bounded lifecycle step.
     const fresh = await readEvidence();
     if (fresh.evidence.observation.evidence_ref !== refs[0] ||
-        fresh.evidence.observation.result.observation_revision !== revision) throw fail();
+        fresh.evidence.observation.observation_revision !== revision) throw fail();
     await bindingStore.verifyTaskAssociation(input.binding);
     goal = await dependencies.goals.append({ ...request, goalId: goal.goal_id,
-      expectedRevision: goal.revision, payload, evidenceRefs: refs });
+      expectedRevision: goal.revision, expectedCurrentIdentity: { ...identity, turn_id: request.turnId }, payload,
+      // The recovery marker retains the old epoch. Fresh evidence is required
+      // above and attached to the subsequent rebound under the current epoch.
+      evidenceRefs: payload.kind === "recovery_required" ? [] : refs });
   };
+  if (unrecordedEpochChange) await append({ kind: "recovery_required", reason: "connector_epoch_changed",
+    last_recoverable_checkpoint_id: goal.latest_checkpoint?.checkpoint_id ?? null });
   if (!goal.recovery.rebound_event_id) await append({ kind: "authority_rebound",
     superseded_producer_epoch_ref: prior.producer_epoch_ref, fresh_observation_revision: revision });
   const facts = { environment_binding_id: identity.environment_binding_id,

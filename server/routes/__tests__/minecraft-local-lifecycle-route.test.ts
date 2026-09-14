@@ -4,6 +4,10 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycleMocks = vi.hoisted(() => ({ execute: vi.fn() }));
+const selectionMocks = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock("../../services/environment-connectors/pairing/local-minecraft-run-profile-store", () => ({
+  readProfileOwnedMinecraftLifecycleAddress: selectionMocks.read,
+}));
 
 vi.mock(
   "../../services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle",
@@ -19,6 +23,7 @@ vi.mock(
 );
 
 import { resetDbClient } from "../../db/client";
+import { MinecraftLocalLifecycleError } from "../../services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle";
 import { accountSessionRouter } from "../account-session";
 import { environmentConnectorBrowserRouter } from
   "../environment-connector-platform";
@@ -49,6 +54,7 @@ describe("Minecraft local lifecycle browser/desktop route", () => {
     await resetDbClient();
     lifecycleMocks.execute.mockReset();
     lifecycleMocks.execute.mockResolvedValue(receipt);
+    selectionMocks.read.mockReset().mockResolvedValue("127.0.0.1:25566");
   });
 
   afterEach(async () => {
@@ -142,6 +148,27 @@ describe("Minecraft local lifecycle browser/desktop route", () => {
     });
     expect(lifecycleMocks.execute).toHaveBeenCalledWith({
       request: { address: "localhost:25565" },
+      ownerProfileId: "profile:minecraft-local-developer",
+      allowServerStartup: true,
     });
+    const selection = await developer.get("/api/agi/environment-connectors/local/minecraft/fabric-loopback/selection")
+      .set("Host", "127.0.0.1").set("Origin", "http://127.0.0.1").set("Sec-Fetch-Site", "same-origin").expect(200);
+    expect(selection.body).toMatchObject({ ok: true, address: "127.0.0.1:25566", terminal_eligible: false });
+    expect(selectionMocks.read).toHaveBeenCalledWith({ ownerProfileId: "profile:minecraft-local-developer", appDataPath: process.env.APPDATA });
+    const server = { schema: "helix.minecraft.local_server_lifecycle.v1", status: "listening",
+      server_process_id: 4321, process_started_at: "2026-09-14T00:00:00.000Z", observed_at: "2026-09-14T00:00:05.000Z",
+      server_address: "127.0.0.1:25566", launcher_action: "launched_server", profile_digest: "a".repeat(64),
+      credentials_exposed: false, authority_widened: false } as const;
+    lifecycleMocks.execute.mockRejectedValueOnce(new MinecraftLocalLifecycleError("minecraft_client_setup_required", 409, "private fixture", server));
+    const failure = await developer.post("/api/agi/environment-connectors/local/minecraft/fabric-loopback/launch")
+      .set("Host", "127.0.0.1").set("Origin", "http://127.0.0.1").set("Sec-Fetch-Site", "same-origin")
+      .send({ address: "127.0.0.1:25566", operator_confirmation: true }).expect(409);
+    expect(failure.body).toMatchObject({ ok: false, server_lifecycle: server, terminal_eligible: false });
+    expect(JSON.stringify(failure.body)).not.toContain("private fixture");
+  });
+  it("does not disclose saved selection to an unauthenticated caller", async () => {
+    await request(app()).get("/api/agi/environment-connectors/local/minecraft/fabric-loopback/selection")
+      .set("Host", "127.0.0.1").set("Origin", "http://127.0.0.1").set("Sec-Fetch-Site", "same-origin").expect(403);
+    expect(selectionMocks.read).not.toHaveBeenCalled();
   });
 });

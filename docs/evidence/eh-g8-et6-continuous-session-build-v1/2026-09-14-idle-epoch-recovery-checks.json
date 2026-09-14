@@ -1,0 +1,103 @@
+{
+  "schema": "casimirbot.idle_epoch_recovery_verification.v1",
+  "recorded_at": "2026-09-14 09:30:16 UTC",
+  "packet": "docs/work-packets/eh-g8-cs-idle-epoch-recovery-v1.md",
+  "classification": "evidence re-entry",
+  "baseline_evidence": "2026-09-14-ready-up-retry-native.json",
+  "red": {
+    "command": "npx vitest run server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts -t 'Ready up recovers' --pool=forks --maxWorkers=1",
+    "exit_code": 1,
+    "passed": 1,
+    "failed": 1,
+    "failure": "durable_goal_authority_stale for active ledger with unrecorded epoch-only drift",
+    "log": ".tmp/idle-epoch-recovery-red-20260914.log",
+    "log_sha256": "4c9b63e165e4e94d26293a7b84b81dcaf2c1b2eb539a9ae702adaf9ff1dab712"
+  },
+  "green": {
+    "exit_code": 0,
+    "files": 5,
+    "tests": 147,
+    "groups": {
+      "real_goal_ledger": 62,
+      "preparation": 31,
+      "readiness": 29,
+      "ready_up": 12,
+      "recovery_composition": 13
+    },
+    "log": ".tmp/idle-epoch-recovery-focused-complete-20260914.log",
+    "log_sha256": "402bab8d0de524edce1e87887fc41ae79a2e3290b7408b887695369c3e585871",
+    "command": "npx vitest run server/services/environment-connectors/goals/__tests__/durable-goal-store.test.ts server/services/environment-connectors/session/__tests__/recover-session-goal.test.ts server/services/environment-connectors/session/__tests__/ready-up-session.test.ts server/services/environment-connectors/session/__tests__/session-readiness.test.ts server/services/environment-connectors/session/__tests__/prepare-browser-session.test.ts --pool=forks --maxWorkers=1"
+  },
+  "scorecard": {
+    "basis": "Deterministic assertions on the enumerated fixtures, not an estimated real-world success probability.",
+    "recovery_scenarios_passed": 6,
+    "healthy_repeats_each": 3,
+    "rejected_variants_passed": 31,
+    "covered": "Authority ID/version/deadline; profile/host/installation/device; source binding/world/player/subject/participants/source/environment/room/run; expired evidence, revoked binding, unavailable authority; identity race before each of four writes; manual/emergency/revocation/death/pause/cancel.",
+    "real_components": [
+      "pg-mem durable ledger",
+      "goal reducer",
+      "evidence hash and identity validation",
+      "optimistic revision checks",
+      "recovery orchestration"
+    ],
+    "fixture_ports": [
+      "current connector identity",
+      "perception payload",
+      "exact task association"
+    ],
+    "physical_sensing_proved": false,
+    "live_movement_proved": false,
+    "lost_committed_reply_cases_passed": 4,
+    "fixture_pass_fraction": 1,
+    "real_world_success_probability": null,
+    "postgres_concurrent_transaction_qualification": false
+  },
+  "implementation": {
+    "recovery_sha256": "aafdc640a96f646219c42ec4851811a6846676e79d4db5227116a98cbfe54d25",
+    "ledger_sha256": "539fad652ff9a855f4fe86196e68b1f130124b27cc20dc32b2ffd389c6953527",
+    "tests_sha256": "76cc7759bead6c0210c2c6a1d2e093819753b4f8ab2b897df874682b4802d534",
+    "contract": "Record one recovery marker only for same-authority epoch-only drift after exact fresh evidence. Check current identity inside every ledger append transaction. Reuse rebound/checkpoint/resume; no milestone progress or gameplay."
+  },
+  "full_discipline": {
+    "command": "npm run helix:ask:discipline:full",
+    "classification": "evidence re-entry",
+    "exit_code": 0,
+    "tests": 101,
+    "groups": {
+      "prelude": 4,
+      "adversarial": 31,
+      "api_base": 15,
+      "api_scenarios": 16,
+      "continuation": 26,
+      "live_source_identity": 9
+    },
+    "server_build_passed": true,
+    "unrelated_existing_duplicate_key_or_case_warnings": 4,
+    "log": ".tmp/idle-epoch-recovery-discipline-full-20260914.log",
+    "log_sha256": "6b2b9a4f39f520641559bbe83dd2653e8ad6e88aba73b12f37ff39cbff5e44a3"
+  },
+  "docs_audit": {
+    "exit_code": 0,
+    "log": ".tmp/idle-epoch-recovery-docs-final-20260914.log",
+    "log_sha256": "325c3ebd15651c8b3d94ef1d090f08dbe5103822f6c81c54a25a866f44bbc980"
+  },
+  "package_rebuilt": false,
+  "native_repair_verified": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "package_status": "building separately; no package or native repair qualification yet",
+  "retention": {
+    "superseded": "apps/desktop/release-native-pairing-20260914",
+    "operation": "sent_to_recycle_bin",
+    "permanent_deletion": false,
+    "retained": [
+      "apps/desktop/release-ready-up-retry-20260914",
+      "apps/desktop/release-review-recovery-20260914"
+    ]
+  }
+}

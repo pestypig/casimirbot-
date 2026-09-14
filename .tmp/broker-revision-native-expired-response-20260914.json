@@ -1,0 +1,1 @@
+{"schema":"helix.environment_session_error.v1","ok":false,"error":"environment_session_readiness_expired","repairs":[],"partial_effects_unknown":false,"readiness_confirmed":false,"execution_authority":false,"answer_authority":false,"assistant_answer":false,"terminal_eligible":false,"credential_included":false}

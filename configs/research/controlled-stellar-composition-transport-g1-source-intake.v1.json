@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "controlled-stellar-composition-transport-g1-source-intake/1",
+  "status": "partial_primary_source_intake_not_science_freeze",
+  "observedDate": "2026-09-13",
+  "launchAllowed": false,
+  "fixtureFallbackAllowed": false,
+  "claimBoundary": "Source evidence only; no evolution or observational acceptance.",
+  "upstreamComparison": {
+    "commit": "7ecf3dfa61d514c7b6f47645e02d968d3e3c28b7",
+    "baseUrl": "https://raw.githubusercontent.com/MESAHub/mesa/7ecf3dfa61d514c7b6f47645e02d968d3e3c28b7/star/test_suite/simplex_solar_calibration/",
+    "method": "SHA256 of UTF-8 response content compared with installed sha256sum",
+    "allListedFilesMatch": true,
+    "wholeTreeVerified": false,
+    "files": {
+      "inlist_prezams": "a7ed926e403c058b862e3cd79ccc037bf6211735c95718f2073be0850caa0fc3",
+      "inlist_solar": "a7c0ff679181febc808574c72b8280a02dbc2958484f79dcae169403dccde7bb",
+      "inlist_simplex_search_controls_solar": "013ea629d6d9deebc9f06500f9924570755d6e21c60a5a22db1a1c7be6e7c8bf",
+      "src/run_star_extras.f90": "7ae9e0adf6f1f39a98980525bbb3d524aeaf50cf5c4a96be1cc7852341dfd5bc",
+      "src/simplex_search_run_support.f90": "5c0ca126c10fdc4e7247710de53fe60c8dbcf7018fc28dcd985cad02fc7e32ee"
+    }
+  },
+  "calibrationDesign": {
+    "source": "https://arxiv.org/abs/1611.09867",
+    "locations": ["section 2", "table 1"],
+    "massSolar": 1,
+    "ageGyr": 4.57,
+    "ageZeroConvention": "pending",
+    "freeParameters": ["initial_Y", "initial_Z", "mixing_length_alpha"],
+    "fitQuantities": ["luminosity", "radius", "surface_Z_over_X"],
+    "candidateMixture": "GS98",
+    "candidateSurfaceZOverX": 0.02292,
+    "note": "Historical family choice, not present abundance consensus; no overshoot fit or added controlled transport."
+  },
+  "heldOutSourceValues": [
+    {
+      "quantity": "surface_helium_mass_fraction",
+      "value": 0.2485,
+      "sigma": 0.0035,
+      "unit": "1",
+      "source": "https://arxiv.org/abs/1611.09867",
+      "location": "table 4 solar column, attributed to Basu and Antia 2004",
+      "status": "summary_candidate_not_final_likelihood",
+      "note": "Do not merge rounded summary with distinct GONG/MDI estimates."
+    },
+    {
+      "quantity": "convection_zone_base_radius_fraction",
+      "value": 0.713,
+      "sigma": 0.001,
+      "unit": "R_solar",
+      "source": "https://arxiv.org/abs/1611.09867",
+      "location": "table 4 solar column, attributed to Basu and Antia 1997",
+      "status": "summary_candidate_not_final_likelihood"
+    },
+    {
+      "quantity": "be7_neutrino_flux",
+      "value": 4990000000,
+      "unit": "cm^-2 s^-1",
+      "sourceId": "borexino_2018_fig4",
+      "sourceRow": "BOREXINO",
+      "sigma": null,
+      "status": "central_value_verified_uncertainty_pending"
+    },
+    {
+      "quantity": "b8_neutrino_flux",
+      "value": 5680000,
+      "unit": "cm^-2 s^-1",
+      "sourceId": "borexino_2018_fig4",
+      "sourceRow": "BOREXINO",
+      "sigma": null,
+      "status": "central_value_verified_uncertainty_pending"
+    }
+  ],
+  "dataSources": [
+    {
+      "id": "borexino_2018_fig4",
+      "url": "https://borex.lngs.infn.it/wp-content/uploads/OpenData/Nature2018_Fig4_DATApoints.txt",
+      "utf8ContentSha256": "62a3688b1e6da44a9c99d295c85e45f7510f2eaa1077d3a254256f607744e8f0",
+      "utf8ContentBytes": 162,
+      "use": "BOREXINO row only; SSM/GLOBAL rows are not independent Borexino measurements"
+    },
+    {
+      "id": "borexino_2018_mc_fit_correlation",
+      "url": "https://borex.lngs.infn.it/wp-content/uploads/OpenData/Nature2018_SimoneCorrMatrix.txt",
+      "utf8ContentSha256": "6b72d79cd8635483fba0d36b47beeec386092939d8712f287a99afb99db3706b",
+      "utf8ContentBytes": 2387,
+      "use": "Detector MC fit with high-metallicity CNO penalty, not general flux covariance",
+      "mayUseAsGlobalFluxCovariance": false
+    }
+  ],
+  "remainingScienceFreezeRequirements": [
+    "age_zero_and_initial_model_definition",
+    "L_R_targets_and_distinct_numerical_tolerances",
+    "mixture_and_microphysics_dependencies",
+    "neutrino_uncertainty_and_flavor_conversion_policy",
+    "structural_inversion_data_and_errors",
+    "acceptance_and_multiple_test_policy",
+    "inlists_parameter_bounds_optimizer_stopping_policy",
+    "convergence_thresholds_input_hash_closure",
+    "resource_enforcement_fresh_capacity_check"
+  ]
+}

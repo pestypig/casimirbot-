@@ -48,6 +48,40 @@ const bootstrapObjective = { objective_text: "Walk across the platform and stop 
   mechanics_collection_ref: null, milestones: [{ milestone_id: "cross", description: "Cross the platform",
     dependency_milestone_ids: [], required_postcondition_ids: ["arrival"] }] };
 
+it.each([
+  ["account", "account_context"], ["target", "task_target"],
+  ["binding", "task_binding"], ["association", "run_association"],
+  ["membership", "room_membership"], ["goal", "goal_lookup"],
+  ["environments", "environment_lookup"], ["refreshSubject", "subject_refresh"],
+  ["createGoal", "goal_creation"], ["observe", "perception_probe"],
+  ["inspect", "readiness_inspection"], ["prepare", "session_recovery"],
+])("localizes %s failure without leaking exception data or granting readiness", async (dependency, phase) => {
+  const f = fixture();
+  const failure = new Error("fixture-private-sql-and-token");
+  if (dependency === "target") f.store.resolveOwnedPreparationTarget.mockImplementation(() => { throw failure; });
+  else if (dependency === "binding") f.store.verifyTaskAssociation.mockImplementation(() => { throw failure; });
+  else if (dependency === "createGoal") {
+    f.deps.goal.mockResolvedValue(null);
+    Object.assign(f.input, { goalBootstrap: { environment_binding_id: "environment:a",
+      subject_binding_id: "subject:a", action_authority_id: "authority:a", objective: bootstrapObjective } });
+    Object.assign(f.deps, { createGoal: vi.fn().mockRejectedValue(failure) });
+  } else {
+    if (dependency === "refreshSubject") {
+      const rows = await f.deps.environments();
+      Object.assign(rows[0].self_subject_binding, { status: "stale", producer_epoch_ref: "epoch:old" });
+    }
+    if (dependency === "inspect") f.deps.observe.mockResolvedValue({ ok: false, observation: f.observation });
+    f.deps[dependency as keyof typeof f.deps].mockRejectedValue(failure);
+  }
+  const error = await f.run().catch(value => value);
+  expect(error).toBeInstanceOf(EnvironmentSessionPreparationError);
+  expect(error.projection).toMatchObject({ error: "environment_session_preparation_failed", failure_phase: phase,
+    readiness_confirmed: false, execution_authority: false, credential_included: false,
+    partial_effects_unknown: ["refreshSubject", "createGoal", "prepare"].includes(dependency) });
+  expect(JSON.stringify(error.projection)).not.toContain(failure.message);
+  expect(error.projection).not.toHaveProperty("selection");
+});
+
 it("returns only verified room navigation when first-session goal setup is missing", async () => {
   const f = fixture();
   f.deps.goal.mockResolvedValue(null);
@@ -268,7 +302,9 @@ it("uses the authenticated MCP account and rejects a different task before obser
   await run(f.target);
   expect(f.deps.account).not.toHaveBeenCalled();
   expect(f.deps.observe.mock.calls[0][0].accountContext).toBe(accountContext);
-  await expect(run({ ...f.target, clientContinuationRef: "task:foreign" })).rejects.toThrow("reasoning_binding_identity_mismatch");
+  await expect(run({ ...f.target, clientContinuationRef: "task:foreign" })).rejects.toMatchObject({ projection: {
+    error: "reasoning_binding_identity_mismatch", failure_phase: "task_binding", readiness_confirmed: false,
+  } });
   expect(f.deps.observe).toHaveBeenCalledOnce();
   expect(f.deps.prepare).toHaveBeenCalledOnce();
 });
@@ -287,7 +323,8 @@ it("automatically acquires a first-party snapshot and passes exact evidence to s
   expect(f.deps.prepare.mock.calls[0][0].context).toMatchObject({ goalId: "goal:a", expectedRevision: 5,
     runId: "run:a", probeRequestId: "probe:a", priorTurnId: args.turnId });
   await f.run();
-  expect(f.deps.observe.mock.calls[1][0].toolCallId).toBe(args.toolCallId);
+  expect(f.deps.observe.mock.calls[1][0].turnId).toBe(args.turnId);
+  expect(f.deps.observe.mock.calls[1][0].toolCallId).not.toBe(args.toolCallId);
 });
 
 it("caps readiness at the verified run deadline without changing that lease", async () => {
@@ -347,7 +384,7 @@ it.each(["fabric_restart", "manual_override", "revoked"])(
     };
     const recoveryDeps = { database: async () => ({}),
       identity: async () => ({ ...identity, producer_epoch_ref: "epoch:new" }),
-      perception: async () => ({ evidence: { observation: { evidence_ref: "evidence:a", result: { observation_revision: 10 } } } }),
+      perception: async () => ({ evidence: { observation: { evidence_ref: "evidence:a", observation_revision: 10, result: { observation_revision: 3 } } } }),
       goals: { inspect: async () => goal, resolveTemporalAdmissionContext: resolveGoal,
         append: async (request: any) => {
           expect(request.expectedRevision).toBe(goal.revision);

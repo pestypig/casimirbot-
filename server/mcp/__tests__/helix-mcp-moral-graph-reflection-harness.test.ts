@@ -12,6 +12,16 @@ import {
   type MoralReflectionMediationPacketV1,
 } from "@shared/contracts/moral-reflection-mediation-packet.v1";
 import { createMoralGraphReflectionMcpHarnessServer } from "../testing/moral-graph-reflection-mcp-harness";
+import {
+  validateProceduralMoralClassificationV1,
+  type ProceduralMoralClassificationV1,
+} from "@shared/procedural-moral-classification";
+import {
+  principleMethodObservations,
+  principleMethodInterpretation,
+  principleMethodGeneralCases,
+} from "@shared/moral-graph/__tests__/fixtures/principle-method-scenarios";
+import { compactMoralGraphReflectionArtifactForModel } from "../../services/helix-ask/model-context-economy";
 
 const scenario = [
   "An outsider rises because inherited rank is poorly aligned with demonstrated competence.",
@@ -42,6 +52,54 @@ async function connectHarness() {
 }
 
 describe("Moral Graph MCP reflection harness", () => {
+  it.each([
+    ["observations only", principleMethodObservations],
+    ["user interpretation with episode claims", principleMethodInterpretation],
+    ...principleMethodGeneralCases,
+    ["competing procedural cues", `${principleMethodObservations} I feel behind, guilty, overwhelmed; this rumination and identity feedback loop needs a test.`],
+  ])("preserves the five review checks through real MCP and model evidence re-entry: %s", async (_label, text) => {
+    const client = await connectHarness();
+    const result = await client.callTool({
+      name: HELIX_ASK_MORAL_GRAPH_REFLECTION_TOOL_NAME,
+      arguments: { text, options: { includeLocator: false } },
+    });
+    expect(result.isError).not.toBe(true);
+    const procedural = result.structuredContent?.proceduralClassification as ProceduralMoralClassificationV1;
+    expect(validateProceduralMoralClassificationV1(procedural)).toEqual([]);
+    const review = procedural.classifications[0];
+    expect(review).toMatchObject({
+      observedPattern: "principle_method_tension",
+      moralRootId: "values-over-images",
+      proceduralMove: "separate_principle_from_method",
+    });
+    expect(procedural.authority).toMatchObject({ terminal_eligible: false, agent_executable: false, moral_finality: false });
+    const mediation = result.structuredContent?.moralReflectionMediation as MoralReflectionMediationPacketV1;
+    expect(validateMoralReflectionMediationPacketV1(mediation)).toEqual([]);
+    expect(mediation.objectiveSourceStatus).toBe("unresolved");
+
+    const compact = compactMoralGraphReflectionArtifactForModel({
+      turnId: "turn-principle-method", artifact: result.structuredContent, userRequested: text,
+    });
+    expect(compact).toMatchObject({ assistant_answer: false, terminal_eligible: false, raw_content_included: false });
+    const findings = compact!.found.join(" ");
+    expect(findings).toContain("not a proven attachment");
+    expect(findings).toContain("The principle itself remains open to ethical review");
+    expect(findings).toContain("Principle and Method Review.");
+    expect(findings).toContain("when should the choice be reviewed?");
+    expect(compact!.support_refs).toContain("moral-badge:values-over-images");
+    for (const missingCheck of review.missingEvidence) {
+      expect(compact!.missing_or_uncertain.join(" ")).toContain(missingCheck);
+    }
+    for (const warning of review.warnings) {
+      expect(compact!.proves.join(" ")).toContain(warning);
+    }
+    if (text === principleMethodInterpretation) {
+      expect(procedural.classifications.map((entry) => entry.observedPattern)).not.toContain("guilt_signal");
+      expect(compact!.found[0]).toContain("external_verification_first");
+      expect(compact!.missing_or_uncertain).toContain("claim_and_inference_separation");
+    }
+  });
+
   it("exposes the real handler as a read-only tool and focuses the renewal scenario", async () => {
     const client = await connectHarness();
     const catalog = await client.listTools();

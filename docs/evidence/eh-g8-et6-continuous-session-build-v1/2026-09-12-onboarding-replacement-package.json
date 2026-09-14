@@ -1,0 +1,60 @@
+{
+  "schema": "casimirbot.continuous_session_development_package.v1",
+  "observed_at": "2026-09-12T16:44:01.235Z",
+  "scope": "Development package content verification only; not launch or live acceptance",
+  "output": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-onboarding-replacement-20260912\\win-unpacked",
+  "build_exit_code": 0,
+  "runtime": {
+    "files_compared": 645,
+    "mismatches": [],
+    "extras": []
+  },
+  "client": {
+    "files_compared": 635,
+    "mismatches": [],
+    "extras": []
+  },
+  "bundles": {
+    "data/starsim/solar-product-registry.v1.json": {
+      "sha256": "50c92e15cad73a0ac4ab8cb8e90a667cdb25b4626ac0af3d0f43b2bde3d049c2",
+      "matches": true
+    },
+    "data/starsim/solar-reference-pack.v1.json": {
+      "sha256": "691b11a0ff6b9d072f068356ef2574d8daa3eb7b185ad1c28e9aa4baa89db132",
+      "matches": true
+    },
+    "icon.png": {
+      "sha256": "e08d6657e2986f943015b4a5920ee8bc64d09a0686e930e60183cf3f7015daae",
+      "matches": true
+    },
+    "main.cjs": {
+      "sha256": "04f15d251266b65e28607990428f50c786bf1a4ed27a6eefaf66e86cb657848c",
+      "matches": true
+    },
+    "preload.cjs": {
+      "sha256": "b57f9f738b87eda3ac6f0c081ff6f86c4ae1ec42bd803076dd217c11746c3329",
+      "matches": true
+    },
+    "realtime-texture-pack-overlay-preload.cjs": {
+      "sha256": "174cf6fe99d039657bc659b4aed5ddec166097b9567169d50f092f1dde5f4ab2",
+      "matches": true
+    },
+    "service-dependencies.json": {
+      "sha256": "6967c89ed25226df844b3fcb63f11aa215e033bccf324c87ba0080341e11d877",
+      "matches": true
+    },
+    "service.mjs": {
+      "sha256": "4fac980e4e3ca6913b7daef30793bd58cfc5eeb8372b8b29b953051cc73324ae",
+      "matches": true
+    }
+  },
+  "exe_sha256": "1a315a6c3091f573ce99d5826ee73d9e66ca78fb22ae6eb70083435dcf23088f",
+  "source_commit": "0ecb9650f110aa62b2293760b15380f0766a3e04",
+  "dirty_checkout": true,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

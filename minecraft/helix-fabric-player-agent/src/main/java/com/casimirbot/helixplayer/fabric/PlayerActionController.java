@@ -1152,10 +1152,12 @@ public final class PlayerActionController {
 
     private void handleManualOverride(String manualInputReason) {
         bridge.expectScreenOpen(false);
-        lastMeasurements = Map.of(
-            "manual_input_reason", manualInputReason,
-            "action_ticks_before_override", actionTicks
-        );
+        // Interruption adds a causal observation; it must not erase execution
+        // facts already collected for the resident result envelope.
+        Map<String, Object> interruptedMeasurements = new LinkedHashMap<>(lastMeasurements);
+        interruptedMeasurements.put("manual_input_reason", manualInputReason);
+        interruptedMeasurements.put("action_ticks_before_override", actionTicks);
+        lastMeasurements = Map.copyOf(interruptedMeasurements);
         releaseOwnedControls.run();
         if (active.manualOverridePolicy() == ManualOverridePolicy.PAUSE) {
             state = State.PAUSED_MANUAL_OVERRIDE;

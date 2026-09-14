@@ -19,6 +19,235 @@ import org.slf4j.LoggerFactory;
 final class PlayerActionRuntimeTransportTest {
     @TempDir Path directory;
 
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "HELIX_NATIVE_COMPILED_HANDOFF", matches = "1")
+    void continuousCompiledChainPollsThreeSuccessorsInOneResidentRuntime() throws Exception {
+        exerciseContinuousChain("success");
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "HELIX_NATIVE_COMPILED_HANDOFF", matches = "1")
+    void continuousCompiledChainCancellationDiscardsThirdSuccessor() throws Exception {
+        exerciseContinuousChain("cancel");
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "HELIX_NATIVE_COMPILED_HANDOFF", matches = "1")
+    void continuousCompiledChainEmergencyStopDiscardsThirdSuccessor() throws Exception {
+        exerciseContinuousChain("emergency");
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "HELIX_NATIVE_COMPILED_HANDOFF", matches = "1")
+    void continuousCompiledChainManualObservationDiscardsThirdSuccessor() throws Exception {
+        exerciseContinuousChain("manual");
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "HELIX_NATIVE_COMPILED_HANDOFF", matches = "1")
+    void continuousCompiledChainLostThirdResponseNeverReplaysDelivery() throws Exception {
+        exerciseContinuousChain("lost-third");
+    }
+
+    private void exerciseContinuousChain(String outcome) throws Exception {
+        boolean lostThird = "lost-third".equals(outcome);
+        boolean interrupted = !"success".equals(outcome) && !lostThird;
+        List<Map<String, Object>> compiled = ((List<?>) HelixJson.parse(java.nio.file.Files.readString(
+            Path.of("build", "server-compiled-continuous-chain.json")))).stream().map(HelixJson::asObject).toList();
+        assertEquals(4, compiled.size());
+        List<Map<String, Object>> wires = new ArrayList<>();
+        for (int index = 0; index < compiled.size(); index++) {
+            Map<String, Object> fixture = compiled.get(index);
+            Map<String, Object> artifact = HelixJson.asObject(fixture.get("artifact"));
+            Map<String, Object> wire = new LinkedHashMap<>();
+            wire.put("action_request_id", index == 0 ? "root" : "child:" + index);
+            wire.put("run_id", "run"); wire.put("workflow_id", "workflow");
+            wire.put("action_authority_id", "authority"); wire.put("environment_binding_id", "env");
+            wire.put("source_id", "source"); wire.put("room_id", "room"); wire.put("world_id", "world");
+            wire.put("participant_id", "participant"); wire.put("subject_binding_id", "subject"); wire.put("subject_native_id", "player");
+            wire.put("capability_id", "com.casimirbot.minecraft.player.sequence.execute"); wire.put("capability_version", 1);
+            wire.put("action_kind", "execute_sequence"); wire.put("requested_control_engine", "native_fabric");
+            wire.put("postconditions", List.of(Map.of("condition_id", "fixture:checkpoint",
+                "condition_kind", "checkpoint", "required", true, "parameters", Map.of())));
+            wire.put("temporal_plan", fixture.get("source")); wire.put("arguments", artifact.get("arguments"));
+            wire.put("temporal_plan_canonical_json", fixture.get("plan_canonical_json"));
+            wire.put("temporal_compilation_canonical_json", fixture.get("compilation_canonical_json"));
+            wire.put("temporal_compilation_hash", artifact.get("compilation_hash"));
+            wires.add(wire);
+        }
+        List<Map<String, Object>> polls = new CopyOnWriteArrayList<>();
+        List<Map<String, Object>> publications = new CopyOnWriteArrayList<>();
+        AtomicInteger reconciliations = new AtomicInteger();
+        String brokerOrigin = System.getenv("HELIX_NATIVE_BROKER_FIXTURE_ORIGIN");
+        if (lostThird && brokerOrigin != null && !"1".equals(System.getenv("HELIX_NATIVE_BROKER_CONTINUOUS_LOST_THIRD")))
+            throw new IllegalArgumentException("Lost-third broker mode must be explicit");
+        if (brokerOrigin != null && !brokerOrigin.matches("http://127\\.0\\.0\\.1:[0-9]+"))
+            throw new IllegalArgumentException("Broker fixture must use an isolated loopback origin");
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            Map<String, Object> body = HelixJson.asObject(HelixJson.parse(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+            if (brokerOrigin != null) {
+                if (exchange.getRequestURI().getPath().equals("/requests/temporal-successor")) polls.add(body);
+                else if (exchange.getRequestURI().getPath().equals("/requests/temporal-successor/status")) reconciliations.incrementAndGet();
+                else publications.add(Map.of("path", exchange.getRequestURI().getPath(), "body", body));
+                forwardToBroker(exchange, brokerOrigin + exchange.getRequestURI().getPath(), HelixJson.stringifyIncludingNulls(body));
+                return;
+            }
+            Map<String, Object> response = new LinkedHashMap<>(Map.of("ok", true));
+            if (exchange.getRequestURI().getPath().equals("/requests/temporal-successor")) {
+                polls.add(body);
+                if (lostThird && polls.size() == 3) {
+                    exchange.sendResponseHeaders(503, -1); exchange.close(); return;
+                }
+                String predecessor = String.valueOf(body.get("predecessor_plan_id"));
+                Map<String, Object> next = wires.stream().skip(1).filter(wire -> predecessor.equals(
+                    HelixJson.asObject(wire.get("temporal_plan")).get("previous_plan_id"))).findFirst().orElse(null);
+                response.put("action_request", next);
+            } else if (exchange.getRequestURI().getPath().equals("/requests/temporal-successor/status")) {
+                reconciliations.incrementAndGet();
+                response.put("delivery_state", Map.of("recorded_status", "leased", "execution_authority", false));
+                response.put("automatic_replay_allowed", false);
+            } else publications.add(Map.of("path", exchange.getRequestURI().getPath(), "body", body));
+            byte[] bytes = HelixJson.stringifyIncludingNulls(response).getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length); exchange.getResponseBody().write(bytes); exchange.close();
+        });
+        server.start();
+        var config = new PlayerActionConfig("http://127.0.0.1:" + server.getAddress().getPort(),
+            "helix_env_action_" + "x".repeat(43), "authority", "installation", "env", "room", "source", "world",
+            "adapter", PlayerActionConfig.DOMAIN_ADAPTER, "participant", "subject", "player", 1,
+            Instant.now().plusSeconds(120).toString());
+        PlayerActionRuntime runtime = null;
+        try {
+            runtime = new PlayerActionRuntime(config, null, LoggerFactory.getLogger(getClass()), ignored -> {},
+                Runnable::run, directory.resolve("unused-continuous.json"));
+            set(runtime, "producerEpochRef", "fixture:producer_epoch");
+            set(runtime, "monotonicClock", new EnvironmentMonotonicClock("fixture:clock", () -> 0L));
+            var bridge = new FluidSequenceEngineTest.SequenceBridge();
+            set(runtime, "evidenceSnapshot", (java.util.function.Supplier<PlayerActionWorkflow.PlayerSnapshot>) bridge::snapshot);
+            set(runtime, "latestClockSnapshot", simulatedClock("fixture:clock", 0));
+            List<PlayerActionWorkflow.WorkflowEvent> events = new ArrayList<>();
+            Method onEvent = PlayerActionRuntime.class.getDeclaredMethod("onWorkflowEvent", PlayerActionWorkflow.WorkflowEvent.class);
+            onEvent.setAccessible(true);
+            PlayerActionRuntime target = runtime;
+            var callbackFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+            var controller = new PlayerActionController(bridge, event -> {
+                events.add(event);
+                try { onEvent.invoke(target, event); } catch (Exception error) {
+                    callbackFailure.compareAndSet(null, error.getCause() == null ? error : error.getCause());
+                    throw new RuntimeException(error);
+                }
+            });
+            Object state = construct("TemporalDeliveryState", wires.get(0));
+            set(runtime, "temporalDeliveryState", state); set(runtime, "controller", controller);
+            set(runtime, "activeEnvelope", construct("ActiveEnvelope", wires.get(0), "execution", Instant.now().toString(),
+                simulatedClock("fixture:clock", 0), "native_fabric", new ArrayList<String>(), new EnvironmentCapacityTelemetry(0, 0, 0, 0, 200)));
+            controller.start(new PlayerActionWorkflow.ActionRequest("root", "workflow", "execute_sequence",
+                HelixJson.asObject(wires.get(0).get("arguments")), 200, PlayerActionWorkflow.ManualOverridePolicy.CANCEL, "native_fabric"));
+            var tick = new java.util.concurrent.atomic.AtomicLong();
+            assertTrue(controller.attachTemporalWindow("root", new TemporalPlanWindow("fixture:clock", 0, 0, 20, 21, 200, 60000),
+                () -> new PlayerActionController.TemporalClockSample("fixture:clock", tick.get(), tick.get() * 50), null));
+            Method poll = PlayerActionRuntime.class.getDeclaredMethod("pollTemporalSuccessor"); poll.setAccessible(true);
+            int movingTicks = 0;
+            int expectedStopTick = lostThird ? 62 : interrupted ? 43 : 84;
+            for (int currentTick = 0; currentTick <= 84; currentTick++) {
+                tick.set(currentTick); set(runtime, "latestClockSnapshot", simulatedClock("fixture:clock", currentTick));
+                bridge.snapshot = new PlayerActionWorkflow.PlayerSnapshot(true, currentTick * 0.1, 64, 65.62, 0, 0, 0, 20, true, false, false, null);
+                if (interrupted && currentTick == 43) {
+                    assertNotNull(get(state, "queuedWire"), "Third successor must be queued before stopping");
+                    if ("manual".equals(outcome)) {
+                        bridge.snapshot = new PlayerActionWorkflow.PlayerSnapshot(true, currentTick * 0.1, 64, 65.62,
+                            0, 0, 0, 20, true, false, true, "forward_key_pressed");
+                    } else {
+                        assertTrue("emergency".equals(outcome) ? controller.emergencyStop("fixture operator stop")
+                            : controller.cancel("workflow", "fixture operator cancellation"));
+                    }
+                }
+                controller.tick();
+                if (currentTick < expectedStopTick) { assertTrue(bridge.movement.forward(), "Released tick " + currentTick); movingTicks++; }
+                else assertFalse(bridge.movement.forward(), "Motion resumed after terminal tick " + currentTick);
+                for (String lane : List.of("criticalDeliveryNetwork", "projectionDeliveryNetwork"))
+                    ((ExecutorService) get(runtime, lane)).submit(() -> {}).get(5, TimeUnit.SECONDS);
+                if (currentTick == 0 || currentTick == 21 || currentTick == 42) {
+                    if (currentTick == 0 && "1".equals(System.getenv("HELIX_NATIVE_BROKER_CONTINUOUS_LOST_BATCH_ACK"))) {
+                        var outbox = (PlayerActionDeliveryOutbox) get(runtime, "deliveryOutbox");
+                        assertFalse(outbox.isProjectionEmpty(), "Unacknowledged committed batch must remain queued");
+                        poll.invoke(runtime);
+                        assertEquals(0, polls.size(), "Evidence backpressure must defer successor polling");
+                        assertNull(get(state, "queuedWire"));
+                        Method retryDelivery = PlayerActionRuntime.class.getDeclaredMethod("scheduleDeliveryFlush");
+                        retryDelivery.setAccessible(true); retryDelivery.invoke(runtime);
+                        for (String lane : List.of("criticalDeliveryNetwork", "projectionDeliveryNetwork"))
+                            ((ExecutorService) get(runtime, lane)).submit(() -> {}).get(5, TimeUnit.SECONDS);
+                        assertTrue(outbox.isProjectionEmpty(), "Exact batch replay must clear evidence backpressure");
+                    }
+                    int before = polls.size(); poll.invoke(runtime);
+                    if (lostThird && currentTick == 42) {
+                        assertNull(get(state, "queuedWire"));
+                        assertNotNull(get(state, "uncertainPoll"));
+                        for (int retry = 0; retry < 3; retry++) poll.invoke(runtime);
+                        assertEquals(3, polls.size(), "Reconciliation must not redeliver the third successor");
+                        assertEquals(3, reconciliations.get());
+                        assertNull(get(state, "queuedWire"));
+                        assertNotNull(get(state, "uncertainPoll"));
+                        assertEquals(2, events.get(events.size() - 1).measurements().get("resident_handoff_count"));
+                        assertTrue(events.stream().noneMatch(event -> "plan:continuous:3".equals(event.measurements().get("sequence_id"))));
+                        assertEquals(43, movingTicks);
+                    } else {
+                        assertNotNull(get(state, "queuedWire"), () -> events.toString());
+                        poll.invoke(runtime); assertEquals(before + 1, polls.size(), "Queued successor suppresses duplicate polling");
+                    }
+                }
+                if ((interrupted || lostThird) && currentTick >= expectedStopTick) {
+                    poll.invoke(runtime);
+                    assertEquals(3, polls.size(), "Stopped runtime must not request further delivery");
+                    assertNull(get(runtime, "activeEnvelope"));
+                    assertNull(get(runtime, "temporalDeliveryState"));
+                }
+            }
+            assertEquals(expectedStopTick, movingTicks); assertEquals(3, polls.size());
+            if ("manual".equals(outcome)) {
+                assertEquals("forward_key_pressed", events.get(events.size() - 1).measurements().get("manual_input_reason"));
+            }
+            if (lostThird) {
+                assertEquals(3, reconciliations.get(), "Terminal state must also stop status polling");
+                assertEquals("temporal_runway_exhausted", events.get(events.size() - 1).measurements().get("temporal_window_reason"));
+            }
+            assertNull(callbackFailure.get(), () -> Arrays.toString(callbackFailure.get().getStackTrace()));
+            assertEquals(!interrupted && !lostThird ? PlayerActionWorkflow.State.SUCCEEDED : "emergency".equals(outcome)
+                ? PlayerActionWorkflow.State.EMERGENCY_STOPPED : PlayerActionWorkflow.State.CANCELED, controller.state(),
+                () -> events.get(events.size() - 1).summary() + " " + events.get(events.size() - 1).measurements());
+            assertFalse(bridge.movement.forward()); assertTrue(bridge.released);
+            assertEquals(interrupted || lostThird ? 2 : 3, events.get(events.size() - 1).measurements().get("resident_handoff_count"));
+            if (interrupted || lostThird) assertTrue(events.stream().noneMatch(event ->
+                "plan:continuous:3".equals(event.measurements().get("sequence_id"))), "Queued third successor must never activate");
+            List<Map<String, Object>> results = publications.stream()
+                .filter(item -> "/requests/result".equals(item.get("path")))
+                .map(item -> HelixJson.asObject(item.get("body"))).toList();
+            assertEquals(1, results.size(), "One resident execution publishes one terminal result");
+            assertEquals("root", results.get(0).get("action_request_id"));
+            assertEquals(!interrupted && !lostThird ? "succeeded" : "emergency".equals(outcome) ? "emergency_stopped" : "request_canceled", results.get(0).get("outcome"));
+            assertEquals(true, results.get(0).get("player_motion_performed"));
+            assertEquals(true, results.get(0).get("controls_released"));
+            assertEquals(false, results.get(0).get("automatic_replay_performed"));
+            for (int index = 0; index < 3; index++) {
+                assertEquals("plan:continuous:" + index, polls.get(index).get("predecessor_plan_id"));
+                assertEquals("root", polls.get(index).get("resident_action_request_id"));
+            }
+            java.nio.file.Files.writeString(Path.of("build", lostThird ? "native-continuous-lost-third-deadline.json" : interrupted ? "native-continuous-" + outcome + ".json" : "native-continuous-runtime.json"),
+                HelixJson.stringifyIncludingNulls(Map.of("wires", wires, "polls", polls, "publications", publications,
+                    "moving_ticks", movingTicks, "reconciliations", reconciliations.get(), "stop_tick", expectedStopTick, "live_acceptance", false)), StandardCharsets.UTF_8);
+        } finally {
+            try {
+                if (runtime != null) {
+                    for (String lane : List.of("network", "criticalDeliveryNetwork", "projectionDeliveryNetwork"))
+                        ((ExecutorService) get(runtime, lane)).shutdownNow();
+                    ((TemporalDeliveryLane) get(runtime, "temporalDeliveryLane")).close();
+                    ((PlayerActionHttpClient) get(runtime, "http")).close();
+                }
+            } finally { server.stop(0); }
+        }
+    }
+
     @Test void workflowBatchRetriesExactPayloadAfterLostResponse() throws Exception {
         exerciseWorkflowBatch("lost");
     }

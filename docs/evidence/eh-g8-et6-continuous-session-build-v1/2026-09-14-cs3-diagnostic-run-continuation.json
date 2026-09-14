@@ -1,0 +1,363 @@
+{
+  "schema": "casimirbot.cs3_diagnostic_and_run_continuation.v1",
+  "recorded_at": "2026-09-14 12:30:55 UTC",
+  "scope": "Supported MCP owner preparation and packaged read-only diagnostic; no gameplay or new-run pairing acceptance",
+  "entries": {
+    "cs3RunContinuationAppendArgs": {
+      "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+      "expected_revision": 13,
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+      "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+      "turn_id": "cs3-run-continuation-checkpoint-20260914-01",
+      "evidence_refs": [
+        "environment_probe_evidence:d4f202e67e5cfdf7c6ec985088de90562196dd85"
+      ],
+      "payload": {
+        "kind": "checkpoint_verified",
+        "checkpoint_id": "checkpoint:cs3-run-continuation-20260914-01",
+        "milestone_id": null,
+        "observation_revision": 1789388426568,
+        "verified_facts": {
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "position": {
+            "x": 0.18,
+            "y": 65,
+            "z": 2.81
+          },
+          "health": 20,
+          "on_ground": true
+        },
+        "completed_postcondition_ids": [],
+        "incomplete_postcondition_ids": [],
+        "checkpoint_evidence_hash": "sha256:ecb57e2705065b7a7657f46ff961941c7b159b82b0c1c1e30cd9b0016db004d0"
+      }
+    },
+    "cs3RunContinuationAppendResult": {
+      "operation": "com.casimirbot.environment.durable_goal.append",
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "ok": true,
+      "goal": {
+        "schema": "helix.environment_durable_goal_projection.v1",
+        "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+        "revision": 14,
+        "latest_event_hash": "sha256:f7da7c292e068f56d3dab75dc5e83c07f82eaef5cefd98a6d30b4fdbc915e64a",
+        "status": "active",
+        "objective": {
+          "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+          "goal_kind": "custom_survival",
+          "domain": "minecraft",
+          "game_version": "1.21.8",
+          "mechanics_collection_ref": null,
+          "milestones": [
+            {
+              "milestone_id": "cs-course-readiness",
+              "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+              "dependency_milestone_ids": [],
+              "required_postcondition_ids": [
+                "cs-fresh-safe-course"
+              ]
+            },
+            {
+              "milestone_id": "cs-three-linked-successors",
+              "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+              "dependency_milestone_ids": [
+                "cs-course-readiness"
+              ],
+              "required_postcondition_ids": [
+                "cs-linked-motion-trace"
+              ]
+            },
+            {
+              "milestone_id": "cs-interruption-recovery",
+              "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+              "dependency_milestone_ids": [
+                "cs-three-linked-successors"
+              ],
+              "required_postcondition_ids": [
+                "cs-interruption-recovery-trace"
+              ]
+            }
+          ]
+        },
+        "identity": {
+          "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+          "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+          "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "producer_epoch_ref": "environment_action_epoch:899a5658-3e00-4dcc-81ef-5a16f7ba731a",
+          "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+          "authority_policy_version": 1,
+          "authority_expires_at": "2026-09-14T15:35:00.911Z",
+          "run_id": "run_30e7bbe7-f334-4947-88cb-2ac85db039b9",
+          "turn_id": "cs3-run-continuation-checkpoint-20260914-01"
+        },
+        "active_milestone_id": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ],
+            "completed_postcondition_ids": []
+          }
+        ],
+        "recent_attempts": [],
+        "attempt_count": 0,
+        "latest_checkpoint": {
+          "checkpoint_id": "checkpoint:cs3-run-continuation-20260914-01",
+          "event_id": "environment_durable_goal_event:83c0cecf-693c-4d07-8000-dd678778c0dd",
+          "observation_revision": 1789388426568,
+          "verified_facts": {
+            "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+            "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "position": {
+              "x": 0.18,
+              "y": 65,
+              "z": 2.81
+            },
+            "health": 20,
+            "on_ground": true
+          },
+          "evidence_refs": [
+            "environment_probe_evidence:d4f202e67e5cfdf7c6ec985088de90562196dd85"
+          ]
+        },
+        "recovery": {
+          "required": false,
+          "reason": null,
+          "rebound_event_id": "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca"
+        },
+        "consumed_semantic_wake_refs": [],
+        "event_refs": [
+          "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302",
+          "environment_durable_goal_event:79fc641e-fd33-41dd-8dda-5de11fc0164c",
+          "environment_durable_goal_event:525050f7-639a-4476-954a-4e90024ee609",
+          "environment_durable_goal_event:d1974220-1b9f-45e4-b9da-d8bef43fd887",
+          "environment_durable_goal_event:1a3bbaa9-914f-40aa-a8ab-b0fc1e487cd8",
+          "environment_durable_goal_event:acdf5464-44ca-4969-a844-63f5f06eb3f4",
+          "environment_durable_goal_event:17fe37f1-43da-4619-9efc-de0e4f4e6d13",
+          "environment_durable_goal_event:b8af0ee4-81f2-498e-bc67-ad9e5f50bb25",
+          "environment_durable_goal_event:1ba28bb9-f5a5-4ed2-9a0c-fb21581063e1",
+          "environment_durable_goal_event:790ef28f-ec5b-42e5-9da7-96d940396863",
+          "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca",
+          "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+          "environment_durable_goal_event:d6c650d8-318c-44c9-bf76-fa4416d96cfd",
+          "environment_durable_goal_event:83c0cecf-693c-4d07-8000-dd678778c0dd"
+        ],
+        "content_role": "environment_durable_goal_projection_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      },
+      "content_role": "environment_durable_goal_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    },
+    "cs3NewPackageOldEvidenceDiagnostic": {
+      "schema": "helix.environment_durable_goal_error.v1",
+      "error": "durable_goal_evidence_stale",
+      "message": "The exact-player perception expired before temporal admission. Acquire fresh evidence before proposing new work.",
+      "retryable": false,
+      "evidence_refs": [],
+      "mismatch_reasons": [],
+      "content_role": "environment_durable_goal_error_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "error_code": "INVALID_ARGUMENT"
+    },
+    "cs3GoalAfterPackageRestart": {
+      "operation": "com.casimirbot.environment.durable_goal.inspect",
+      "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "ok": true,
+      "goal": {
+        "schema": "helix.environment_durable_goal_projection.v1",
+        "goal_id": "environment_durable_goal:f15854ade7a779ee48eb077b430c006184d9a24e9a9ab7520439153f5609588f",
+        "revision": 13,
+        "latest_event_hash": "sha256:d716ec32aa795667c03bf3a07450d542c1842ffd8e14ca5157dd44fcbf6b94e8",
+        "status": "active",
+        "objective": {
+          "objective_text": "Run the bounded CS1-CS4 continuous-session development rehearsal on the prepared isolated Minecraft course as DatDamPig. Use only the approved Walk, Look, Jump and Fluid TAS sequence capabilities. First inspect fresh footing, hazards and a bounded useful route; preserve player viability. Prove three linked moving successors through the real compiler, broker and resident executor, then interruption, revocation, stale rejection and fresh observation re-entry. Stop on manual input or an unsafe/stale condition. Do not mutate blocks, inventory or other actors, broaden permissions, or claim ET6/NAV1 acceptance.",
+          "goal_kind": "custom_survival",
+          "domain": "minecraft",
+          "game_version": "1.21.8",
+          "mechanics_collection_ref": null,
+          "milestones": [
+            {
+              "milestone_id": "cs-course-readiness",
+              "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+              "dependency_milestone_ids": [],
+              "required_postcondition_ids": [
+                "cs-fresh-safe-course"
+              ]
+            },
+            {
+              "milestone_id": "cs-three-linked-successors",
+              "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+              "dependency_milestone_ids": [
+                "cs-course-readiness"
+              ],
+              "required_postcondition_ids": [
+                "cs-linked-motion-trace"
+              ]
+            },
+            {
+              "milestone_id": "cs-interruption-recovery",
+              "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+              "dependency_milestone_ids": [
+                "cs-three-linked-successors"
+              ],
+              "required_postcondition_ids": [
+                "cs-interruption-recovery-trace"
+              ]
+            }
+          ]
+        },
+        "identity": {
+          "owner_profile_id": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+          "host_ref": "environment_device:connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "connector_installation_id": "connector_installation:legacy:94d23d7804dda1276d275ad5a15ca749e0e37114",
+          "device_id": "connector_device:legacy:8da0d5a0cc1395862abf3380f1664f50283e6d1e",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "goal_owner_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "authority_participant_id": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+          "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+          "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "producer_epoch_ref": "environment_action_epoch:899a5658-3e00-4dcc-81ef-5a16f7ba731a",
+          "action_authority_id": "environment_action_authority:62ea42d8-7f37-4d84-b08e-ebfb66877151",
+          "authority_policy_version": 1,
+          "authority_expires_at": "2026-09-14T15:35:00.911Z",
+          "run_id": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+          "turn_id": "environment_session_preparation:74556957f6307e2b6967abd85cb6537d7d536b3194ca781185b2787a9d8d4816"
+        },
+        "active_milestone_id": null,
+        "milestones": [
+          {
+            "milestone_id": "cs-course-readiness",
+            "description": "Verify a fresh, bounded development route and exact player, authority and controller identity before motion.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-fresh-safe-course"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-three-linked-successors",
+            "description": "Measure useful continuous motion consuming three linked successors under frozen timing budgets.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-linked-motion-trace"
+            ],
+            "completed_postcondition_ids": []
+          },
+          {
+            "milestone_id": "cs-interruption-recovery",
+            "description": "Prove release, interruption, revocation and stale rejection with fresh exact observation re-entry and zero duplicate effects.",
+            "status": "candidate",
+            "required_postcondition_ids": [
+              "cs-interruption-recovery-trace"
+            ],
+            "completed_postcondition_ids": []
+          }
+        ],
+        "recent_attempts": [],
+        "attempt_count": 0,
+        "latest_checkpoint": {
+          "checkpoint_id": "checkpoint:ready-up:sha256:34a4a1f3cd1cc48586fae176dddfc85deb639b8ebbeaa2e40f067d35a7dd130c",
+          "event_id": "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+          "observation_revision": 1789385214553,
+          "verified_facts": {
+            "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+            "subject_binding_id": "environment_subject_binding:15efc55b-58b0-475a-b80b-5c541d2d33f8",
+            "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+            "observation_revision": 1789385214553
+          },
+          "evidence_refs": [
+            "environment_probe_evidence:79f0f81d73faae674297be20d3167bd38ae55574"
+          ]
+        },
+        "recovery": {
+          "required": false,
+          "reason": null,
+          "rebound_event_id": "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca"
+        },
+        "consumed_semantic_wake_refs": [],
+        "event_refs": [
+          "environment_durable_goal_event:eb71460f-bd6a-4c5b-966f-b799bce29302",
+          "environment_durable_goal_event:79fc641e-fd33-41dd-8dda-5de11fc0164c",
+          "environment_durable_goal_event:525050f7-639a-4476-954a-4e90024ee609",
+          "environment_durable_goal_event:d1974220-1b9f-45e4-b9da-d8bef43fd887",
+          "environment_durable_goal_event:1a3bbaa9-914f-40aa-a8ab-b0fc1e487cd8",
+          "environment_durable_goal_event:acdf5464-44ca-4969-a844-63f5f06eb3f4",
+          "environment_durable_goal_event:17fe37f1-43da-4619-9efc-de0e4f4e6d13",
+          "environment_durable_goal_event:b8af0ee4-81f2-498e-bc67-ad9e5f50bb25",
+          "environment_durable_goal_event:1ba28bb9-f5a5-4ed2-9a0c-fb21581063e1",
+          "environment_durable_goal_event:790ef28f-ec5b-42e5-9da7-96d940396863",
+          "environment_durable_goal_event:e0e484f2-3b44-4c03-a4c5-3d56a37a0cca",
+          "environment_durable_goal_event:96c90c67-ab59-42e4-85dc-4f2877a92817",
+          "environment_durable_goal_event:d6c650d8-318c-44c9-bf76-fa4416d96cfd"
+        ],
+        "content_role": "environment_durable_goal_projection_not_assistant_answer",
+        "reentry_required": true,
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      },
+      "content_role": "environment_durable_goal_observation_not_assistant_answer",
+      "reentry_required": true,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false
+    }
+  },
+  "new_run_pairing_approved": false,
+  "gameplay_admitted": false,
+  "et6_passed": false
+}

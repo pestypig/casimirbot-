@@ -26,6 +26,7 @@ import {
 } from "../services/helix-account/profile-ingress-store";
 import {
   deleteProfileStorageSnapshot,
+  ProfileStorageReadError,
   readProfileStorageSnapshot,
   writeProfileStorageSnapshot,
 } from "../services/helix-account/profile-storage-store";
@@ -179,9 +180,18 @@ accountSessionRouter.get("/profile-storage/snapshot", async (req: Request, res: 
       raw_profile_content_included: false,
     });
   }
-  return res.status(200).json(await readProfileStorageSnapshot(profileId, {
-    quota_bytes: status.account_policy.quotas.profile_storage_bytes,
-  }));
+  try {
+    return res.status(200).json(await readProfileStorageSnapshot(profileId, {
+      quota_bytes: status.account_policy.quotas.profile_storage_bytes,
+    }));
+  } catch (error) {
+    if (!(error instanceof ProfileStorageReadError)) throw error;
+    return res.status(503).json({
+      ok: false, error: "profile_storage_restore_unavailable",
+      message: "Saved profile data is temporarily unavailable. No data was restored or cleared.",
+      raw_profile_content_included: false,
+    });
+  }
 });
 
 accountSessionRouter.get("/profile-storage/export", async (req: Request, res: Response) => {
@@ -195,9 +205,19 @@ accountSessionRouter.get("/profile-storage/export", async (req: Request, res: Re
       raw_profile_content_included: false,
     });
   }
-  const snapshot = await readProfileStorageSnapshot(profileId, {
-    quota_bytes: status.account_policy.quotas.profile_storage_bytes,
-  });
+  let snapshot: Awaited<ReturnType<typeof readProfileStorageSnapshot>>;
+  try {
+    snapshot = await readProfileStorageSnapshot(profileId, {
+      quota_bytes: status.account_policy.quotas.profile_storage_bytes,
+    });
+  } catch (error) {
+    if (!(error instanceof ProfileStorageReadError)) throw error;
+    return res.status(503).json({
+      ok: false, error: "profile_storage_restore_unavailable",
+      message: "Saved profile data is unavailable and could not be exported.",
+      raw_profile_content_included: false,
+    });
+  }
   return res.status(200).json({
     ok: true,
     exported_at: new Date().toISOString(),
@@ -214,6 +234,23 @@ accountSessionRouter.post("/profile-storage/snapshot", async (req: Request, res:
       ok: false,
       error: "profile_session_required",
       message: "A profile session is required before profile storage can be saved.",
+      raw_profile_content_included: false,
+    });
+  }
+  const expectedProfileId = req.body?.expected_profile_id;
+  if (typeof expectedProfileId !== "string" || !expectedProfileId.trim()) {
+    return res.status(400).json({
+      ok: false,
+      error: "profile_storage_expected_profile_required",
+      message: "The account that prepared this backup is required.",
+      raw_profile_content_included: false,
+    });
+  }
+  if (expectedProfileId !== profileId) {
+    return res.status(409).json({
+      ok: false,
+      error: "profile_storage_account_changed",
+      message: "The signed-in account changed. This backup was not saved.",
       raw_profile_content_included: false,
     });
   }

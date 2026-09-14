@@ -1,0 +1,51 @@
+{
+  "schema": "casimirbot.cs3_perception_diagnostic_checks.v1",
+  "recorded_at": "2026-09-14 12:34:45 UTC",
+  "classification": [
+    "evidence normalization",
+    "evidence re-entry"
+  ],
+  "checks": [
+    {
+      "log": ".tmp/cs3-expiry-diagnostic-focused-20260914.log",
+      "result": "PASS",
+      "files": 4,
+      "tests": 52
+    },
+    {
+      "log": ".tmp/cs3-expiry-diagnostic-projection-20260914.log",
+      "result": "PASS",
+      "files": 2,
+      "tests": 26,
+      "overlap_note": "Includes the same 10 perception-context cases from the preceding 52; do not sum as unique cases."
+    },
+    {
+      "log": ".tmp/cs-run-continuation-ledger-20260914.log",
+      "result": "PASS",
+      "files": 1,
+      "tests": 1,
+      "deliberately_filtered": 62
+    },
+    {
+      "log": ".tmp/cs3-expiry-diagnostic-docs-20260914.log",
+      "result": "PASS"
+    },
+    {
+      "log": ".tmp/cs3-expiry-diagnostic-quick-20260914.log",
+      "result": "PASS",
+      "scope": "Dirty-worktree static classification; not integrated acceptance"
+    }
+  ],
+  "negative_evidence": [
+    "Initial red run used an unsupported matcher; corrected red failed on missing expiry callback.",
+    "Two exact root submissions were refused before workflow creation; no resident gameplay measurement.",
+    "Packaged read-only old-evidence frontier returned durable_goal_evidence_stale; this does not prove the earlier ambiguous root failure was caused by expiry."
+  ],
+  "limits": [
+    "Five-second freshness unchanged.",
+    "Packaged plan-submit timing projection has not yet been captured.",
+    "Public frontier wrapper returns typed stale error but omits diagnostic timing fields.",
+    "No Casimir verifier scope changed; no physics/certificate integrity claim.",
+    "No CS1-CS4, ET6 or NAV1 qualification."
+  ]
+}

@@ -1,0 +1,10 @@
+const fs = require('node:fs');
+const file = 'client/src/components/agent-access/DurableTaskPairing.tsx';
+let text = fs.readFileSync(file).toString('latin1');
+const before = 'import ReasoningClaimHandle from "./ReasoningClaimHandle";';
+if (!text.includes(before)) throw new Error('pairing_import_anchor_missing');
+text = text.replace(before, before + '\r\nimport { usePairingRecoveryStorage } from "../../lib/agent-access/pairingRecoveryStorage";');
+const anchor = '  const selected = destinations.find(item => item.registrationId === review.registrationId);';
+if (!text.includes(anchor)) throw new Error('pairing_hook_anchor_missing');
+text = text.replace(anchor, '  usePairingRecoveryStorage(profileId, chatId);\r\n' + anchor);
+fs.writeFileSync(file, Buffer.from(text, 'latin1'));

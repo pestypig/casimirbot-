@@ -1,7 +1,8 @@
 import { readSharedRealtimeRoomDatabase } from '../../helix-ask/realtime-room/room-store/database';
-import { readEnvironmentActionObservation, resolveEnvironmentActionWorkflowControlContext } from './action-broker';
+import { readEnvironmentActionObservation, resolveEnvironmentActionWorkflowControlContext, terminalRequestStatusForOutcome } from './action-broker';
 
-const terminal = new Set(['succeeded', 'failed', 'canceled', 'timed_out']);
+const terminal = new Set(['succeeded', 'failed', 'canceled', 'timed_out',
+  'emergency_stopped', 'connector_offline', 'authority_stale']);
 
 /** Historical result only. Never substitutes for a current control observation. */
 export async function readRetainedEnvironmentWorkflowResult(
@@ -30,7 +31,7 @@ export async function readRetainedEnvironmentWorkflowResult(
   const result = await deps.readObservation(row.action_request_id);
   if (!result || !result.provenance_valid || !result.eligible_for_current_turn_reentry ||
       result.action_request_ref !== row.action_request_id || result.workflow_ref !== context.workflowId ||
-      result.outcome !== row.status) return null;
+      terminalRequestStatusForOutcome(result.outcome) !== row.status) return null;
   const current = await deps.resolveContext(input);
   if (Object.keys(context).some(key => context[key as keyof typeof context] !== current[key as keyof typeof current])) return null;
   const after = await latest();

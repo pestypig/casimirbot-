@@ -1,0 +1,62 @@
+{
+  "schema": "casimirbot.cs1_ready_up_retry_checks.v1",
+  "recorded_at": "2026-09-14T08:29:13Z",
+  "classification": "evidence re-entry",
+  "source_hashes": {
+    "preparation": "09148978d8406e1f4725f2943d36c2c3101fde48f4bee767d0922f15cf31b61a",
+    "preparation_tests": "339c10fb9820e489e1cc9b6cd8ce13f3f3e071a4e0a3d452595e8b870c3e23f2",
+    "broker_tests": "50fc17e505997ea86e40f368a98ad2d850fd8bc50604867210cdeaa69dd9ae8c"
+  },
+  "red": {
+    "log": ".tmp/ready-up-retry-red2-20260914.log",
+    "sha256": "91a2e6ea9994a12d657f023814c02db85e7f4b19d4e8219d5f3b3396ea14d647",
+    "result": "second delayed identical Ready up request failed"
+  },
+  "focused": {
+    "log": ".tmp/ready-up-retry-focused-20260914.log",
+    "sha256": "00de4ad389cabbb639404b6946d55147d7934699d0862ec727d3fba61a2b7a33",
+    "passed": 98,
+    "failed": 0,
+    "files": 4
+  },
+  "full_discipline": {
+    "log": ".tmp/ready-up-retry-discipline-full-20260914.log",
+    "sha256": "ce5ba35f7164ce119388b4b6be722685da12bac64411554d12d3f7d2989ffc2f",
+    "exit_code": 0,
+    "passed": 101,
+    "failed": 0,
+    "prompt_prelude": 4,
+    "prompt_adversarial": 31,
+    "api_fixed_contracts": 15,
+    "api_scenarios": 16,
+    "live_source_continuation": 26,
+    "live_source_identity": 9,
+    "server_build": "PASS",
+    "warnings": "Four existing duplicate-key/case warnings in untouched demonstration, solar-derived and starsim surfaces."
+  },
+  "scorecard": {
+    "focused_empirical_pass_fraction": 1,
+    "selected_loop_empirical_pass_fraction": 1,
+    "live_acceptance_probability": null,
+    "interpretation": "Selected deterministic regressions only; no statistical prediction of live reliability. Shard skips exclude cases assigned to other groups. No live model or physical environment acceptance is established."
+  },
+  "quick": {
+    "passed": true,
+    "log": ".tmp/ready-up-retry-discipline-quick-20260914.log",
+    "sha256": "33c0007651fedbc51d4fbd252da669f77220cca1dd2f20db5d1b318c111a5fc2",
+    "scope": "Full dirty-checkout scan includes unrelated changes; exact patch classification is recorded above."
+  },
+  "casimir_verification": {
+    "applicable": false,
+    "reason": "Internal application observation correlation and tests; no physics, adapter contract, constraint, certificate or release-verification implementation changed.",
+    "certificate_integrity_claimed": false
+  },
+  "package_status": "building",
+  "gameplay_workflows_submitted": 0,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false
+}

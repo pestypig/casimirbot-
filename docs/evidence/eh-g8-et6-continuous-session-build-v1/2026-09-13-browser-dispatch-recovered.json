@@ -1,0 +1,25 @@
+{
+  "schema": "casimir_desktop_callback_dispatch_diagnostic/1",
+  "observed_at_utc": "2026-09-13T20:43:56.743Z",
+  "prior_failure_evidence": "2026-09-13-procmon-stale-handler.json",
+  "package": "apps/desktop/release-oauth-status-recovery-20260913/win-unpacked/CasimirBot.exe",
+  "exe_sha256": "df52a60ab93d841a0656040ca91812b75f6cc2e249963227b5449f30bf5238d5",
+  "repair_attempt": "Ordinary Explorer launch of the verified current EXE at 20:35:07 UTC, including its existing startup protocol registration before the single-instance check",
+  "probe": "Chrome handoff of a fabricated access_denied callback with an invalid diagnostic state; operator completed the external-application prompt",
+  "journal_events": [
+    {"at_utc": "2026-09-13T20:43:56.722Z", "event": "process_entry"},
+    {"at_utc": "2026-09-13T20:43:56.723Z", "event": "second_instance"},
+    {"at_utc": "2026-09-13T20:43:56.724Z", "event": "received"},
+    {"at_utc": "2026-09-13T20:43:56.743Z", "event": "rejected"}
+  ],
+  "main_pid_retained": 25916,
+  "service_pid_retained": 10936,
+  "operator_report": "Clicking brought the operator to the CasimirBot EXE",
+  "browser_negative_callback_verified": true,
+  "registry_view_discrepancy_cause_proven": false,
+  "durable_product_repair_verified": false,
+  "real_oauth_link_verified": false,
+  "authority_granted": false,
+  "et6_passed": false,
+  "nav1_qualified": false
+}

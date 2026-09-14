@@ -1,0 +1,368 @@
+{
+  "schema": "casimirbot.cancellation_native_preparation.v1",
+  "observed_at": "2026-09-14T04:10:00Z",
+  "scope": "Packaged pre-consent recovery and preparation only; no live pairing acceptance or gameplay qualification",
+  "package": "apps/desktop/release-cancellation-20260913/win-unpacked",
+  "exe_sha256": "8b062f09e971466d11ff520b8d6f9cdea229fcec31575972e1c1f82b0f8fb955",
+  "service_sha256": "7b41f558797acb90406f0dad4dffacc64d32256fd821dbc7f223382fda36e7c1",
+  "renderer_sha256": "3089d14027f79bfcc88d956965063e9d8e7e04bbee42c184fdf4d24d2f103f07",
+  "runtime_manifest_sha256": "fdc8f9c5ba5db4737dd32b3ad06644293432b82d9c4078664767c2f521f0fdf3",
+  "main_pid": 5424,
+  "main_started_at": "2026-09-14T03:57:38.5845009Z",
+  "service_pid": 4428,
+  "native_window": 5115614,
+  "origin": "http://127.0.0.1:51034",
+  "origin_evidence": "Authenticated source-list public ingress projection and independent listening socket owned by service PID 4428",
+  "trust": {
+    "native_ui_confirmed": true,
+    "delegated_from_saved_trust": true,
+    "human_reapproval": false
+  },
+  "presence": {
+    "ok": true,
+    "presence": {
+      "schema": "helix.local_supervisor_coordination.v1",
+      "service_instance_ref": "service_instance:938c0a1b44b2d4cac7d25264a3ec7221",
+      "client_session_ref": "supervisor_client:70f51c015b514c86e465382aa3ae3eeb",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_objective_summary": "Verify prepared exact task/chat/run review in the repaired package; awaiting human pairing consent before integrated ingress tests.",
+      "declared_objective_is_verified": false,
+      "lifecycle_basis": "authenticated_client_heartbeat",
+      "lifecycle_state": "active",
+      "thread_observability_bridge": {
+        "supported_levels": [
+          "tool_activity_only"
+        ],
+        "requested_level": "tool_activity_only",
+        "checkpoint_publication": null,
+        "declaration_basis": "authenticated_client_declaration",
+        "provider_thread_content_included": false,
+        "hidden_reasoning_included": false,
+        "answer_authority": false,
+        "terminal_eligible": false
+      },
+      "resource_claims": [
+        {
+          "resource_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "claim_class": "read",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:room_membership:53cc32928249f4f28ddec5d2c61ffeec",
+          "collision_authority": false
+        },
+        {
+          "resource_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+          "claim_class": "retained_runtime",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:retained_agent_run:063215b5236d19a9cd060993b92a5f32",
+          "collision_authority": true
+        }
+      ],
+      "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "environment_ref": null,
+      "run_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+      "verified_room_identity": {
+        "basis": "server_verified",
+        "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "participant_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "verification_ref": "supervisor_verification:room_membership:53cc32928249f4f28ddec5d2c61ffeec"
+      },
+      "verified_connector_identity": null,
+      "verified_retained_runtime_identity": {
+        "basis": "server_verified",
+        "run_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "run_version": 1,
+        "run_room_binding_ref": "agent_room_binding:406e167a-a302-4095-9cea-fe6ab0cbeaf6",
+        "run_room_binding_version": 1,
+        "verification_ref": "supervisor_verification:retained_agent_run:063215b5236d19a9cd060993b92a5f32"
+      },
+      "verified_execution_lease_identity": null,
+      "blocker_summary": null,
+      "observed_at": "2026-09-14T04:09:06.511Z",
+      "heartbeat_expires_at": "2026-09-14T04:12:06.511Z",
+      "active": true,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "native_account_identity_included": false,
+      "content_role": "supervisor_presence_advisory",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "identity_basis": {
+      "authenticated_profile": "server_verified",
+      "authenticated_mcp_client": "server_verified",
+      "conversation_thread": "client_declared",
+      "client_session": "server_derived"
+    },
+    "credential_included": false,
+    "private_endpoint_included": false,
+    "hidden_reasoning_included": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "preparation": {
+    "ok": true,
+    "operation": "prepare_run",
+    "intent": {
+      "requestId": "8e596e44-e05b-42a5-9250-c3a7afc4be37",
+      "profileRef": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "clientSessionRef": "supervisor_client:70f51c015b514c86e465382aa3ae3eeb",
+      "continuationRef": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "helixConversationId": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+      "roomId": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "requestedDurationSeconds": 28800,
+      "intentId": "environment_preparation:04683aba1c7f6faf2ccd7374c9b01701",
+      "serviceInstanceRef": "service_instance:938c0a1b44b2d4cac7d25264a3ec7221",
+      "authenticatedMcpClientRef": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "createdAt": "2026-09-14T04:06:43.635Z",
+      "expiresAt": "2026-09-14T04:16:43.635Z",
+      "origin": "authenticated_browser_setup",
+      "chat_reference_basis": "browser_declared_profile_scoped",
+      "status": "run_prepared",
+      "execution_authority": false,
+      "task_binding_authority": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "preparedRunId": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+      "preparedAt": "2026-09-14T04:08:07.709Z"
+    },
+    "presence": {
+      "schema": "helix.local_supervisor_coordination.v1",
+      "service_instance_ref": "service_instance:938c0a1b44b2d4cac7d25264a3ec7221",
+      "client_session_ref": "supervisor_client:70f51c015b514c86e465382aa3ae3eeb",
+      "conversation_thread_ref": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+      "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+      "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+      "declared_objective_summary": "Prepare finite exact-room session for human task-pairing review and continuous-session build verification; no game action authority.",
+      "declared_objective_is_verified": false,
+      "lifecycle_basis": "authenticated_client_heartbeat",
+      "lifecycle_state": "active",
+      "thread_observability_bridge": {
+        "supported_levels": [
+          "tool_activity_only"
+        ],
+        "requested_level": "tool_activity_only",
+        "checkpoint_publication": null,
+        "declaration_basis": "authenticated_client_declaration",
+        "provider_thread_content_included": false,
+        "hidden_reasoning_included": false,
+        "answer_authority": false,
+        "terminal_eligible": false
+      },
+      "resource_claims": [
+        {
+          "resource_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "claim_class": "read",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:room_membership:53cc32928249f4f28ddec5d2c61ffeec",
+          "collision_authority": false
+        },
+        {
+          "resource_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+          "claim_class": "retained_runtime",
+          "claim_basis": "server_verified",
+          "verification_ref": "supervisor_verification:retained_agent_run:063215b5236d19a9cd060993b92a5f32",
+          "collision_authority": true
+        }
+      ],
+      "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "environment_ref": null,
+      "run_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+      "verified_room_identity": {
+        "basis": "server_verified",
+        "room_ref": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "participant_ref": "shared_realtime_participant:5660f9e8-893a-4d64-b430-7565a269a4ab",
+        "verification_ref": "supervisor_verification:room_membership:53cc32928249f4f28ddec5d2c61ffeec"
+      },
+      "verified_connector_identity": null,
+      "verified_retained_runtime_identity": {
+        "basis": "server_verified",
+        "run_ref": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "run_version": 1,
+        "run_room_binding_ref": "agent_room_binding:406e167a-a302-4095-9cea-fe6ab0cbeaf6",
+        "run_room_binding_version": 1,
+        "verification_ref": "supervisor_verification:retained_agent_run:063215b5236d19a9cd060993b92a5f32"
+      },
+      "verified_execution_lease_identity": null,
+      "blocker_summary": null,
+      "observed_at": "2026-09-14T04:08:07.718Z",
+      "heartbeat_expires_at": "2026-09-14T04:09:07.718Z",
+      "active": true,
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "native_account_identity_included": false,
+      "content_role": "supervisor_presence_advisory",
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "ready": false,
+    "task_binding_authority": false,
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false
+  },
+  "run_discovery": {
+    "ok": true,
+    "schema": "helix.environment_session_run_discovery.v1",
+    "operation": "discover_runs",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "candidates": [
+      {
+        "runId": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+        "runVersion": 1,
+        "expiresAt": "2026-09-14T12:08:07.647Z",
+        "roomBindingId": "agent_room_binding:406e167a-a302-4095-9cea-fe6ab0cbeaf6",
+        "roomBindingVersion": 1
+      }
+    ],
+    "selection_required": false,
+    "candidate_limit_reached": false,
+    "ready": false,
+    "task_binding_verified": false,
+    "revalidation_required": true,
+    "execution_authority": false,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "environment": {
+    "schema": "helix.room_environments.receipt.v1",
+    "ok": true,
+    "error": null,
+    "message": "Environment subjects listed for the authenticated room member.",
+    "environments": [
+      {
+        "schema": "helix.room_environment_projection.v1",
+        "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+        "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+        "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+        "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+        "world_id": "minecraft:minehut:8fc80440-6fe",
+        "domain": "minecraft",
+        "domain_adapter": "minecraft.fabric_mod.v1",
+        "source_label": "Continuous session Fabric rehearsal",
+        "connection_status": "active",
+        "latest_observed_at": "2026-09-14T04:06:44.352039600Z",
+        "capability_ids": [
+          "com.casimirbot.minecraft.actor.status.read",
+          "com.casimirbot.minecraft.inventory.check",
+          "com.casimirbot.minecraft.nearby_entities.list",
+          "com.casimirbot.minecraft.hazards.scan",
+          "com.casimirbot.minecraft.local_map.inspect",
+          "com.casimirbot.minecraft.spatial_region.inspect",
+          "com.casimirbot.minecraft.line_of_sight.check",
+          "com.casimirbot.minecraft.crop_state.read",
+          "com.casimirbot.minecraft.reachability.check",
+          "com.casimirbot.minecraft.perception_snapshot.read",
+          "com.casimirbot.minecraft.registry.fact.read",
+          "com.casimirbot.minecraft.recipe.fact.read"
+        ],
+        "subject_directory": {
+          "schema": "helix.environment_subject_directory.v1",
+          "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+          "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+          "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+          "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+          "world_id": "minecraft:minehut:8fc80440-6fe",
+          "subject_kind": "minecraft.player",
+          "observed_at": "2026-09-14T04:06:44.352039600Z",
+          "freshness": "fresh",
+          "subjects": [
+            {
+              "subject_ref": "environment_subject:4ae0191f0ac6b5fcf5aa554bf7f2aecdbfbc274e2513e2b4",
+              "subject_kind": "minecraft.player",
+              "display_label": "DatDamPig",
+              "presence": "online",
+              "claimed_by_participant_id": null,
+              "observed_at": "2026-09-14T04:06:44.352039600Z",
+              "freshness": "fresh",
+              "answer_authority": false,
+              "assistant_answer": false,
+              "terminal_eligible": false,
+              "raw_content_included": false
+            }
+          ],
+          "content_role": "environment_subject_directory_not_assistant_answer",
+          "answer_authority": false,
+          "assistant_answer": false,
+          "terminal_eligible": false,
+          "raw_content_included": false
+        },
+        "self_subject_binding": null,
+        "identity_assignment": "binding_required",
+        "owner_controls_visible": true,
+        "content_role": "room_environment_projection_not_assistant_answer",
+        "answer_authority": false,
+        "assistant_answer": false,
+        "terminal_eligible": false,
+        "raw_content_included": false
+      }
+    ],
+    "binding": null,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "source_recovery": {
+    "rotation_requested_after_this_restart": false,
+    "status": "active",
+    "last_used_at": "2026-09-14T04:05:24.781Z",
+    "expires_at": "2026-09-14T04:31:24.227Z",
+    "credential_included": false
+  },
+  "native_review": {
+    "selected_task": "codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d",
+    "chat": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+    "candidate": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb",
+    "candidate_visible": true,
+    "candidate_checked": false,
+    "consent_checked": false,
+    "approval_button_cyan_and_visible": true,
+    "approval_button_disabled": true,
+    "invitation_expiry_minutes": 15,
+    "pairing_duration_hours": 8,
+    "human_only_controls_automated": false,
+    "automatic_delivery_available": false
+  },
+  "call_error": {
+    "operation": "prepare_run",
+    "error": "internal_error / INVALID_ARGUMENT",
+    "cause": "Caller supplied request_id, which the strict prepare_run command does not accept even though the combined MCP object includes it.",
+    "correction": "Removed the extra field; used the original preparation intent and unchanged objective. Preparation succeeded.",
+    "product_patch_made_for_this_call_error": false
+  },
+  "minecraft": {
+    "client_pid": 8812,
+    "client_started_at": "2026-09-14T02:09:58.8879886Z",
+    "server_pid": 27252,
+    "server_started_at": "2026-09-14T01:24:10.3132425Z",
+    "processes_unchanged_across_exe_replacement": true
+  },
+  "evidence_limits": [
+    "Native consent not performed by agent.",
+    "The cancellation race and expired-run recovery are isolated real-handler evidence, not live human consent.",
+    "Fresh source observation is read-only; no player assignment, game-action lease, useful motion, linked successor, interruption or revocation acceptance."
+  ],
+  "human_pairing_approved": false,
+  "task_binding_verified": false,
+  "gameplay_actions": 0,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_unlocked": false
+}

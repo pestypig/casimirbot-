@@ -8,6 +8,7 @@ import {
 type GuidanceView = Readonly<{
   request: WorkstationGuidanceRequest;
   rect: DOMRect;
+  integrationBlocked: boolean;
 }>;
 
 const findGuidanceTarget = (
@@ -92,10 +93,12 @@ export default function WorkstationGuidanceOverlay() {
       let observer: MutationObserver | null = null;
       const updateRect = () => {
         if (!target) return;
-        const targetLabel = target.dataset.helixGuidanceLabel;
+        const guidanceContext = target.closest<HTMLElement>("[data-helix-guidance-label]") ?? target;
+        const targetLabel = guidanceContext.dataset.helixGuidanceLabel;
         setView({
           request: targetLabel ? { ...request, label: targetLabel } : request,
           rect: target.getBoundingClientRect(),
+          integrationBlocked: guidanceContext.dataset.helixGuidanceIntegrationBlocked === "true",
         });
       };
       const resolve = () => {
@@ -218,7 +221,9 @@ export default function WorkstationGuidanceOverlay() {
         aria-live="polite"
       >
         <span className="block pr-1">
-          {isAttention
+          {view.integrationBlocked
+            ? "Connection limitation: "
+            : isAttention
             ? "Your action is required: "
             : "Agent activity (view only): "}
           {view.request.label}

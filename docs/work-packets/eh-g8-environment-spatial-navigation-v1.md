@@ -4,7 +4,7 @@ Capability or component: ENV-NAV1 — bounded spatial/topological evidence, goal
 Lifecycle stage: evidence normalization → intent arbitration → tool admission → execution → evidence re-entry → follow-up reasoning
 Reaction timescale: adapter cadence for local control and safety; short checkpoint horizons for route execution; semantic-event cadence for Codex replanning; durable milestones for longer objectives
 Authority owner: Runtime Codex selects the destination, policy and strategy; Helix owns identity, admission, effect bounds, provenance and terminal eligibility; the adapter owns evidence compilation; the admitted local planner/controller may choose only a route and trajectory inside the fixed destination, traversal, cost and safety envelope; the environment arbiter owns physical execution and release
-Current maturity: deterministically verified for NAV0, NAV1-D synthetic topology, NAV1-M native measurement/replay and NAV1-C capture orchestration fixtures; remaining NAV1–NAV9 work stays specified; live executor integration depends on NAV-EQ
+Current maturity: deterministically verified for NAV0, NAV1-D synthetic topology, NAV1-M native measurement/replay, NAV1-C capture orchestration fixtures and NAV1-O admitted observation integration; remaining NAV1–NAV9 work stays specified; live executor integration depends on NAV-EQ
 Target maturity: deterministically verified provider-neutral contracts and Minecraft planner/controller, followed by live-accepted Minecraft A0/A1/B evidence and a non-shipping Baritone black-box comparison; FiveM remains a contract-only second-environment fixture in this packet
 Required evidence: strict schemas and adversarial fixtures; revision-bound coverage and topology; bounded search and trajectory budgets; checkpoint-linked temporal plans; obstacle, hazard, deviation and coverage-boundary replanning; local and user interruption latency; no duplicate effects; deterministic Minecraft courses; held-out black-box benchmark results; shipping-profile dependency exclusion; A0 direct, A1 authenticated MCP and B keyed Helix acceptance; and one non-Minecraft conformance fixture
 Explicit non-goals: no Baritone redistribution, shipping dependency, source translation, copied API or implementation structure; no FiveM/GTA runtime implementation in this packet; no unbounded world dump or generic physics engine; no planner-authored objective; no mining, building, combat, inventory mutation, teleportation or World Authority hidden inside movement-only navigation; no claim that reachability, distance, one local frontier or one benchmark course proves general navigation
@@ -298,6 +298,169 @@ invalidates the corridor. Re-enter a semantic route-change observation before
 executing a materially different corridor. Repeated failure against an
 unchanged revision and unchanged approach is rejected as duplicate behavior.
 
+### Game-AI execution hierarchy — procedural first (2026-09-12)
+
+This refinement is `specified`. Established game-AI navigation methods inform
+NAV2–NAV6 alongside the robotics research; they do not introduce a second
+runtime, new authority or a requirement to use a navmesh in Minecraft.
+
+Use inexpensive qualified procedural movement for ordinary traversal. Reserve
+bounded input-sequence simulation for maneuvers whose dynamics or uncertainty
+justify it. A capability to search does not require searching every tick.
+
+| Situation | Bounded response | Stage |
+| --- | --- | --- |
+| Valid ordinary corridor | Qualified path following, arrival and movement primitives | NAV2/3 |
+| Small deviation with valid clearance | Local correction within the admitted corridor and dynamics envelope | NAV3/4 |
+| Blocked or invalid corridor | Revision-bound route repair under the same goal and policy | NAV5 |
+| Difficult or unqualified maneuver | Bounded model-based candidate search, or typed abstention if the model is inapplicable | NAV3 |
+| No permitted route or exhausted budget | Distinguish no-path, missing coverage and budget exhaustion; return evidence to reasoning | NAV2/5 |
+
+Choose the response from explicit measured conditions: primitive applicability,
+corridor clearance, deviation, prediction error, repeated failure and remaining
+deadline. Use bounded hysteresis to avoid oscillation between modes, but never
+delay manual takeover, Emergency Stop or revocation. Search failure cannot
+fall back to a procedural primitive whose preconditions are unsatisfied.
+
+#### Methods and references
+
+- [Detour path corridors](https://recastnav.com/classdtPathCorridor.html)
+  separate a route from locally maintained path-following state. Adapt this
+  concept to revision-bound foothold corridors; local repair cannot invent
+  unseen geometry or silently widen the admitted route/effect policy.
+- [Reynolds' steering behaviors](https://www.red3d.com/cwr/steer/gdc99/)
+  distinguish action selection, steering and locomotion. Use qualified path
+  following, arrival and avoidance concepts, not arbitrary steering-vector
+  blending that could send a Minecraft player off support or into a hazard.
+- [Unity navigation links](https://docs.unity.cn/Manual/nav-NavigationSystem.html)
+  represent transitions outside ordinary walkable surfaces. Our traversal
+  edges must additionally qualify takeoff state, clearance, momentum, landing
+  and interruption. A graph link alone is not proof of executable player input.
+- [Unreal behavior-tree tasks](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-behavior-tree-node-reference-tasks)
+  illustrate procedural task execution. Map applicable concepts to the
+  existing finite scheduler and resource arbiter; do not add a competing
+  behavior-tree engine, hidden strategy loop or independent dispatcher.
+
+These are documentation-level design references, not imported implementations
+or evidence of Minecraft fidelity. Native player controls and actual collision
+mechanics remain the verifier. The Baritone exclusion policy is unchanged.
+
+#### NAV6 comparison
+
+Compare procedural-only, always-search and procedural-first hybrid modes on
+matched ordinary corridors, narrow turns, difficult jumps and dynamic
+obstructions. Use identical evidence, authority, input capabilities and total
+compute/deadline limits. Record completion, coordinate error, stalled ticks,
+planning latency, search invocations, mode transitions, repeated failures and
+release latency. Freeze selection thresholds before held-out trials.
+
+The hybrid must demonstrate useful difficult-maneuver gains without regressing
+ordinary-path responsiveness or interruption correctness. Retain failure
+evidence; fewer searches alone is not success. NAV1-O's pause, NAV-EQ and
+NAV8's live acceptance requirements remain unchanged.
+
+### NAV3 refinement — bounded forward simulation and input search (2026-09-12)
+
+This refinement is `specified`, not implemented or accepted. It adds a
+qualified input-conditioned movement model and bounded candidate search to
+NAV3, rather than replacing the route planner, scheduler or watchdog. The
+NAV1-O pause and NAV-EQ live-executor prerequisite remain unchanged. No live
+test or implementation resumes through this documentation edit.
+
+The question changes from “where does current velocity carry the actor?” to
+“which permitted short input sequence reaches the selected waypoint?” The
+existing short-horizon predictor is a reuse/calibration starting point, not
+proof of a complete movement simulator. Follow the
+[motion/timing review](../research/eh-nav-minecraft-motion-timing-review-2026-09-09.md)
+and [skill-composition review](../research/eh-nav-robotics-skill-composition-review-2026-09-09.md).
+
+#### Bounded model and isolation contract
+
+- Capture immutable, revision-bound starting pose, velocity, input state,
+  movement regime, relevant effects and bounded collision/support geometry.
+  Bind model, game and adapter versions, native timestep, coverage and expiry.
+- The neutral seam describes model applicability, isolated candidate rollout,
+  resource budgets, predicted outcomes and uncertainty. Minecraft owns its
+  motion, arithmetic, collision and control semantics; no block constants or
+  Minecraft-specific input vocabulary become shared required fields.
+- Simulate candidates against copied/model state only. Prediction workers
+  cannot assert live controls, advance the live world, alter RNG, or obtain
+  mutation authority. Do not describe a partial local snapshot as an exact
+  clone of the whole client/server simulation.
+- Omit rendering only where its removal preserves relevant behavior. Faster
+  wall-clock evaluation must not change the modeled native timestep. No
+  `/tick` speed change, teleport or rewind counts as normal-speed acceptance.
+- Return unsupported regime, insufficient coverage, stale start,
+  budget exhaustion or no candidate found distinctly. Unknown geometry is
+  never free space, and no candidate found is not an impossibility proof.
+
+#### Search and live integration
+
+1. NAV2 supplies a bounded corridor and waypoint under the existing request.
+2. NAV3 first compares a small deterministic set of maneuver/input candidates:
+   direction, heading, jump timing and bounded duration. Fix wall-time,
+   rollout-count, horizon and memory budgets; keep search off the game thread.
+3. Score only within the admitted cost/risk policy. Prefer candidates with
+   tested tolerance to initial-state and timing error over brittle exact-state
+   successes. Report uncertainty rather than invent a success probability.
+4. Compile only a short portion of the selected candidate into the existing
+   Environment Time plan. Revalidate start state, geometry, identity and
+   authority before commit; discard stale background results.
+5. NAV4/5 compare fresh native observations against predictions, record the
+   first divergence and invalidate/repair within the existing envelope. Manual
+   takeover, expiry and revocation still pre-empt locally; predicted safe
+   landing does not permit continued control after authority ends.
+
+Reuse prior candidates only with valid state/geometry/model dependencies.
+Position alone cannot establish equivalent future states: velocity, heading,
+effects and other modeled state may change the result. Heuristic pruning may
+improve search, but optimality or impossibility claims require separately
+justified model bounds and complete search conditions.
+
+#### First experiment and advancement criteria
+
+Start with one platform-to-platform jump, varying sub-block starting position,
+heading and velocity. Compare the same procedural baseline with bounded
+model-based input search under matched evidence, inputs and compute limits.
+
+Required evidence:
+
+- calibration followed by frozen tolerances and held-out starting states;
+- prediction error at declared tick horizons, landing error/success, first
+  divergence, model applicability and correction/recovery behavior;
+- end-to-end planning latency, p50/p95/p99/max compute cost, deadline misses,
+  rollout count, stale-candidate rejection and zero unintended live effects;
+- normal-speed replay through admitted controls, with predicted state and
+  observed outcome kept separate; and
+- unchanged interruption/resource-release tests and a trace of failed trials.
+
+Reject promotion if prediction error exceeds the frozen envelope, the search
+misses its deadline, changes semantics or adds latency without a demonstrated
+benefit on the selected scorecard. Preserve the simple baseline; any fallback
+must itself be admitted and valid, otherwise hold/release as specified. NAV6
+adds obstacles, perturbations and broader held-out courses only after this
+bounded comparison. Simulation success alone never establishes live acceptance.
+
+#### Research basis and explicit deferrals
+
+- The [SMB minimum-A-press TAS authors](https://tasvideos.org/7094S) describe
+  reduced vertical-physics and targeted search tools used in a published run:
+  an offline, human-assisted precedent, not autonomous live-control proof.
+- [Wafel](https://github.com/branpk/wafel) documents SM64 save/restore and
+  simulation advancement; this demonstrates an interface pattern, not an
+  available Minecraft clone or guaranteed optimal search.
+- [Sampling-based robotic MPC](https://arxiv.org/html/2307.09105v2) demonstrates
+  parallel simulation with real robot feedback; its compute and dynamics
+  results do not transfer automatically to this adapter.
+- [Prismarine Physics](https://github.com/PrismarineJS/prismarine-physics)
+  documents input-conditioned Minecraft simulation. It is a feasibility
+  reference, not an imported dependency or fidelity certificate for our build.
+
+Defer full-world cloning, learned world models, generic simulation engines,
+SAT/SMT motion solving and exploit-discovery search. They are not NAV3 exit
+requirements. No Baritone code, API or implementation structure enters this
+work; the non-shipping black-box policy is unchanged.
+
 ## Future FiveM conformance profile
 
 The contract-only fixture maps:
@@ -400,7 +563,7 @@ for structured evidence.
 | NAV0  | Seal neutral schemas, authority split, clean-room policy and benchmark protocol      | schema/adversarial fixtures; documentation audit                        |
 | NAV1  | Compile existing Minecraft snapshot/frontier evidence into owned foothold topology   | deterministic coverage, clearance, hazard and unknown-boundary fixtures |
 | NAV2  | Bounded route planner with typed complete/partial/no-path/budget outcomes            | deterministic course search results and stable plan hashes              |
-| NAV3  | Receding-horizon trajectory compiler into Environment Time/scheduler checkpoints     | no unbounded queue; current/next segment continuity and stale discard   |
+| NAV3  | Qualified bounded forward model/input search and receding-horizon trajectory compiler | held-out baseline comparison, model-error/timing bounds, continuity and stale discard |
 | NAV4  | Controller/watchdog progress, stuck, hazard, deviation and manual-interrupt feedback | tick-budget, stop-latency and zero-late-effect tests                    |
 | NAV5  | Sensor-driven route repair and reconnect/recovery                                    | changed-evidence replan, no unchanged retry, no duplicate effect        |
 | NAV6  | Full deterministic Minecraft arena suite                                             | frozen scorecard and all stop/fail cases                                |
@@ -501,9 +664,12 @@ or movement occurred; NAV-EQ still gates live executor integration.
 
 ## NAV1-C bounded capture — 2026-09-08
 
-The follow-on observation integration is paused in progress at
-[NAV1-O](eh-g8-nav1o-admitted-collision-observation-v1.md). It has not advanced
-live maturity or unlocked movement; remaining verification is listed there.
+The follow-on observation integration at
+[NAV1-O](eh-g8-nav1o-admitted-collision-observation-v1.md) is deterministically
+verified as of 2026-09-13. Its requirement audit and evidence preserve the
+unavailable matching-runtime live-test boundary. It has not advanced live
+maturity or unlocked movement; full NAV1 and NAV-EQ remain open. Earlier dated
+pause references in this plan are historical, not the current NAV1-O status.
 
 The unregistered capture primitive and deterministic boundary fixtures are
 recorded in `docs/work-packets/eh-g8-nav1c-bounded-native-capture-v1.md`.

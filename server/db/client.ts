@@ -2,7 +2,8 @@ import fs from "node:fs";
 import { once } from "node:events";
 import path from "node:path";
 import pg from "pg";
-import { newDb } from "pg-mem";
+import { newDb, type IMemoryDb } from "pg-mem";
+import { commitEmbeddedPairingReplacement, type PreparedPairingWrite } from "../services/local-supervisor/embedded-pairing-replacement-commit";
 import type { Pool as PgPool } from "pg";
 import { LocalPersistenceScheduler } from "./local-persistence-scheduler";
 import { StrictSnapshotBarrier } from "./strict-snapshot-barrier";
@@ -21,6 +22,9 @@ let migratePromise: Promise<void> | null = null;
 let lastDsn: string | undefined;
 
 const memPools = new Map<string, PgPool>();
+// Only the database owner retains embedded engines. No application callbacks or
+// query interceptors are installed on these engines during an atomic commit.
+const memEngines = new WeakMap<PgPool, IMemoryDb>();
 const localPersistenceTables = [
   "helix_accounts",
   // Restore the account/session policy root before any durable connector can
@@ -49,6 +53,8 @@ const localPersistenceTables = [
   // Server-owned consent ledger; never restore authority from browser snapshots.
   "helix_pairing_ledger",
   "helix_pairing_destinations",
+  "helix_durable_steering",
+  "helix_pairing_delivery",
   "helix_account_events",
   "helix_account_credentials",
   "helix_account_sign_in_attempts",
@@ -316,6 +322,9 @@ let localPersistenceSuppress = false;
 let localPersistenceScheduler: LocalPersistenceScheduler | null = null;
 let localPersistenceSnapshotCache: LocalSnapshot | null = null;
 const localPersistenceMutationVersions = new Map<string, number>();
+// Coverage of successful atomic snapshots, never a cached authority verdict.
+// Mutations invalidate it; storage reset and failed table collection do too.
+const localPersistenceConfirmedTables = new Set<string>();
 
 const deferredLocalPersistenceEnabled = (): boolean =>
   (process.env.HELIX_LOCAL_PG_MEM_WRITE_MODE ?? "").trim().toLowerCase() ===
@@ -539,6 +548,7 @@ const markLocalPersistenceTablesDirty = (
         table,
         (localPersistenceMutationVersions.get(table) ?? 0) + 1,
       );
+      localPersistenceConfirmedTables.delete(table);
     }
   }
 };
@@ -621,6 +631,7 @@ function createMemPool(key: string): PgPool {
   const adapter = db.adapters.createPg();
   const memPool = new adapter.Pool();
   const pgPool = memPool as unknown as PgPool;
+  memEngines.set(pgPool, db);
   memPools.set(key, pgPool);
   return pgPool;
 }
@@ -660,10 +671,11 @@ async function persistLocalSnapshot(activePool: PgPool, requiredTables?: readonl
   const tablesToRefresh =
     localPersistenceSnapshotCache && capturedVersions.size > 0
       ? localPersistenceTables.filter((table) =>
-          capturedVersions.has(table),
+          capturedVersions.has(table) || requiredTables?.includes(table),
         )
       : localPersistenceTables;
   if (tablesToRefresh.length === 0) return;
+  const collectedTables = new Set<string>();
   const savedAt = new Date().toISOString();
   for (const table of tablesToRefresh) {
     try {
@@ -709,7 +721,9 @@ async function persistLocalSnapshot(activePool: PgPool, requiredTables?: readonl
         const { rows } = await activePool.query(`SELECT * FROM ${table};`);
         tables[table] = rows as Array<Record<string, unknown>>;
       }
+      collectedTables.add(table);
     } catch (error) {
+      localPersistenceConfirmedTables.delete(table);
       // Delivery cannot be acknowledged from a snapshot that omitted the
       // very mutation whose durability it promises. Optional legacy tables
       // retain the existing best-effort behavior outside a strict barrier.
@@ -727,6 +741,12 @@ async function persistLocalSnapshot(activePool: PgPool, requiredTables?: readonl
   await writeLocalSnapshotAtomically(localPersistencePath, snapshot);
   const writtenAtMs = Date.now();
   localPersistenceSnapshotCache = snapshot;
+  for (const table of collectedTables) {
+    // A mutation arriving during collection/write needs its own barrier.
+    if (localPersistenceMutationVersions.get(table) === capturedVersions.get(table)) {
+      localPersistenceConfirmedTables.add(table);
+    }
+  }
   for (const [table, version] of capturedVersions) {
     if (localPersistenceMutationVersions.get(table) === version) {
       localPersistenceMutationVersions.delete(table);
@@ -812,17 +832,35 @@ export async function requireDurableDatabaseSnapshot(touchedTables: readonly str
   await strictSnapshotBarrier.request(touchedTables);
 }
 
+/** Read confirmation can reuse already acknowledged, unchanged table coverage.
+ * Mutations and uncertain saves still use the strict barrier. The caller must
+ * read and validate the current encrypted row after this; no grant is cached. */
+export async function confirmDurableDatabaseSnapshot(tables: readonly string[]): Promise<void> {
+  if (!pool) throw new Error("durable_database_unavailable");
+  if (lastDsn && !lastDsn.startsWith("pg-mem://")) return;
+  if (!localPersistencePath || !localPersistenceReady || localPersistenceSuppress) {
+    throw new Error("durable_database_unavailable");
+  }
+  if (!tables.length || tables.some(table => !localPersistenceTables.includes(table as (typeof localPersistenceTables)[number]))) {
+    throw new Error("durable_snapshot_table_unknown");
+  }
+  if (tables.every(table => localPersistenceConfirmedTables.has(table) && !localPersistenceMutationVersions.has(table))) return;
+  await strictSnapshotBarrier.request(tables);
+  if (!tables.every(table => localPersistenceConfirmedTables.has(table) && !localPersistenceMutationVersions.has(table))) {
+    throw new Error("durable_snapshot_changed_during_confirmation");
+  }
+}
+
 const strictSnapshotBarrier = new StrictSnapshotBarrier(saveStrictLocalDatabaseSnapshot);
 
 async function saveStrictLocalDatabaseSnapshot(touchedTables?: readonly string[]): Promise<void> {
   if (!pool || !localPersistencePath || !localPersistenceReady || localPersistenceSuppress) {
     throw new Error("Strict local snapshot became unavailable before persistence");
   }
-  markLocalPersistenceTablesDirty(touchedTables);
   while (localPersistenceWrite) await localPersistenceWrite;
-  // A preceding best-effort writer may have consumed the dirty versions.
-  // Re-read the required tables for this strict caller's own save.
-  markLocalPersistenceTablesDirty(touchedTables);
+  // Required tables are collected even when already clean. A request for a
+  // strict save is not a database mutation and must not invalidate another
+  // reader's successfully persisted coverage while its reply is delivered.
   const activePool = pool;
   const write = persistLocalSnapshot(activePool, touchedTables ?? localPersistenceTables);
   // Other best-effort callers wait for this writer without inheriting its
@@ -986,6 +1024,54 @@ export function getPool(): PgPool {
   return pool;
 }
 
+/** Internal two-ledger-write commit. Authentication/encryption precede this
+ * call; the repository must await its strict snapshot barrier afterward. */
+export async function commitPairingLedgerWrites(
+  writes: readonly [PreparedPairingWrite, PreparedPairingWrite],
+): Promise<boolean> {
+  for (const write of writes) {
+    if (!/^UPDATE helix_pairing_ledger\s/iu.test(write.sql) || write.sql.includes(";")) {
+      throw new Error("pairing_atomic_write_invalid");
+    }
+  }
+  await ensureDatabase();
+  const activePool = getPool();
+  const embedded = memEngines.get(activePool);
+  if (embedded) {
+    const committed = commitEmbeddedPairingReplacement(embedded, writes);
+    if (committed) markLocalPersistenceTablesDirty(["helix_pairing_ledger"]);
+    return committed;
+  }
+  const client = await activePool.connect();
+  let discardClient = false;
+  // pg detaches its idle error listener while a client is checked out. A
+  // backend shutdown can emit a socket error while ROLLBACK is pending, in
+  // addition to rejecting the query. Contain that transport event here; pg
+  // still rejects pending/subsequent queries and the caller receives failure.
+  const onConnectionError = () => { discardClient = true; };
+  client.on("error", onConnectionError);
+  try {
+    await client.query("BEGIN");
+    for (const write of writes) {
+      const result = await client.query(write.sql, [...write.values]);
+      if (result.rowCount !== 1) {
+        await client.query("ROLLBACK");
+        return false;
+      }
+    }
+    await client.query("COMMIT");
+    return true;
+  } catch (error) {
+    // Never return a failed transaction's possibly broken client to the pool.
+    discardClient = true;
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release(discardClient);
+    client.removeListener("error", onConnectionError);
+  }
+}
+
 export async function ensureDatabase(): Promise<void> {
   if (!migratePromise) {
     const activePool = getPool();
@@ -1038,6 +1124,7 @@ export async function resetDbClient(): Promise<void> {
   localPersistenceScheduler = null;
   localPersistenceSnapshotCache = null;
   localPersistenceMutationVersions.clear();
+  localPersistenceConfirmedTables.clear();
   if (lastDsn?.startsWith("pg-mem://") || !lastDsn) {
     memPools.clear();
   }

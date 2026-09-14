@@ -1,0 +1,11 @@
+{
+  "observed_at": "2026-09-14T11:00:02.3301067Z",
+  "target": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-idle-epoch-recovery-20260914",
+  "bytes": 615488672.0,
+  "operation": "SendToRecycleBin",
+  "target_absent": true,
+  "retained_current_sha256": "0657677e826306c3032c67e13a1be74e121d97b02e3fc62bdd9e88952e34518e",
+  "retained_rollback_sha256": "b861875c67d943198bc2437fa5f690a01b47a64727bc06b1838a2fe544fc4c55",
+  "permanent_delete": false,
+  "bin_emptied": false
+}

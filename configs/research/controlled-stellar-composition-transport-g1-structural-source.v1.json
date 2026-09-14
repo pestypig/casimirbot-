@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "g1-structural-source/1",
+  "status": "BLOCK_SOURCE_BINDING",
+  "blocker": "Numerical per-row averaging kernels/resolution mapping and a complete systematic-error comparison policy are not available in the retained table; safe primary-paper and author-data endpoint checks did not bind them. This is not a claim that the data do not exist.",
+  "launchAllowed": false,
+  "admissionAllowed": false,
+  "source": "https://arxiv.org/html/0905.0651v2",
+  "pdfSource": "https://arxiv.org/pdf/0905.0651v2",
+  "artifactRoot": "artifacts/research/g1-source-validation-v1/bison13-intake-20260913",
+  "table": "Table 3, BiSON-13; absolute inferred solar profiles",
+  "rows": 37,
+  "csvSha256": "3831ccfee250ce4398c54c8aa65b081160eaaf4587c287786ffbc2a2dfc571a6",
+  "pdfSha256": "c0efec964bfa85a11c66accc514adda0af6afd4ebb245bc42970f00b74158cab",
+  "crossCheck": "All 37 six-column PDF rows match HTML-derived CSV; typeset Table 3 visually reviewed on PDF pages 28 and 29",
+  "units": {"soundSpeed": "cm/s", "density": "g/cm^3", "radius": "r/R_sun"},
+  "SIConversion": {"soundSpeedAndSigma": 0.01, "densityAndSigma": 1000},
+  "tabulatedSupport": {"soundSpeed": [0.061949, 0.95661], "density": [0.058884, 0.95754]},
+  "supportIsAcceptanceDomain": false,
+  "referenceModel": "BP04, paper Section III and Table 2; table is an inference, not a BP04 prediction",
+  "radialPositionConvention": "second quartile of averaging kernel; two separate radial grids",
+  "resolutionConvention": "first-to-third quartile distance; numerical per-row kernels/widths not bound",
+  "uncertainty": "Tabulated marginal propagated frequency errors; not a complete systematic uncertainty budget or independent joint likelihood",
+  "comparisonOperator": null,
+  "remainingSourceRequirements": [
+    "numerical averaging kernels or defensible quantitative resolution mapping",
+    "frozen reliable radial support and reference-radius convention mapping",
+    "explicit systematic-error treatment distinct from tabulated statistical errors"
+  ],
+  "missingRequirementDecision": "BLOCK_SOURCE_BINDING",
+  "forbiddenFallbacks": ["fixture or reference-model substitution", "silent point-interpolation equivalence to kernel comparison", "invented covariance", "post-result tolerance inflation"]
+}

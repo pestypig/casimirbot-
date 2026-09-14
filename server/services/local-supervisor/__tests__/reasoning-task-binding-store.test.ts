@@ -90,6 +90,24 @@ const issueAndClaim = (store: HelixReasoningTaskBindingStore) => {
 };
 
 describe("HelixReasoningTaskBindingStore", () => {
+  it("O2 preserves a healthy binding and its epoch when a replacement fails validation", () => {
+    const { store } = setup();
+    const { binding } = issueAndClaim(store);
+    const replacement = { profileRef: "profile-current", clientSessionRef: "client-session-current",
+      helixConversationId: "helix-conversation-current", missionId: "mission-current", runId: "run-current" };
+    for (const change of [{ missionId: "x" }, { runId: "invalid\nrun" }, { expiresInSeconds: Number.NaN }]) {
+      expect(() => store.issueClaim({ ...replacement, ...change })).toThrow();
+      expect(store.inspect({ profileRef: "profile-current", bindingId: binding.reasoning_binding_id }))
+        .toEqual(binding);
+    }
+    const event = store.dispatch({ profileRef: "profile-current", bindingId: binding.reasoning_binding_id,
+      bindingEpoch: binding.binding_epoch, clientEventRef: "after-invalid-replacement", origin: "typed",
+      instructionText: "Report the current connection status." });
+    expect(event.reasoning_binding_id).toBe(binding.reasoning_binding_id);
+    const valid = store.issueClaim(replacement);
+    expect(valid.binding.binding_epoch).toBe(binding.binding_epoch + 1);
+  });
+
   it("labels agent ingress truthfully and rejects origin or target substitution", () => {
     const { store } = setup();
     const { binding } = issueAndClaim(store);

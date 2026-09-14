@@ -1,0 +1,2224 @@
+{
+  "schema": "casimirbot.cs3_course_preflight_supplement.v1",
+  "recorded_at": "2026-09-14T17:29:40.062Z",
+  "survey": {
+    "schema": "helix.environment_connector.probe_observation.v1",
+    "probe_request_ref": "environment_probe_request:baa9748d-298f-4c3f-9535-aebc7dd43709",
+    "probe_attempt_ref": "environment_probe_attempt:3331096e-e85f-479f-a850-894c0052e339",
+    "capability_id": "com.casimirbot.minecraft.spatial_region.inspect",
+    "capability_version": 2,
+    "outcome": "succeeded",
+    "summary": "Bounded spatial-region read-only probe verified 3 conservative one-block movement candidate(s). Use only a walk_step_candidates relative_direction whose safe_candidate value is true.",
+    "result": {
+      "result_summary": "Bounded spatial-region read-only probe verified 3 conservative one-block movement candidate(s). Use only a walk_step_candidates relative_direction whose safe_candidate value is true.",
+      "purpose": "movement_safety",
+      "center": {
+        "x": -3,
+        "y": 65,
+        "z": 7
+      },
+      "bounds": {
+        "min": {
+          "x": -10,
+          "y": 63,
+          "z": 0
+        },
+        "max": {
+          "x": 4,
+          "y": 67,
+          "z": 14
+        }
+      },
+      "columns_complete": true,
+      "omitted_column_count": 0,
+      "walk_step_candidates": [
+        {
+          "cardinal_direction": "south",
+          "relative_direction": "forward",
+          "target_feet_position": {
+            "x": -3,
+            "y": 65,
+            "z": 8
+          },
+          "target_head_position": {
+            "x": -3,
+            "y": 66,
+            "z": 8
+          },
+          "support_position": {
+            "x": -3,
+            "y": 64,
+            "z": 8
+          },
+          "support_block": "minecraft:smooth_stone",
+          "evidence_complete": true,
+          "feet_clear": false,
+          "head_clear": false,
+          "support_solid_nonhazardous": true,
+          "nearby_hazard_count": 0,
+          "nearby_fluid_count": 0,
+          "safe_candidate": false
+        },
+        {
+          "cardinal_direction": "west",
+          "relative_direction": "right",
+          "target_feet_position": {
+            "x": -4,
+            "y": 65,
+            "z": 7
+          },
+          "target_head_position": {
+            "x": -4,
+            "y": 66,
+            "z": 7
+          },
+          "support_position": {
+            "x": -4,
+            "y": 64,
+            "z": 7
+          },
+          "support_block": "minecraft:smooth_stone",
+          "evidence_complete": true,
+          "feet_clear": true,
+          "head_clear": true,
+          "support_solid_nonhazardous": true,
+          "nearby_hazard_count": 0,
+          "nearby_fluid_count": 0,
+          "safe_candidate": true
+        },
+        {
+          "cardinal_direction": "north",
+          "relative_direction": "back",
+          "target_feet_position": {
+            "x": -3,
+            "y": 65,
+            "z": 6
+          },
+          "target_head_position": {
+            "x": -3,
+            "y": 66,
+            "z": 6
+          },
+          "support_position": {
+            "x": -3,
+            "y": 64,
+            "z": 6
+          },
+          "support_block": "minecraft:smooth_stone",
+          "evidence_complete": true,
+          "feet_clear": true,
+          "head_clear": true,
+          "support_solid_nonhazardous": true,
+          "nearby_hazard_count": 0,
+          "nearby_fluid_count": 0,
+          "safe_candidate": true
+        },
+        {
+          "cardinal_direction": "east",
+          "relative_direction": "left",
+          "target_feet_position": {
+            "x": -2,
+            "y": 65,
+            "z": 7
+          },
+          "target_head_position": {
+            "x": -2,
+            "y": 66,
+            "z": 7
+          },
+          "support_position": {
+            "x": -2,
+            "y": 64,
+            "z": 7
+          },
+          "support_block": "minecraft:smooth_stone",
+          "evidence_complete": true,
+          "feet_clear": true,
+          "head_clear": true,
+          "support_solid_nonhazardous": true,
+          "nearby_hazard_count": 0,
+          "nearby_fluid_count": 0,
+          "safe_candidate": true
+        }
+      ],
+      "palette": [
+        {
+          "block": "minecraft:air",
+          "count": 951
+        },
+        {
+          "block": "minecraft:smooth_stone",
+          "count": 97
+        },
+        {
+          "block": "minecraft:polished_deepslate",
+          "count": 77
+        }
+      ],
+      "columns_at_footing_heights": [
+        {
+          "x": -3,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 7,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 6,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 8,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 5,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 4,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 3,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 2,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 1,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 7,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -3,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 7,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 6,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 8,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -4,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -2,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 6,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 8,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone",
+            "minecraft:smooth_stone"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 5,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -5,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -1,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 5,
+          "blocks": [
+            "minecraft:smooth_stone",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 9,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 4,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -6,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 0,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 4,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate",
+            "minecraft:polished_deepslate"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 10,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 3,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -7,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 1,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 3,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 11,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 2,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -8,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 2,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 2,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 12,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 1,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 0,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -9,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 3,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 1,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 13,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 0,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": -10,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 0,
+          "blocks": [
+            "minecraft:polished_deepslate",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        },
+        {
+          "x": 4,
+          "z": 14,
+          "blocks": [
+            "minecraft:air",
+            "minecraft:air",
+            "minecraft:air"
+          ]
+        }
+      ],
+      "projection": "Each column lists original blocks at y=64,65,66; other heights omitted here; full observation retained in the tool transcript."
+    },
+    "evidence_ref": "environment_probe_evidence:b2cb3c4825e9e2bb7ea346dc6f30b6c206d2f6a8",
+    "observation_revision": 1789406386520,
+    "observed_at": "2026-09-14T17:19:46.520Z",
+    "freshness_age_ms": 264,
+    "provenance_valid": true,
+    "eligible_for_current_turn_reentry": true,
+    "late_result_disposition": null,
+    "content_role": "environment_probe_observation_not_assistant_answer",
+    "reentry_required": true,
+    "answer_authority": false,
+    "assistant_answer": false,
+    "terminal_eligible": false,
+    "raw_content_included": false
+  },
+  "new_gameplay_submitted": false,
+  "world_mutation_performed": false,
+  "native_ui": {
+    "package": "release-retained-outcome-20260914",
+    "binding_active": true,
+    "prompt_acknowledged": true,
+    "ready_button_clicked": true,
+    "observed_states": [
+      "preparing",
+      "observation_aged_out_binding_retained"
+    ],
+    "fresh_ready_banner_captured": false,
+    "tooling_error": "Initial indexed input reported coordinate input geometry is unavailable; refreshed exact-window capture and scrolled before visible-button input.",
+    "text": "￼\n￼\nNew chat\nHELIX ASK SESSION\nGUIDE\nAccount & Sessions\nx\nAgent Access\nx\n+\nWorkspace\nPanels\nAgent Access\nworkspace://workspace/panels/agent-access\n￼\n￼\nAGENT CONNECTIONS\nAI app connected\nStart Harness\nREVIEW TASK BINDING\nConnection checked. Next: review the exact-task binding below. Connection readiness alone does not bind this chat or grant game actions.\nThis device is trusted for Full Harness\nRemember approval for short, logged tunnel leases and for starting or stopping installed local environment applications on this profile and device. This never grants in-environment Minecraft actions, trading, answer, or terminal authority.\nRemove Full Harness device trust\nCatalog probe: current. Chat attachment: current. Continuation: polling under the approved pairing.\nThread visibility: tool activity only. Checkpoint publication: not requested.\nThe approved task can pick up queued steering when running. This does not wake an idle task or enable automatic delivery.\nThis proves connection readiness only. It does not expose private reasoning or grant environment actions.\nPair an existing AI task\nPairing permits exact-chat steering. Environment action permission is separate. Task registration does not mean the AI is currently active.\nRegistered AI task\n￼\nRefresh registered tasks\nHelix chat: 534a24b1-62e2-4feb-9e47-48a8f6caff64\nTask identity declared by the authenticated client: codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d\nInvitation expires after\n￼\nPairing duration\n￼\n￼\n￼\nUse Copy invitation and send it to the selected task for authenticated acceptance. Automatic delivery is unavailable for this connection.\nPairing: accepted. Current task availability has not been verified.\nSession binding recovered. Ready up can check the environment prerequisites.\nInvitation deadline: 2026-09-14T14:15:36.357Z. Pairing deadline: 2026-09-14T22:00:36.357Z.\nReview replacement pairingCheck acceptanceRevoke pairing\nAI task presence: 2:01 remaining (local clock estimate).\nBind the current Helix chat to this exact AI task\nThis does not create or control an AI-app chat. It authorizes only the authenticated task shown above to poll for steering from the selected local Helix chat.\nChat binding: active. A missing heartbeat does not revoke this binding.\nAI availability: current connection check passed; polling pickup still requires the AI task to run.\nAn associated run does not by itself prove current game connectivity or action permission.\nReady up\nChecks the bound environment session without replacing its binding or renewing permissions.\nReview environment settings\nThe readiness check has aged out. Use Ready up to check again; your binding was not revoked.\nSource credential deadline: 1:44:06 PM. About 18 minutes until that deadline. This is separate from gameplay permission; Ready up does not renew it.\nGameplay permission deadline: 1:58:15 PM. About 33 minutes until that deadline. This deadline does not override revocation or controller readiness and is separate from chat binding.\nEnvironment run deadline: 4:14:10 PM. About 168 minutes remaining. This is separate from chat binding and gameplay permission; Ready up does not extend it.\nKeep this binding while recovering the session. Do not replace it just because task presence or game permissions expired.\n￼\nInclude this verified environment run in the new binding:\nrun_30e7bbe7-f334-4947-88cb-2ac85db039b9\nRoom: shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621\nThis associates steering with the run; environment action permission remains separate.\nBinding state: active. Transport: polling. Environment run: run_30e7bbe7-f334-4947-88cb-2ac85db039b9.\nReplace binding\nCheck binding\nRevoke binding\nRefresh harness connection\nBack\nRecheck connection\nExplain\nCopy diagnostics\nOptional Device Check: separate from the agent connection and never counts as chat or catalog proof.\nSkip Device Check\nDisconnect\nAdvanced manual setup\n￼\nBound external AI task · \nready\n￼\nScroll Ask controls left\n￼\nLive Voice\n￼\nObserve\n￼\nOff\n￼\nRoom 1/2\nChoose Ask agent runtime\n￼\n￼\n￼\nScreen\n￼\n￼\n￼\nScroll Ask controls right\nAsk Helix\nRecent agent-submitted prompts — transport status, not answers or task completion.\nAgent-origin session check: this exact task accepted the eight-hour pairing for run_30e7bbe7-f334-4947-88cb-2ac85db039b9. Binding is verified. Ready up found the existing goal needs current player-epoch recovery; no gameplay has been submitted by this check. Read and acknowledge this advisory once, then diagnose recovery while preserving the existing goal and finite player permission.\nLast checked: acknowledged\nAgent-origin verification: the persistence repair package recovered this same accepted task/chat/run pairing. Three explicit MCP Ready up reads passed all ten checks with fresh perception, no repairs, and unchanged goal revision 22 or permission deadlines. This advisory is a delivery test, not a user instruction, gameplay request or final answer. Pick up and acknowledge it once while continuing the remaining CS1-CS4 verification.\nLast checked: acknowledged\nActivity & setup\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼\n￼"
+  },
+  "checks": {
+    "focused_tests": 27,
+    "package_comparison": "passed",
+    "known_fixture_scan": "passed",
+    "discipline_quick": "passed",
+    "documentation_audit": "passed"
+  },
+  "goal_complete": false
+}

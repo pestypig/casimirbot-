@@ -18,7 +18,25 @@ type Intent = Request & { intentId: string; serviceInstanceRef: string;
   execution_authority: false; task_binding_authority: false; answer_authority: false;
   assistant_answer: false; terminal_eligible: false };
 
-export class PreparationIntentError extends Error {}
+export const PREPARATION_INTENT_FAILURES = {
+  preparation_target_unavailable: "Refresh this same task's authenticated supervisor presence before reading or preparing its session. This does not renew pairing or environment permission.",
+  preparation_target_changed: "The reviewed task selection changed. Inspect the current exact task before preparing the session.",
+  preparation_service_changed: "The preparation belongs to an earlier service. Inspect current preparation state before requesting setup again.",
+  preparation_request_conflict: "This request ID already describes different setup. Reconcile the original request before changing the selection.",
+  preparation_intent_expired: "The preparation request expired. Review current setup before requesting preparation again.",
+  preparation_capacity_reached: "The preparation mailbox is full. Inspect outstanding setup requests before submitting more.",
+  preparation_target_mismatch: "This preparation does not belong to the authenticated task. Use the exact intended task.",
+  preparation_intent_unavailable: "No current preparation request matches this task and intent. Read this task's current preparation state before proceeding.",
+  preparation_run_conflict: "The preparation is already associated with a different run. Reconcile its current run before proceeding.",
+  preparation_run_selection_required: "Existing eligible runs require an explicit selection. Inspect the candidates and select the intended run.",
+  preparation_room_unavailable: "The selected room is unavailable to this account. Review room access before preparing the session.",
+} as const;
+export class PreparationIntentError extends Error {
+  constructor(readonly code: keyof typeof PREPARATION_INTENT_FAILURES) {
+    super(code);
+    this.name = "PreparationIntentError";
+  }
+}
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 
 /** Setup mailbox only. No model loop, run creation, approval or acknowledgement

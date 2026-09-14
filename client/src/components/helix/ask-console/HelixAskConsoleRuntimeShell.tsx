@@ -1,4 +1,5 @@
-import React, { Suspense } from "react";
+import React, { Suspense, useState } from "react";
+import { requestWorkstationGuidance } from "@/lib/workstation/workstationGuidance";
 import { HelixLoadingMark } from "@/components/common/HelixLoadingMark";
 import type { HelixAskMinimalRuntimeShellProps } from "./HelixAskMinimalRuntimeShell";
 import type { HelixAskConsoleProps } from "./HelixAskConsoleState";
@@ -34,9 +35,10 @@ export function HelixAskConsoleRuntimeShell({
   minimalRuntime,
   ...props
 }: HelixAskConsoleRuntimeShellProps) {
+  const [activityOpen, setActivityOpen] = useState(false);
   const observer = (
     <div className="flex shrink-0 justify-end gap-3 py-1 text-xs">
-      <Sheet>
+      <Sheet open={activityOpen} onOpenChange={setActivityOpen}>
         <SheetTrigger className="rounded px-2 py-1 text-slate-300 hover:bg-slate-800">Activity & setup</SheetTrigger>
         <SheetContent className="overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-lg">
           <SheetTitle className="text-slate-100">Activity & setup</SheetTitle>
@@ -44,6 +46,23 @@ export function HelixAskConsoleRuntimeShell({
           <HelixOperatorActivityPanel />
           <details className="mt-4 rounded-lg border border-slate-700 p-3">
             <summary className="cursor-pointer text-sm">External agent setup</summary>
+            <p className="mt-3 text-sm text-slate-300">
+              Review your account, connection and exact-task pairing in Agent Access.
+            </p>
+            <button
+              type="button"
+              className="mt-2 rounded border border-cyan-700 px-3 py-2 text-sm text-cyan-100"
+              onClick={() => {
+                setActivityOpen(false);
+                requestWorkstationGuidance({
+                  kind: "user_attention",
+                  panelId: "agent-access",
+                  label: "Review your account and connection in Agent Access.",
+                });
+              }}
+            >
+              Open Agent Access
+            </button>
             <AgentRunObserverBindingSurface className="mt-3" contextId={props.contextId} />
           </details>
         </SheetContent>

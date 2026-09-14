@@ -16,6 +16,30 @@ afterEach(() => {
 });
 
 describe("WorkstationGuidanceOverlay", () => {
+  it("inherits readiness explanation when MCP targets a nested disabled consent control", async () => {
+    render(<><WorkstationGuidanceOverlay /><section data-helix-guidance-label="Pickup is unavailable."
+      data-helix-guidance-integration-blocked="true"><button disabled data-helix-control-id="fixture.bind"
+      ref={element => { if (element) element.scrollIntoView = vi.fn(); }}>Bind task</button></section></>);
+    requestWorkstationGuidance({ kind: "user_attention", controlId: "fixture.bind", label: "Review the control." });
+    expect(await screen.findByText("Connection limitation: Pickup is unavailable.")).toBeInTheDocument();
+    expect(screen.queryByText(/Your action is required:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bind task" })).toBeDisabled();
+  });
+  it("distinguishes an integration blocker from human consent and follows recovery", async () => {
+    const click = vi.fn();
+    render(<><WorkstationGuidanceOverlay /><button data-helix-guidance-target="reasoning-task-binding"
+      data-helix-guidance-integration-blocked="true" data-helix-guidance-label="Pickup is unavailable."
+      onClick={click} ref={element => { if (element) element.scrollIntoView = vi.fn(); }}>Bind task</button></>);
+    requestWorkstationGuidance({ kind: "user_attention", targetId: "reasoning-task-binding", label: "Review binding." });
+    expect(await screen.findByText("Connection limitation: Pickup is unavailable.")).toBeInTheDocument();
+    expect(screen.queryByText(/Your action is required:/)).not.toBeInTheDocument();
+    const target = screen.getByRole("button", { name: "Bind task" });
+    target.removeAttribute("data-helix-guidance-integration-blocked");
+    target.setAttribute("data-helix-guidance-label", "Review consent.");
+    expect(await screen.findByText("Your action is required: Review consent.")).toBeInTheDocument();
+    expect(click).not.toHaveBeenCalled();
+  });
+
   it("opens the requested panel, scrolls to the consent target, and never clicks it", async () => {
     const opened: string[] = [];
     const handleOpen = (event: Event) => {

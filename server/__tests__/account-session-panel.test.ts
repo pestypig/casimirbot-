@@ -480,6 +480,7 @@ describe("account session panel API", () => {
     const receipt = await agent
       .post("/api/account/profile-storage/snapshot")
       .send({
+        expected_profile_id: "profile:quota-user",
         entries: [{
           storage_key: "quota:test",
           storage_backend: "localStorage",
@@ -986,6 +987,7 @@ describe("account session panel API", () => {
     await agent
       .post("/api/account/profile-storage/snapshot")
       .send({
+        expected_profile_id: profileId,
         entries: [{
           storage_key: "agi-chat-sessions-v1",
           storage_backend: "localStorage",

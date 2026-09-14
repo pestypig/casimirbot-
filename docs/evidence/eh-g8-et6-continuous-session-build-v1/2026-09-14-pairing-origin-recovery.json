@@ -1,0 +1,235 @@
+{
+  "schema": "helix.cs.pairing_origin_recovery_evidence.v1",
+  "recorded_at": "2026-09-14T05:51:28.843Z",
+  "program_gate": "G8",
+  "capability_maturity_scope": "deterministically verified",
+  "live_acceptance": false,
+  "parent_goal_complete": false,
+  "original_et6_passed": false,
+  "nav1_qualified": false,
+  "boundary": "Exact reviewed request absent from authenticated encrypted profile backup after an unknown-outcome submission",
+  "classification": [
+    "presentation",
+    "evidence re-entry"
+  ],
+  "commands": {
+    "focused": "npx vitest run client/src/lib/agent-access/__tests__/pairingRecoveryStorage.spec.ts client/src/components/agent-access/__tests__/DurablePairingProfileRecovery.spec.tsx client/src/components/agent-access/__tests__/DurableTaskPairing.spec.tsx client/src/lib/workstation/__tests__/profileStorageSync.spec.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "browser": "npx playwright test -c playwright.onboarding.config.ts pairing-origin-recovery.spec.ts --max-failures=1",
+    "build": "npm run build:client",
+    "docs": "npm run helix:environment-harness:docs-audit",
+    "discipline": "npm run helix:ask:discipline:quick"
+  },
+  "results": {
+    "red": {
+      "failed": 1,
+      "reason": "profile payload request was undefined; exact local request expected"
+    },
+    "first_core": {
+      "passed": 57
+    },
+    "focused": {
+      "passed": 70,
+      "files": 4,
+      "duration_seconds": 16.29
+    },
+    "initial_browser": {
+      "completed_passed": 1,
+      "completed_failed": 2,
+      "interrupted": true,
+      "reason": "Incomplete test membership/eligibility injection; fixed fixture without production authority changes"
+    },
+    "diagnostic_browser": {
+      "passed": 1
+    },
+    "final_browser": {
+      "passed": 6,
+      "duration_seconds": 150,
+      "rows": [
+        {
+          "evidence": "isolated_pairing_origin_recovery",
+          "input": "pointer",
+          "stage": "draft",
+          "fresh_snapshot_to_verified_ui_ms": 4924,
+          "extra_pairing_posts_on_restore": 0,
+          "live_acceptance": false
+        },
+        {
+          "evidence": "isolated_pairing_origin_recovery",
+          "input": "pointer",
+          "stage": "pending-lost-reply",
+          "fresh_snapshot_to_verified_ui_ms": 2782,
+          "extra_pairing_posts_on_restore": 0,
+          "live_acceptance": false
+        },
+        {
+          "evidence": "isolated_pairing_origin_recovery",
+          "input": "pointer",
+          "stage": "accepted",
+          "fresh_snapshot_to_verified_ui_ms": 2750,
+          "extra_pairing_posts_on_restore": 0,
+          "live_acceptance": false
+        },
+        {
+          "evidence": "isolated_pairing_origin_recovery",
+          "input": "keyboard",
+          "stage": "draft",
+          "fresh_snapshot_to_verified_ui_ms": 2300,
+          "extra_pairing_posts_on_restore": 0,
+          "live_acceptance": false
+        },
+        {
+          "evidence": "isolated_pairing_origin_recovery",
+          "input": "keyboard",
+          "stage": "pending-lost-reply",
+          "fresh_snapshot_to_verified_ui_ms": 2093,
+          "extra_pairing_posts_on_restore": 0,
+          "live_acceptance": false
+        },
+        {
+          "evidence": "isolated_pairing_origin_recovery",
+          "input": "keyboard",
+          "stage": "accepted",
+          "fresh_snapshot_to_verified_ui_ms": 2265,
+          "extra_pairing_posts_on_restore": 0,
+          "live_acceptance": false
+        }
+      ]
+    },
+    "client_build": {
+      "passed": true,
+      "duration_seconds": 125
+    },
+    "docs_audit": {
+      "passed": true
+    },
+    "discipline_quick": {
+      "passed": true
+    },
+    "casimir_gate": {
+      "applicable": false,
+      "reason": "Application metadata/UI patch, no physics, adapter contract, certificate or release gate change"
+    }
+  },
+  "source_files": [
+    {
+      "file": "client/src/lib/agent-access/pairingRecoveryStorage.ts",
+      "sha256": "4872f9ca082918981ce61fbd824ca1414d92ec27937b3ef5a118dc3e775ea57b"
+    },
+    {
+      "file": "client/src/lib/workstation/profileStorageSync.ts",
+      "sha256": "c052e7351d05f11ff991cf9e30fa20a51431f0bee06cb8a33235be25f485c9f1"
+    },
+    {
+      "file": "client/src/components/agent-access/DurableTaskPairing.tsx",
+      "sha256": "638650fe7663db88fd97fbaa503e9a74f94942671c8cef568b523e7f2fc47326"
+    },
+    {
+      "file": "client/src/lib/agent-access/__tests__/pairingRecoveryStorage.spec.ts",
+      "sha256": "32b1e11b6af75ec42dd6be5587a48a34cb7fd20cdcd4aec44947c900e93bff85"
+    },
+    {
+      "file": "client/src/components/agent-access/__tests__/DurablePairingProfileRecovery.spec.tsx",
+      "sha256": "d8a75b20ebd9c5fad4e83118bb72d72edcd282cfca741f993e5ed6f77740afd0"
+    },
+    {
+      "file": "client/e2e/onboarding-isolated/pairing-origin-recovery.spec.ts",
+      "sha256": "be9ce1c89873f1b398c97609f6ddb6a0951335b28c2d323e4ffaae4cd4a3a583"
+    },
+    {
+      "file": "client/e2e/onboarding-isolated/pairing-origin-entry.tsx",
+      "sha256": "9d813fdaaa87db2e2773d3a0b64a4ce85bd01f7416398ae841f5cdbebb79832b"
+    },
+    {
+      "file": "client/e2e/onboarding-isolated/pairing-origin-exports.ts",
+      "sha256": "4c86ffe7da27d1ba0b3407dad298579107d5b82e2842803111a4b0bfc87c6e0b"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cs-pairing-origin-recovery-v1.md",
+      "sha256": "de3b0253eb304a5a23184c88803d60f50a35fef26822fb6a298b022054e5fa5e"
+    }
+  ],
+  "logs": [
+    {
+      "file": ".tmp/pairing-origin-red-20260914.log",
+      "sha256": "55d1a7243afd490f73138f400c162681f8c7bedc1fe176e1e4d6e10c87115b39"
+    },
+    {
+      "file": ".tmp/pairing-origin-core-20260914.log",
+      "sha256": "9bc5d08291ce10607686045960eab1ec2bfc622be5bfac29207fcc25fb69ad1a"
+    },
+    {
+      "file": ".tmp/pairing-origin-focused-20260914.log",
+      "sha256": "4d20703d087a09eede27c50bbfd0295fec7da8823a7362b8438494a2c56eca22"
+    },
+    {
+      "file": ".tmp/pairing-origin-browser-20260914.log",
+      "sha256": "671d2c962bfac66338e6323f7c67a27a469b494a8047893945fc02134c93bd19"
+    },
+    {
+      "file": ".tmp/pairing-origin-browser-diagnosis-20260914.log",
+      "sha256": "4ad98686378a729afe6aa6447fde56a34b408c1e07cce19aa6d19abef480bdd7"
+    },
+    {
+      "file": ".tmp/pairing-origin-browser-final-20260914.log",
+      "sha256": "0d4ab8f83990b4ce25821ee76d0c4c0431a3973e7bb6565c9af364632ab6faf4"
+    },
+    {
+      "file": ".tmp/pairing-origin-client-build-20260914.log",
+      "sha256": "90d80f15545be9355a42db695568f05ceaa5acf34c40866327e77cd53bf7e25a"
+    },
+    {
+      "file": ".tmp/pairing-origin-docs-audit-20260914.log",
+      "sha256": "325c3ebd15651c8b3d94ef1d090f08dbe5103822f6c81c54a25a866f44bbc980"
+    },
+    {
+      "file": ".tmp/pairing-origin-discipline-quick-20260914.log",
+      "sha256": "f76862588d71c49ff43c58aa0e763e10a211a24be69c05e20e8f971277c57d0d"
+    }
+  ],
+  "native": {
+    "package": "apps/desktop/release-native-pairing-20260914/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "2f8cbb3643a1bab8a03ed58b83f7f1f3fa842743d3d04fe1eb7b43858ea07489",
+    "this_repair_packaged": false,
+    "native_restart_performed": false,
+    "native_occupied_port_recovery_qualified": false,
+    "current_pairing_id": "pairing:75ce6e76-0bc3-44f7-8578-999779152e96",
+    "pairing_expires_at": "2026-09-14T13:04:02.798Z",
+    "gameplay_approved": false,
+    "gameplay_effects": 0,
+    "read_source_recovery": {
+      "reason": "Expired source produced action_adapter_admission_inactive",
+      "idempotency_key": "cs-onboarding-20260914-origin-recovery-source-01",
+      "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+      "binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+      "expires_at": "2026-09-14T06:40:32.175Z",
+      "healthy_source_rotations": 0,
+      "expired_source_rotations": 1
+    },
+    "current_subject_binding_id": "environment_subject_binding:5db96337-adbf-48ab-a956-caf579c9d56f",
+    "current_subject_epoch": "adapter_epoch:e742817d99f8b123b01328183d191012871da8bf",
+    "subject_verification": "self_claim",
+    "subject_confidence": 0.75,
+    "draft_reset_observed": true,
+    "draft_reset_fixed": false,
+    "draft_restored_by_agent": true,
+    "unsaved_draft": {
+      "capabilities": [
+        "Walk",
+        "Look",
+        "Jump",
+        "Fluid TAS sequence"
+      ],
+      "hours": 8,
+      "manual_input": "cancel",
+      "acknowledgement": false
+    }
+  },
+  "limits": [
+    "Profile/pairing persistence uses isolated pg-mem, not PostgreSQL concurrency proof",
+    "Device trust, external account-link observation, provider identity and environment membership/eligibility are fixture ports",
+    "No provider automatic-delivery or wake qualification",
+    "No gameplay or CS3/CS4 qualification",
+    "No secret, checked consent, runtime binding, presence or player action grant added to profile backup"
+  ],
+  "cs5": "docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-14-pairing-origin-cs5-handoff.md"
+}

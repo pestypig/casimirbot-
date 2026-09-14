@@ -22,17 +22,27 @@ export function BoundAgentPromptDisplay({ binding }: { binding: BrowserReasoning
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
-    const controller = new AbortController();
+    let controller: AbortController | undefined;
     const refresh = async () => {
+      controller = new AbortController();
+      const currentController = controller;
+      let deadline: ReturnType<typeof setTimeout> | undefined;
       try {
         const query = new URLSearchParams({ binding_epoch: String(binding.binding_epoch),
           helix_conversation_id: binding.helix_conversation_id });
         if (binding.run_id) query.set("run_id", binding.run_id);
-        const response = await fetch(`/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(binding.reasoning_binding_id)}/chat-prompts?${query}`, {
-          credentials: "include", signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("display unavailable");
-        const body = await response.json();
+        const body = await Promise.race([
+          (async () => {
+            const response = await fetch(`/api/account/session/agent-connections/reasoning-bindings/${encodeURIComponent(binding.reasoning_binding_id)}/chat-prompts?${query}`, {
+              credentials: "include", signal: currentController.signal,
+            });
+            if (!response.ok) throw new Error("display unavailable");
+            return response.json();
+          })(),
+          new Promise<never>((_, reject) => {
+            deadline = setTimeout(() => { reject(new Error("display timeout")); currentController.abort(); }, 5000);
+          }),
+        ]);
         if (body.display_only !== true || !Array.isArray(body.deliveries) || body.deliveries.length > 50) throw new Error("invalid display");
         const next = new Map<string, { id: string; text: string; state: string }>();
         for (const delivery of body.deliveries) {
@@ -44,10 +54,11 @@ export function BoundAgentPromptDisplay({ binding }: { binding: BrowserReasoning
         }
         if (!stopped) { setRows([...next.values()]); setUnavailable(false); setLoadedFor(contextKey); }
       } catch { if (!stopped) { setRows([]); setUnavailable(true); setLoadedFor(contextKey); } }
+      finally { if (deadline !== undefined) clearTimeout(deadline); }
       if (!stopped) timer = setTimeout(refresh, 5000);
     };
     void refresh();
-    return () => { stopped = true; controller.abort(); clearTimeout(timer); };
+    return () => { stopped = true; controller?.abort(); clearTimeout(timer); };
   }, [contextKey]);
   if (loadedFor !== contextKey) return null;
   if (!rows.length) return unavailable ? <p role="status">Agent prompt display unavailable; no pickup is claimed.</p> : null;

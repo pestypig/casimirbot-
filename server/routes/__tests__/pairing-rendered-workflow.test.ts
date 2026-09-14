@@ -11,6 +11,8 @@ import { createAgentConnectionsRouter } from "../agent-connections";
 import { migration087 } from "../../db/migrations/087_pairing_ledger";
 import { migration088 } from "../../db/migrations/088_pairing_destinations";
 import { migration089 } from "../../db/migrations/089_pairing_destination_identity";
+import { migration090 } from "../../db/migrations/090_durable_steering";
+import * as steeringRepository from "../../services/local-supervisor/durable-steering-repository";
 import { PairingDestinationRegistrationStore } from "../../services/local-supervisor/pairing-destination-registration";
 import { PairingLedgerRepository } from "../../services/local-supervisor/pairing-ledger-repository";
 import { PairingTransitionService } from "../../services/local-supervisor/pairing-transition-service";
@@ -18,7 +20,7 @@ import { DurableReasoningBindingAccess } from "../../services/local-supervisor/d
 import { HelixReasoningTaskBindingStore } from "../../services/local-supervisor/reasoning-task-binding-store";
 import { ephemeralPairingVault } from "../../services/local-supervisor/__tests__/pairing-vault-fixture";
 
-afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 it.each([false, true])("O5 real rendered lifecycle with lost issuance response = %s", async lostResponse => {
   // Only identity/trust and the encryption key are fixture ports. No production
@@ -34,11 +36,13 @@ it.each([false, true])("O5 real rendered lifecycle with lost issuance response =
   await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
   await pool.query("INSERT INTO helix_accounts VALUES ($1)", [profileId]);
   const db = await pool.connect();
-  try { for (const migration of [migration087, migration088, migration089]) await migration.run(db, { enablePgvector: false }); }
+  try { for (const migration of [migration087, migration088, migration089, migration090]) await migration.run(db, { enablePgvector: false }); }
   finally { db.release(); }
   try {
     const vault = ephemeralPairingVault();
     const flush = vi.fn(async () => {});
+    vi.spyOn(steeringRepository, "createNativeDurableSteeringRepository")
+      .mockResolvedValue(new steeringRepository.DurableSteeringRepository(pool, vault, flush));
     const registrations = new PairingDestinationRegistrationStore(pool, flush, () => new Date(), vault);
     await registrations.registerAuthenticated(destination, { requestId: "fixture-register", durationSeconds: 900 });
     const repository = new PairingLedgerRepository(pool, vault, flush);
@@ -129,7 +133,12 @@ it.each([false, true])("O5 real rendered lifecycle with lost issuance response =
       .set("Cookie", "helix_session=fixture-browser-session").send(promptBody);
     const prompt = await submitPrompt();
     expect(prompt.status).toBe(202);
-    expect((await submitPrompt()).body).toEqual(prompt.body);
+      expect((await submitPrompt()).body).toEqual(prompt.body);
+      const conflict = await request(runtime.app).post("/api/account/session/agent-connections/reasoning-bindings/steering")
+        .set("Cookie", "helix_session=fixture-browser-session")
+        .send({ ...promptBody, instruction_text: "Describe the inventory instead." });
+      expect(conflict.status).toBe(409);
+      expect(JSON.stringify(conflict.body)).toContain("reasoning_steering_request_conflict");
     const pickup = { profileRef: profileId, clientSessionRef: "fixture-session-after",
       bindingId: recovered.reasoning_binding_id, bindingEpoch: recovered.binding_epoch };
     const deliveries = await runtime.access.read(pickup);
@@ -139,6 +148,22 @@ it.each([false, true])("O5 real rendered lifecycle with lost issuance response =
     const acknowledgement = await runtime.access.acknowledge({ ...pickup, eventRef: prompt.body.event.steering_event_ref });
     expect(acknowledgement.delivery_state).toBe("acknowledged");
     expect(await runtime.access.acknowledge({ ...pickup, eventRef: prompt.body.event.steering_event_ref })).toEqual(acknowledgement);
+    const restarted = makeRuntime("fixture-service-steering-restart");
+    const restartedBinding = await restarted.access.restore({ destination, pairingId: invitation.id,
+      clientSessionRef: "fixture-session-steering-restart" });
+    const retryBody = { ...promptBody, reasoning_binding_id: restartedBinding.reasoning_binding_id,
+      binding_epoch: restartedBinding.binding_epoch };
+    const restartedPrompt = await request(restarted.app).post("/api/account/session/agent-connections/reasoning-bindings/steering")
+      .set("Cookie", "helix_session=fixture-browser-session").send(retryBody);
+    expect(restartedPrompt.status).toBe(202);
+    expect(restartedPrompt.body.event).toMatchObject({ steering_event_ref: prompt.body.event.steering_event_ref,
+      created_at: prompt.body.event.created_at, expires_at: prompt.body.event.expires_at,
+      acknowledged_at: acknowledgement.acknowledged_at, delivery_state: "acknowledged" });
+    expect((await pool.query("SELECT count(*) AS count FROM helix_durable_steering")).rows[0].count).toBe(1);
+    const restartedRead = { ...pickup, bindingId: restartedBinding.reasoning_binding_id,
+      bindingEpoch: restartedBinding.binding_epoch, clientSessionRef: "fixture-session-steering-restart" };
+    expect(await restarted.access.read(restartedRead)).toHaveLength(1);
+    await expect(restarted.access.read(pickup)).rejects.toThrow("reasoning_binding_not_found");
     fireEvent.click(screen.getByRole("button", { name: "Revoke pairing" }));
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Pairing: revoked"));
     expect(onRuntimeBinding).toHaveBeenCalledWith(null, invitation.id);
@@ -146,6 +171,7 @@ it.each([false, true])("O5 real rendered lifecycle with lost issuance response =
     await expect(transitions.recover("fixture-provider", invitation.id)).rejects.toThrow("pairing_revoked");
     expect((await submitPrompt()).status).toBe(409);
     await expect(runtime.access.read(pickup)).rejects.toThrow("pairing_revoked");
+    await expect(restarted.access.read(restartedRead)).rejects.toThrow("pairing_revoked");
     expect((await repository.read(profileId, invitation.id))?.revision).toBe(3);
     expect(flush).toHaveBeenCalled();
     view.unmount();

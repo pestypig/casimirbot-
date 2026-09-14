@@ -1,0 +1,70 @@
+{
+  "schema": "casimir_desktop_callback_dispatch_diagnostic/1",
+  "trace_date": "2026-09-13",
+  "timezone": "America/New_York",
+  "source_csv_sha256": "16b6cd598c913001b239624451883d8ed6537a44a91741a24528fa4446665acd",
+  "source_csv_rows": 2928,
+  "decisive_rows": [
+    {
+      "Time of Day": "4:26:45.4371162 PM",
+      "Process Name": "chrome.exe",
+      "PID": "21396",
+      "Operation": "RegQueryValue",
+      "Path": "HKCU\\Software\\Classes\\casimirbot\\shell\\open\\command\\(Default)",
+      "Result": "SUCCESS",
+      "Detail": "Type: REG_SZ, Length: 410, Data: \"C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-guide-slice6b\\win-unpacked\\CasimirBot.exe\" \"%1\""
+    },
+    {
+      "Time of Day": "4:26:45.4373779 PM",
+      "Process Name": "chrome.exe",
+      "PID": "21396",
+      "Operation": "CreateFile",
+      "Path": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-guide-slice6b\\win-unpacked\\CasimirBot.exe",
+      "Result": "PATH NOT FOUND",
+      "Detail": "Desired Access: Read Attributes, Disposition: Open, Options: Open Reparse Point, Attributes: n/a, ShareMode: Read, Write, Delete, AllocationSize: n/a"
+    },
+    {
+      "Time of Day": "4:26:45.4395867 PM",
+      "Process Name": "chrome.exe",
+      "PID": "21396",
+      "Operation": "RegQueryValue",
+      "Path": "HKCU\\Software\\Classes\\casimirbot\\shell\\open\\command\\(Default)",
+      "Result": "SUCCESS",
+      "Detail": "Type: REG_SZ, Length: 410, Data: \"C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-guide-slice6b\\win-unpacked\\CasimirBot.exe\" \"%1\""
+    },
+    {
+      "Time of Day": "4:26:45.4408755 PM",
+      "Process Name": "chrome.exe",
+      "PID": "21396",
+      "Operation": "CreateFile",
+      "Path": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-guide-slice6b\\win-unpacked\\CasimirBot.exe",
+      "Result": "PATH NOT FOUND",
+      "Detail": "Desired Access: Read Attributes, Disposition: Open, Options: Open Reparse Point, Attributes: n/a, ShareMode: Read, Write, Delete, AllocationSize: n/a"
+    },
+    {
+      "Time of Day": "4:26:45.4414203 PM",
+      "Process Name": "chrome.exe",
+      "PID": "21396",
+      "Operation": "RegQueryValue",
+      "Path": "HKCU\\Software\\Classes\\casimirbot\\shell\\open\\command\\(Default)",
+      "Result": "SUCCESS",
+      "Detail": "Type: REG_SZ, Length: 410, Data: \"C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-guide-slice6b\\win-unpacked\\CasimirBot.exe\" \"%1\""
+    },
+    {
+      "Time of Day": "4:26:45.4415831 PM",
+      "Process Name": "chrome.exe",
+      "PID": "21396",
+      "Operation": "CreateFile",
+      "Path": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-guide-slice6b\\win-unpacked\\CasimirBot.exe",
+      "Result": "PATH NOT FOUND",
+      "Detail": "Desired Access: Read Attributes, Disposition: Open, Options: Open Reparse Point, Attributes: n/a, ShareMode: Read, Write, Delete, AllocationSize: n/a"
+    }
+  ],
+  "finding": "Chrome read the removed release-guide-slice6b command and file lookup returned PATH NOT FOUND",
+  "repair_attempt": "Current verified package launched through Explorer at 20:35:07 UTC; existing instance received second_instance and callback_unrecognized",
+  "repair_verified": false,
+  "raw_process_environment_included": false,
+  "authority_granted": false,
+  "et6_passed": false,
+  "nav1_qualified": false
+}

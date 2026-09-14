@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { z } from "zod";
 import { PairingLedgerRepository } from "./pairing-ledger-repository";
-import { acceptPairingLedgerRow, revokePairingLedgerRow, projectPairingLedgerRow,
+import { acceptPairingLedgerRow, acceptPairingReplacement, revokePairingLedgerRow, projectPairingLedgerRow,
   type PairingDestination } from "./pairing-ledger-contract";
 
 const acceptanceSchema = z.object({
@@ -45,19 +45,36 @@ export class PairingTransitionService<Credential> {
       if (!current || !crypto.timingSafeEqual(suppliedDigest, Buffer.from(current.acceptanceSecretDigest, "hex"))) {
         throw new Error("pairing_acceptance_invalid");
       }
-      const next = acceptPairingLedgerRow(current, actor, this.now());
-      if (next.revision === current.revision) {
-        await this.repository.confirmDurability();
-        // Re-read after the barrier so a revocation committed during recovery
-        // cannot be projected as accepted by this reconciliation path.
-        const recovered = await this.repository.read(actor.profileId, request.id);
-        if (!recovered) throw new Error("pairing_acceptance_invalid");
-        acceptPairingLedgerRow(recovered, actor, this.now());
-        return projectPairingLedgerRow(recovered, actor.profileId, this.now());
+      if (current.approval.replacement && !current.acceptedAt) {
+        const predecessor = await this.repository.read(actor.profileId, current.approval.replacement.pairingId);
+        if (!predecessor) throw new Error("pairing_replacement_conflict");
+        // These reads may straddle another acceptance of this same invitation.
+        // Re-enter normal authenticated replay rather than treating its own
+        // committed supersession as a competing replacement. Never infer
+        // acceptance from the predecessor record alone.
+        if (predecessor.supersession?.pairingId === current.id) {
+          const refreshed = await this.repository.read(actor.profileId, current.id);
+          if (refreshed?.acceptedAt && refreshed.revision > current.revision) continue;
+        }
+        const next = acceptPairingReplacement(current, predecessor, actor, this.now());
+        if (!await this.repository.compareAndSwapPair(
+          { row: next.predecessor, expectedRevision: predecessor.revision },
+          { row: next.replacement, expectedRevision: current.revision },
+        )) continue;
+      } else {
+        const next = acceptPairingLedgerRow(current, actor, this.now());
+        if (next.revision === current.revision) {
+          await this.repository.confirmDurability();
+        } else if (!await this.repository.compareAndSwap(next, current.revision)) {
+          continue;
+        }
       }
-      if (await this.repository.compareAndSwap(next, current.revision)) {
-        return projectPairingLedgerRow(next, actor.profileId, this.now());
-      }
+      // Both first acceptance and replay cross an asynchronous durability
+      // barrier. A revocation committed there must win over the earlier row.
+      const recovered = await this.repository.read(actor.profileId, request.id);
+      if (!recovered) throw new Error("pairing_acceptance_invalid");
+      acceptPairingLedgerRow(recovered, actor, this.now());
+      return projectPairingLedgerRow(recovered, actor.profileId, this.now());
     }
     // Bounded database contention, not a provider/model retry loop.
     throw new Error("pairing_transition_conflict");
@@ -79,5 +96,16 @@ export class PairingTransitionService<Credential> {
       }
     }
     throw new Error("pairing_transition_conflict");
+  }
+
+  async cancelRequest(credential: Credential, rawRequestId: unknown) {
+    const requestId = z.string().min(3).max(120).parse(rawRequestId);
+    const owner = await this.authorize.humanOwner(credential);
+    const requestDigest = crypto.createHash("sha256").update(JSON.stringify([owner, requestId])).digest("hex");
+    const prior = await this.repository.reserveRequestCancellation(owner, requestDigest, this.now());
+    // Issuance won the unique slot: revoke that exact row through existing CAS
+    // and durability checks, including acceptance races. No predecessor revival.
+    const pairing = prior ? await this.revoke(credential, prior.id) : null;
+    return { cancelled: true as const, pairing };
   }
 }

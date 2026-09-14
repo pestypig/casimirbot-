@@ -23,7 +23,7 @@ export const minecraftLocalLifecycleManifest:
     capability_id: HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
     label: "Start or join local Minecraft Fabric",
     description:
-      "Launches or reuses the prepared Minecraft Fabric 1.21.8 client and joins a listening loopback server through the fixed Helix lifecycle adapter. It cannot select an arbitrary executable, remote server, shell command, file, credential, or profile.",
+      "Starts or reuses the authenticated owner's saved Fabric server and prepared Minecraft client, then stages a loopback join. Requires separate workstation confirmation and existing EULA acceptance. It cannot select an arbitrary executable, remote server, shell command, file, credential, or profile; it grants no gameplay permission.",
     panel_id: "situation-room-pipelines",
     action_id: "launch_and_join_local_minecraft_fabric",
     mode: "act",
@@ -81,7 +81,7 @@ export const buildMinecraftLocalLifecycleApprovalPlanV1 = async (input: {
     input.args,
   );
   const sealedInputSha256 = await computeCasimirSpecValueSha256V1({
-    domain: "helix-minecraft-local-lifecycle/v1",
+    domain: "helix-minecraft-local-lifecycle/v2-saved-server",
     capabilityId: HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_CAPABILITY,
     arguments: canonicalArguments,
   });
@@ -139,7 +139,7 @@ const failure = (input: {
 }): MinecraftLocalLifecycleGatewayExecution => ({
   ok: false,
   status: input.status ?? "blocked",
-  summary: `Minecraft local lifecycle did not run: ${input.code}.`,
+  summary: `Minecraft local lifecycle did not complete: ${input.code}.`,
   observation: {
     schema: HELIX_MINECRAFT_FABRIC_LOOPBACK_LIFECYCLE_OBSERVATION_SCHEMA,
     ok: false,
@@ -208,6 +208,8 @@ export const executeMinecraftLocalLifecycleGatewayCapability = async (input: {
   try {
     const receipt = await executeMinecraftFabricLoopbackLifecycle({
       request: plan.canonicalArguments,
+      ownerProfileId: context.profile_id,
+      allowServerStartup: true,
       runner: input.runner,
       signal: input.signal,
     });
@@ -232,6 +234,10 @@ export const executeMinecraftLocalLifecycleGatewayCapability = async (input: {
     const code = error instanceof MinecraftLocalLifecycleError
       ? error.code
       : "minecraft_local_lifecycle_unavailable";
-    return failure({ code, status: "failed" });
+    const result = failure({ code, status: "failed" });
+    if (error instanceof MinecraftLocalLifecycleError && error.serverObservation) {
+      result.observation.server_lifecycle = error.serverObservation;
+    }
+    return result;
   }
 };

@@ -9,6 +9,8 @@ const requestSchema = z.object({ requestId: z.string().min(3).max(120),
   environment: z.object({ roomId: z.string().min(3).max(320), runId: z.string().min(3).max(320) }).strict().nullable(),
   invitationSeconds: z.union([z.literal(300), z.literal(900), z.literal(3600)]),
   pairingSeconds: z.union([z.literal(3600), z.literal(28800), z.literal(86400)]),
+  invitationDelivery: z.literal("automatic").optional(),
+  replacement: z.object({ pairingId: z.string().min(3).max(320), revision: z.number().int().positive() }).strict().optional(),
 }).strict();
 export type PairingInvitationRequest = z.infer<typeof requestSchema>;
 const digest = (value: string) => crypto.createHash("sha256").update(value).digest("hex");
@@ -38,7 +40,9 @@ export class PairingInvitationService<Credential> {
     const approval = pairingApprovalSchema.parse(authorized.approval);
     // The trusted resolver must return precisely the human-reviewed scope.
     if (approval.chatId !== request.chatId || JSON.stringify(approval.environment) !== JSON.stringify(request.environment) ||
-      approval.invitationSeconds !== request.invitationSeconds || approval.pairingSeconds !== request.pairingSeconds) {
+      approval.invitationSeconds !== request.invitationSeconds || approval.pairingSeconds !== request.pairingSeconds ||
+      approval.invitationDelivery !== request.invitationDelivery ||
+      JSON.stringify(approval.replacement) !== JSON.stringify(request.replacement)) {
       throw new PairingInvitationError("pairing_approval_scope_mismatch");
     }
     const owner = approval.destination.profileId;
@@ -51,6 +55,22 @@ export class PairingInvitationService<Credential> {
       sameApproval(prior);
       await this.repository.confirmDurability();
     } else {
+      // Validate a newly reviewed predecessor without consuming it. Acceptance
+      // rechecks this exact revision and commits supersession atomically. Prior
+      // request reconciliation must still work after that commit.
+      if (approval.replacement) {
+        const predecessor = await this.repository.read(owner, approval.replacement.pairingId);
+        if (!predecessor || predecessor.revision !== approval.replacement.revision) {
+          throw new PairingInvitationError("pairing_replacement_conflict");
+        }
+        if (predecessor.approval.destination.installationId !== approval.destination.installationId ||
+            predecessor.approval.chatId !== approval.chatId) {
+          throw new PairingInvitationError("pairing_replacement_scope_mismatch");
+        }
+        if (pairingState(predecessor, this.now()) !== "accepted") {
+          throw new PairingInvitationError("pairing_predecessor_unavailable");
+        }
+      }
       const secret = crypto.randomBytes(32).toString("base64url");
       await this.repository.insert(createPairingLedgerRow({ id: `pairing:${crypto.randomUUID()}`,
         approval, requestDigest, acceptanceSecret: secret, acceptanceSecretDigest: digest(secret),
@@ -59,7 +79,12 @@ export class PairingInvitationService<Credential> {
     // A concurrent issuer can win or a grant can be revoked during the barrier.
     // Reconcile the actual row; never return an uncommitted generated secret.
     const stored = await this.repository.readByRequest(owner, requestDigest);
-    if (!stored) throw new PairingInvitationError("pairing_invitation_commit_unknown", 503);
+    if (!stored) {
+      if ((await this.repository.inspectRequest(owner, requestDigest))?.schema === "helix.pairing_request_cancellation.v1") {
+        throw new PairingInvitationError("pairing_request_cancelled");
+      }
+      throw new PairingInvitationError("pairing_invitation_commit_unknown", 503);
+    }
     sameApproval(stored);
     return this.response(stored);
   }

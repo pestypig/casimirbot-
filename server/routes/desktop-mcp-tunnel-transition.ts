@@ -8,9 +8,10 @@ import { getAccountSessionById } from
   "../services/helix-account/account-session-store";
 import { readHelixSessionCookie } from
   "../services/helix-account/session-cookie";
-import type {
-  InstalledDeviceFullHarnessTrust,
-  InstalledSecurityStore,
+import {
+  InstalledSecurityStoreError,
+  type InstalledDeviceFullHarnessTrust,
+  type InstalledSecurityStore,
 } from "../services/helix-account/installed-security-store";
 
 const flags = {
@@ -74,7 +75,7 @@ const account = async (req: Request) => {
 };
 
 const respondError = (res: Response, error: unknown): void => {
-  if (error instanceof DesktopMcpTunnelTransitionError) {
+  if (error instanceof DesktopMcpTunnelTransitionError || error instanceof InstalledSecurityStoreError) {
     res.status(error.status).json({ ok: false, error: error.code, ...flags });
     return;
   }
@@ -98,7 +99,10 @@ const decisionSchema = z.object({
   lease_seconds: z.number().int().min(30).max(300).optional(),
 }).strict();
 
-const trustDecisionSchema = z.object({ trusted: z.boolean() }).strict();
+const trustDecisionSchema = z.object({
+  trusted: z.boolean(),
+  expected_policy_revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+}).strict();
 const trustedRenewalSchema = z.object({
   previous_transition_request_ref: z.string().trim().min(1).max(180),
 }).strict();
@@ -175,6 +179,7 @@ export const createDesktopMcpTunnelTransitionRouter = (input: {
       },
       deviceId,
       trusted: body.trusted,
+      expectedPolicyRevision: body.expected_policy_revision,
     });
     const delegatedRequestRefs: string[] = [];
     if (trust.trusted && trust.delegated_account_session_id) {

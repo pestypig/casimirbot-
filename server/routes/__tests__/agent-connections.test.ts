@@ -1,7 +1,12 @@
+import { migration091 } from "../../db/migrations/091_pairing_delivery";
+import { PairingDeliveryRepository } from "../../services/local-supervisor/pairing-delivery-repository";
+import { PairingDeliveryService } from "../../services/local-supervisor/pairing-delivery-service";
 import express from "express";
 import crypto from "node:crypto";
 import { migration087 } from "../../db/migrations/087_pairing_ledger";
 import { PairingLedgerRepository } from "../../services/local-supervisor/pairing-ledger-repository";
+import { PairingTransitionService } from "../../services/local-supervisor/pairing-transition-service";
+import { commitEmbeddedPairingReplacement } from "../../services/local-supervisor/embedded-pairing-replacement-commit";
 import { newDb } from "pg-mem";
 import { migration088 } from "../../db/migrations/088_pairing_destinations";
 import { migration089 } from "../../db/migrations/089_pairing_destination_identity";
@@ -21,6 +26,53 @@ import { EnvironmentSessionPreparationIntentStore } from "../../services/environ
 const SESSION_ID = "session-owned";
 const PROFILE_ID = "profile-owned";
 const SERVICE_REF = "service-current";
+
+it.each([
+  ["get", "reasoning-destinations"],
+  ["get", "reasoning-invitations/fixture-request"],
+  ["get", "reasoning-pairings/fixture-pairing"],
+  ["get", "reasoning-deliveries"],
+  ["post", "reasoning-invitations"],
+  ["post", "reasoning-invitations/fixture-request/cancel"],
+  ["post", "reasoning-pairings/fixture-pairing/revoke"],
+  ["post", "reasoning-deliveries/fixture-pairing"],
+] as const)("default browser identity rejects asserted fixture authority: %s %s", async (method, path) => {
+  // No resolver/authenticator override, live service, database, cookie or key.
+  // The default resolver rejects missing session identity before store access.
+  const listPresence = vi.fn(() => []);
+  const listBindings = vi.fn();
+  const listOwned = vi.fn();
+  const resolveOwned = vi.fn();
+  const trust = vi.fn();
+  const app = express();
+  app.use("/api/account", createAgentConnectionsRouter({
+    coordinationStore: { serviceInstanceRef: SERVICE_REF, listPresence },
+    bindingStore: { listBindings },
+    destinationRegistrationStore: { listOwned, resolveOwned },
+    readPairingDeviceTrust: trust,
+  }));
+  for (const origin of ["typed", "gpt_live", "mcp"]) {
+    const call = request(app)[method](`/api/account/session/agent-connections/${path}`)
+      .set("Authorization", "Bearer fixture-model-credential")
+      .set("X-Fixture-Profile", "fixture-owner")
+      .set("X-Helix-Profile-Id", "fixture-owner")
+      .set("X-Human-Approved", "true");
+    const response = await (method === "post" ? call.send({
+      profile_id: "fixture-owner", human_approved: true, origin,
+      requestId: "fixture-request", registrationId: "fixture-registration",
+      chatId: "fixture-chat", environment: null, invitationSeconds: 900, pairingSeconds: 28800,
+    }) : call);
+    expect(response.status).toBe(401);
+    expect(response.body).toMatchObject({ ok: false, error: "session_required",
+      credential_included: false, answer_authority: false, terminal_eligible: false });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(JSON.stringify(response.body)).not.toContain("fixture-model-credential");
+  }
+  for (const dependency of [listPresence, listBindings, listOwned, resolveOwned, trust]) {
+    expect(dependency).not.toHaveBeenCalled();
+  }
+});
+
 const binding: HelixAgentAccountBindingProjection = {
   binding_ref: "binding-owned",
   issuer: "https://auth.example",
@@ -71,6 +123,7 @@ const presence = (overrides: Partial<HelixLocalSupervisorPresence> = {}): HelixL
 
 const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presence?: HelixLocalSupervisorPresence[];
   destinationRegistrationStore?: Parameters<typeof createAgentConnectionsRouter>[0]["destinationRegistrationStore"];
+  pairingDeliveryService?: Parameters<typeof createAgentConnectionsRouter>[0]["pairingDeliveryService"];
   pairingLedgerRepository?: Parameters<typeof createAgentConnectionsRouter>[0]["pairingLedgerRepository"];
   readPairingDeviceTrust?: Parameters<typeof createAgentConnectionsRouter>[0]["readPairingDeviceTrust"];
   validatePairingEnvironment?: Parameters<typeof createAgentConnectionsRouter>[0]["validatePairingEnvironment"];
@@ -97,6 +150,7 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
   app.use("/api/account", createAgentConnectionsRouter({
     destinationRegistrationStore: input?.destinationRegistrationStore,
     pairingLedgerRepository: input?.pairingLedgerRepository,
+    pairingDeliveryService: input?.pairingDeliveryService,
     readPairingDeviceTrust: input?.readPairingDeviceTrust,
     validatePairingEnvironment: input?.validatePairingEnvironment,
     bindingStore: { listBindings } as never,
@@ -119,6 +173,142 @@ const getReadiness = (app: express.Express, profile = "codex_app") =>
     .set("Cookie", `helix_session=${SESSION_ID}`);
 
 describe("owner-scoped AI app connection readiness", () => {
+  it("requires exact human-reviewed replacement scope and preserves the old grant until atomic acceptance", async () => {
+    const db = newDb(); const pool = new (db.adapters.createPg().Pool)();
+    await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
+    await pool.query("INSERT INTO helix_accounts VALUES ($1)", [PROFILE_ID]);
+    const client = await pool.connect();
+    try { for (const migration of [migration087, migration088, migration089, migration091]) await migration.run(client, { enablePgvector: false }); }
+    finally { client.release(); }
+    vi.stubEnv("HELIX_DESKTOP_DEVICE_ID", "fixture-device");
+    try {
+      const vault = ephemeralPairingVault();
+      const store = new PairingDestinationRegistrationStore(pool, async () => {}, () => new Date(), vault);
+      const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
+      const originalActor = { issuer: opaque("issuer", binding.issuer), profileId: PROFILE_ID,
+        installationId: opaque("installation", "fixture-device"), clientId: "fixture-client", taskId: "fixture-old-task" };
+      const nextActor = { ...originalActor, taskId: "fixture-next-task" };
+      const originalRegistration = await store.registerAuthenticated(originalActor, { requestId: "fixture-original-registration", durationSeconds: 900 });
+      const nextRegistration = await store.registerAuthenticated(nextActor, { requestId: "fixture-next-registration", durationSeconds: 900 });
+      const repository = new PairingLedgerRepository(pool, vault, async () => {},
+        async writes => commitEmbeddedPairingReplacement(db, writes));
+      const h = setup({ presence: [], destinationRegistrationStore: store, pairingLedgerRepository: repository,
+        readPairingDeviceTrust: async () => ({ trusted: true }) as never });
+      h.resolveSession.mockImplementation(async (...args: unknown[]) => args[0] === SESSION_ID
+        ? { session_id: SESSION_ID, profile: { profile_id: PROFILE_ID } } : null as never);
+      const issue = (value: unknown) => request(h.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", `helix_session=${SESSION_ID}`).send(value);
+      const body = { requestId: "fixture-original-review", registrationId: originalRegistration.registrationId,
+        chatId: "fixture-replacement-chat", environment: null, invitationSeconds: 900, pairingSeconds: 28800 };
+      const first = await issue(body); expect(first.status).toBe(200);
+      const transitions = new PairingTransitionService(repository, {
+        destination: async (credential: string) => {
+          if (credential === "fixture-old-provider") return originalActor;
+          if (credential === "fixture-next-provider") return nextActor;
+          throw new Error("fixture-provider-required");
+        }, humanOwner: async () => { throw new Error("fixture-human-route-only"); },
+      });
+      const original = await transitions.accept("fixture-old-provider", first.body.invitation);
+      const frozen = await repository.read(PROFILE_ID, original.id);
+      const unapprovedAutomatic = await issue({ ...body, requestId: "fixture-unapproved-automatic", invitationDelivery: "automatic" });
+      expect(unapprovedAutomatic.status).toBe(503);
+      expect(unapprovedAutomatic.body.error).toBe("pairing_delivery_provider_unavailable");
+      expect((await pool.query("SELECT * FROM helix_pairing_ledger")).rows).toHaveLength(1);
+      expect(await repository.read(PROFILE_ID, original.id)).toEqual(frozen);
+      const replacement = { ...body, requestId: "fixture-replacement-review", registrationId: nextRegistration.registrationId,
+        replacement: { pairingId: original.id, revision: original.revision } };
+      expect((await issue({ ...replacement, replacement: { ...replacement.replacement, revision: 1 } })).body.error)
+        .toBe("pairing_replacement_conflict");
+      expect((await issue({ ...replacement, chatId: "fixture-other-chat" })).body.error)
+        .toBe("pairing_replacement_scope_mismatch");
+      const modelOnly = await request(h.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Authorization", "Bearer fixture-provider").send(replacement);
+      expect(modelOnly.status).toBe(401);
+      expect(await repository.read(PROFILE_ID, original.id)).toEqual(frozen);
+      const issued = await issue(replacement); expect(issued.status).toBe(200);
+      expect(issued.body.pairing).toMatchObject({ state: "pending", replacement: replacement.replacement });
+      expect(await repository.read(PROFILE_ID, original.id)).toEqual(frozen);
+      expect((await issue({ ...replacement, replacement: { ...replacement.replacement, revision: 3 } })).body.error)
+        .toBe("pairing_invitation_request_conflict");
+      await transitions.accept("fixture-next-provider", issued.body.invitation);
+      const replay = await issue(replacement);
+      expect(replay.status).toBe(200);
+      expect(replay.body).toMatchObject({ pairing: { state: "accepted", revision: 2 }, invitation: null });
+      const oldStatus = await request(h.app).get(`/api/account/session/agent-connections/reasoning-pairings/${encodeURIComponent(original.id)}`)
+        .set("Cookie", `helix_session=${SESSION_ID}`);
+      expect(oldStatus.body.pairing).toMatchObject({ state: "superseded", supersession: { pairingId: issued.body.pairing.id } });
+      await expect(transitions.recover("fixture-old-provider", original.id)).rejects.toThrow("pairing_superseded");
+      expect((await pool.query("SELECT * FROM helix_pairing_ledger")).rows).toHaveLength(2);
+      let trusted = true;
+      let membershipActive = true, runEligible = true;
+      let onProviderConnect = async () => {};
+      const messages = new Map<string, string>();
+      const deliveryService = new PairingDeliveryService(repository, new PairingDeliveryRepository(pool, vault, async () => {}),
+        async (session: { session_id: string; profile: { profile_id: string } }) => {
+          if (session.session_id !== SESSION_ID) throw new Error("fixture-session-required");
+          return session.profile.profile_id;
+        }, async (_session, destination) => { await onProviderConnect(); return { destination,
+          lookup: async id => messages.has(id) ? { state: "delivered" as const, messageId: messages.get(id)! } : { state: "absent" as const },
+          sendOnce: async ({ deliveryId }) => {
+            if (!messages.has(deliveryId)) messages.set(deliveryId, "fixture-route-message");
+            return { messageId: messages.get(deliveryId)! };
+          },
+        }; });
+      const automaticApp = setup({ presence: [], destinationRegistrationStore: store, pairingLedgerRepository: repository,
+        pairingDeliveryService: deliveryService, readPairingDeviceTrust: async () => ({ trusted }) as never,
+        readPreparationMembership: async () => membershipActive ? { participantId: "fixture-participant", roomStatus: "open" } as never : null,
+        validatePairingEnvironment: async () => runEligible });
+      automaticApp.resolveSession.mockImplementation(async (...args: unknown[]) => args[0] === SESSION_ID
+        ? { session_id: SESSION_ID, profile: { profile_id: PROFILE_ID } } : null as never);
+      const automaticRequest = { ...body, requestId: "fixture-approved-automatic", invitationDelivery: "automatic" };
+      const autoIssued = await request(automaticApp.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", `helix_session=${SESSION_ID}`).send(automaticRequest);
+      expect(autoIssued.status).toBe(200);
+      const discovered = await request(automaticApp.app).get("/api/account/session/agent-connections/reasoning-deliveries")
+        .set("Cookie", `helix_session=${SESSION_ID}`);
+      expect(discovered.body.pairingIds).toEqual([autoIssued.body.pairing.id]);
+      const path = `/api/account/session/agent-connections/reasoning-deliveries/${encodeURIComponent(autoIssued.body.pairing.id)}`;
+      expect((await request(automaticApp.app).post(path).set("Authorization", "Bearer fixture-provider").send({})).status).toBe(401);
+      const delivered = await request(automaticApp.app).post(path).set("Cookie", `helix_session=${SESSION_ID}`).send({});
+      expect(delivered.status).toBe(200);
+      expect(delivered.body.delivery).toMatchObject({ state: "delivered", providerMessageId: "fixture-route-message" });
+      const retry = await request(automaticApp.app).post(path).set("Cookie", `helix_session=${SESSION_ID}`).send({});
+      expect(retry.body).toEqual(delivered.body);
+      expect(messages.size).toBe(1);
+      expect(JSON.stringify(delivered.body)).not.toContain(autoIssued.body.invitation.secret);
+      expect((await repository.read(PROFILE_ID, autoIssued.body.pairing.id))?.acceptedAt).toBeNull();
+      onProviderConnect = async () => { trusted = false; };
+      const revokedDuringVerification = await request(automaticApp.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", `helix_session=${SESSION_ID}`).send({ ...automaticRequest, requestId: "fixture-trust-revoked-during-provider" });
+      expect(revokedDuringVerification.status).toBe(403);
+      expect(revokedDuringVerification.body.error).toBe("pairing_device_trust_required");
+      trusted = true;
+      const activeLinks = await automaticApp.listBindings();
+      onProviderConnect = async () => { automaticApp.listBindings.mockResolvedValue({ ...activeLinks, oauth_ready: false, bindings: [] }); };
+      const linkRevoked = await request(automaticApp.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", `helix_session=${SESSION_ID}`).send({ ...automaticRequest, requestId: "fixture-link-revoked-during-provider" });
+      expect(linkRevoked.status).toBe(403);
+      expect(linkRevoked.body.error).toBe("pairing_account_link_required");
+      automaticApp.listBindings.mockResolvedValue(activeLinks);
+      for (const change of ["membership", "run"] as const) {
+        membershipActive = true; runEligible = true;
+        onProviderConnect = async () => { if (change === "membership") membershipActive = false; else runEligible = false; };
+        const environmentLost = await request(automaticApp.app).post("/api/account/session/agent-connections/reasoning-invitations")
+          .set("Cookie", `helix_session=${SESSION_ID}`).send({ ...automaticRequest, requestId: `fixture-${change}-lost-during-provider`,
+            environment: { roomId: "fixture-room", runId: "fixture-run" } });
+        expect(environmentLost.status).toBe(409);
+        expect(environmentLost.body.error).toBe("pairing_environment_unavailable");
+        expect((await pool.query("SELECT * FROM helix_pairing_ledger")).rows).toHaveLength(3);
+      }
+      onProviderConnect = async () => { await store.revokeOwned(PROFILE_ID, originalRegistration.registrationId); };
+      const registrationRevoked = await request(automaticApp.app).post("/api/account/session/agent-connections/reasoning-invitations")
+        .set("Cookie", `helix_session=${SESSION_ID}`).send({ ...automaticRequest, requestId: "fixture-registration-revoked-during-provider" });
+      expect(registrationRevoked.status).toBe(409);
+      expect(registrationRevoked.body.error).toBe("pairing_registration_revoked");
+      expect((await pool.query("SELECT * FROM helix_pairing_ledger")).rows).toHaveLength(3);
+
+    } finally { vi.unstubAllEnvs(); await pool.end(); }
+  });
   it("issues one encrypted invitation through the browser handler while idle and rejects changed authority", async () => {
     const pool = new (newDb().adapters.createPg().Pool)();
     await pool.query("CREATE TABLE helix_accounts(profile_id text PRIMARY KEY)");
@@ -209,6 +399,21 @@ describe("owner-scoped AI app connection readiness", () => {
       const rows = (await pool.query("SELECT * FROM helix_pairing_ledger")).rows;
       expect(rows).toHaveLength(1);
       expect(JSON.stringify(rows)).not.toContain(results[0].body.invitation.secret);
+      // O5 storage recovery: backend corruption must not blame caller input or
+      // disclose decrypted values. Reading cannot replace the existing grant.
+      const open = vi.spyOn(vault, "open");
+      open.mockRejectedValueOnce(new Error("fixture-private-key-diagnostic"));
+      const unavailable = await read();
+      expect(unavailable.status).toBe(503);
+      expect(unavailable.body.error).toBe("pairing_storage_unreadable");
+      expect(JSON.stringify(unavailable.body)).not.toContain("fixture-private-key-diagnostic");
+      open.mockResolvedValueOnce({ invalid: "fixture-private-payload" });
+      const invalid = await read();
+      expect(invalid.status).toBe(503);
+      expect(invalid.body.error).toBe("pairing_storage_invalid");
+      expect(JSON.stringify(invalid.body)).not.toContain("fixture-private-payload");
+      expect((await pool.query("SELECT * FROM helix_pairing_ledger")).rows).toEqual(rows);
+      open.mockRestore();
     } finally { vi.unstubAllEnvs(); await pool.end(); }
   });
   it("lists encrypted registered destinations while idle using only browser session ownership", async () => {

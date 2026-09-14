@@ -1,0 +1,20 @@
+{
+  "observedAt": "2026-09-14T09:13:30.7209781Z",
+  "built": {
+    "Path": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\minecraft\\helix-fabric-player-agent\\build\\libs\\HelixFabricPlayerAgent-0.4.12.jar",
+    "Hash": "9E9B6A83CEE0F995FC9F0A44B4B35196D32F5D54BFFCF4E12DE47B38C7EA3B29"
+  },
+  "installed": {
+    "Path": "C:\\Users\\dan\\AppData\\Roaming\\.minecraft-helix-c0\\mods\\HelixFabricPlayerAgent-0.4.12.jar",
+    "Hash": "BD5B8EB7E0A89A34415D14A97B58722590AB1264BD5D33989B7DCB88F77C550E"
+  },
+  "entryCount": 142,
+  "differentEntries": [
+    "META-INF/jars/HelixMinecraftConnectorCore-0.2.0.jar",
+    "com/casimirbot/helixplayer/fabric/ResidentEffectMeasurements.class",
+    "com/casimirbot/helixplayer/fabric/PlayerActionController$1.class",
+    "com/casimirbot/helixplayer/fabric/PlayerActionController.class"
+  ],
+  "installedExtraEntries": [],
+  "scope": "On-disk artifact comparison, not loaded-class or execution proof"
+}

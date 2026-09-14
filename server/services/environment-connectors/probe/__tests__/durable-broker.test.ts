@@ -28,6 +28,11 @@ import {
 } from "@shared/helix-room-source-ingress";
 import { ensureDatabase, getPool, resetDbClient } from "../../../../db/client";
 import { installedDeviceRef } from "../../../helix-account/installed-security-store";
+import { prepareBrowserEnvironmentSession } from "../../session/prepare-browser-session";
+import { recoverEnvironmentSessionGoal } from "../../session/recover-session-goal";
+import { EnvironmentDurableGoalStore } from "../../goals/durable-goal-store";
+import { readExactEnvironmentPerceptionEvidence } from "../../temporal-plans/temporal-perception-context";
+import { withSharedRealtimeRoomTransaction } from "../../../helix-ask/realtime-room/room-store/database";
 import { materializeLegacyRoomSourceConnector } from "../../bindings";
 import {
   listEnvironmentConnectorCapabilityDescriptors,
@@ -428,6 +433,162 @@ const dispatch = async (
   });
 
 describe("durable environment probe broker", () => {
+  it.each(["healthy", "idle epoch"])("keeps repeated Ready up checks fresh without replacing the goal or weakening probe replay (%s)", async scenario => {
+    // Real preparation + broker storage/lease/normalization/evidence reads.
+    // Authentication projections and the physical sensor are isolated fixtures.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+    try {
+      const connector = await seed();
+      const subjectBindingId = "environment_subject_binding:ready-up-retry";
+      const nativeId = "00000000-0000-4000-8000-000000000001";
+      const capability = HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY;
+      await getPool().query(`INSERT INTO helix_room_environment_subject_bindings (
+        subject_binding_id, room_id, participant_id, profile_id, environment_binding_id,
+        room_source_binding_id, source_id, world_id, subject_kind, subject_ref,
+        subject_native_id, subject_label, verification_method, confidence,
+        producer_epoch_ref, verified_at, last_confirmed_at, created_at, updated_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'minecraft.player','environment_subject:ready-up-retry',
+        $9,'ReadinessFixturePlayer','self_claim',0.8,$10,$11,$11,$11,$11)`,
+      [subjectBindingId, ROOM_ID, PARTICIPANT_ID, PROFILE_ID, connector.environmentBindingId,
+        BINDING_ID, SOURCE_ID, WORLD_ID, nativeId, producerEpochRef, NOW.toISOString()]);
+      const input = { sessionId: "session:ready", profileRef: PROFILE_ID, bindingId: "binding:ready",
+        bindingEpoch: 1, helixConversationId: "chat:ready", missionId: null, runId: RUN_ID, requestId: "same-request" };
+      const target = { ...input, authenticatedMcpClientRef: "client:ready", clientSessionRef: "client-session:ready",
+        clientContinuationRef: "task:ready" };
+      const store = { resolveOwnedPreparationTarget: vi.fn(() => target), verifyTaskAssociation: vi.fn() };
+      const presence = [{ authenticated_profile_ref: PROFILE_ID, client_session_ref: target.clientSessionRef,
+        authenticated_mcp_client_ref: target.authenticatedMcpClientRef, conversation_thread_ref: target.clientContinuationRef }];
+      const identity = { environment_binding_id: connector.environmentBindingId, source_id: SOURCE_ID, world_id: WORLD_ID,
+        subject_binding_id: subjectBindingId, subject_native_id: nativeId, action_authority_id: "authority:unchanged" };
+      const exact = { environmentBindingId: connector.environmentBindingId, sourceId: SOURCE_ID, worldId: WORLD_ID,
+        subjectBindingId, subjectNativeId: nativeId, observationProducerEpochRef: producerEpochRef };
+      let goal: any = { goal_id: "goal:unchanged", revision: 5, identity };
+      const connectorRow = (await getPool().query(`SELECT installation_id, device_id
+        FROM helix_environment_connector_bindings WHERE environment_binding_id=$1`, [connector.environmentBindingId])).rows[0];
+      let actionEpoch = "action-epoch:old";
+      const currentIdentity = (turnId: string) => ({ ...identity,
+        owner_profile_id: PROFILE_ID, host_ref: `environment_device:${connectorRow.device_id}`,
+        connector_installation_id: connectorRow.installation_id, device_id: connectorRow.device_id,
+        room_source_binding_id: BINDING_ID, room_id: ROOM_ID, goal_owner_participant_id: PARTICIPANT_ID,
+        participant_id: PARTICIPANT_ID, authority_participant_id: PARTICIPANT_ID,
+        producer_epoch_ref: actionEpoch, authority_policy_version: 1,
+        authority_expires_at: new Date(NOW.getTime() + 60_000).toISOString(), run_id: RUN_ID, turn_id: turnId });
+      // Real ledger and evidence resolver; only current authority is a fixture.
+      const goals = new EnvironmentDurableGoalStore(withSharedRealtimeRoomTransaction,
+        async (_db, request) => currentIdentity(request.turnId));
+      if (scenario === "idle epoch") {
+        goal = await goals.create({ ownerProfileId: PROFILE_ID, participantId: PARTICIPANT_ID,
+          roomId: ROOM_ID, environmentBindingId: connector.environmentBindingId, subjectNativeId: nativeId,
+          actionAuthorityId: identity.action_authority_id, runId: RUN_ID, turnId: "turn:create",
+          objective: { domain: "minecraft", game_version: "1.21.8", goal_kind: "custom_survival",
+            mechanics_collection_ref: null, objective_text: "Observe the bounded fixture without moving.",
+            milestones: [{ milestone_id: "observe", description: "Inspect", dependency_milestone_ids: [],
+              required_postcondition_ids: ["observed"] }] } });
+        actionEpoch = "action-epoch:new";
+      }
+      const originalGoalId = goal.goal_id;
+      const reads: Array<{ requestId: string; turnId: string; replayed: boolean }> = [];
+      const readExact = (requestId: string, priorTurnId: string, expectedEnvironmentIdentity = exact) =>
+        readDurableEnvironmentProbeContinuationEvidence({ requestId, expectedPriorTurnId: priorTurnId,
+          expectedRoomId: ROOM_ID, expectedCapabilityId: capability, expectedEnvironmentIdentity,
+          maxAgeMs: 5_000, now: new Date() });
+      const deps = {
+        account: vi.fn().mockResolvedValue({ trusted_account_session: true, profile_id: PROFILE_ID, session_id: input.sessionId }),
+        association: vi.fn().mockResolvedValue({ room_id: ROOM_ID, run_id: RUN_ID,
+          run_expires_at: new Date(NOW.getTime() + 60_000).toISOString() }),
+        membership: vi.fn().mockResolvedValue({ participantId: PARTICIPANT_ID, roomStatus: "active" }),
+        goal: vi.fn(async () => goal), createGoal: vi.fn(), refreshSubject: vi.fn(), inspect: vi.fn(),
+        environments: vi.fn().mockResolvedValue([{ ...identity, room_id: ROOM_ID,
+          self_subject_binding: { subject_binding_id: subjectBindingId, participant_id: PARTICIPANT_ID, status: "active" } }]),
+        observe: vi.fn(async (request) => {
+          await request.assertCurrentTarget();
+          expect(request.expectedEnvironmentIdentity).toEqual({ roomId: ROOM_ID,
+            environmentBindingId: connector.environmentBindingId, sourceId: SOURCE_ID, worldId: WORLD_ID,
+            subjectBindingId, subjectNativeId: nativeId });
+          const dispatchInput = { descriptor: readEnvironmentConnectorCapabilityDescriptor(capability)!,
+            arguments: request.arguments, turnId: request.turnId, toolCallId: request.toolCallId,
+            providerExecutionId: request.providerExecutionId, requestingParticipantId: PARTICIPANT_ID,
+            resolvedSubject: { subjectBindingId, subjectNativeId: nativeId },
+            idempotencyKey: `environment_probe:${RUN_ID}:${request.turnId}:${request.toolCallId}:${capability}`,
+            now: new Date() };
+          const dispatched = await dispatch(connector, "ready-up", dispatchInput);
+          // Retransmission of one read must still be idempotent.
+          expect(await dispatch(connector, "ready-up", dispatchInput)).toMatchObject({ requestId: dispatched.requestId, replayed: true });
+          reads.push({ requestId: dispatched.requestId, turnId: request.turnId, replayed: dispatched.replayed });
+          if (!dispatched.replayed) {
+            const [lease] = await leaseDurableEnvironmentProbesForClaim({ claim, adapterAdmission: admission, limit: 1, now: new Date() });
+            const position = { x: 0, y: 0, z: 0 };
+            const result: HelixEnvironmentProbeResult = {
+              schema: HELIX_ENVIRONMENT_PROBE_RESULT_SCHEMA, probe_result_id: `result:${dispatched.requestId}`,
+              probe_request_id: dispatched.requestId, source_id: SOURCE_ID, room_id: ROOM_ID,
+              domain: "minecraft", probe_type: "perception_snapshot", status: "succeeded",
+              result_summary: "Synthetic bounded readiness perception", result: { details: {
+                snapshot_schema: "helix.minecraft_perception_snapshot.v1", observation_revision: reads.length,
+                game_tick: reads.length, capture_duration_ms: 1, dimension: "minecraft:overworld",
+                actor: { position, velocity: position, yaw: 0, pitch: 0, health: 20, max_health: 20,
+                  food_level: 20, air: 300, on_ground: true, on_fire: false, freezing: false },
+                focus: { kind: "miss", distance_blocks: 0, line_of_sight: true, occlusion: "none" }, entities: [], hazards: [],
+                movement_candidates: ["north", "south", "east", "west"].map(cardinal_direction => ({
+                  cardinal_direction, relative_direction: "forward", target_feet_position: position, support_position: position,
+                  support_block: "minecraft:stone", evidence_complete: false, feet_clear: false, head_clear: false,
+                  drop_depth_blocks: 0, drop_scan_complete: false, nearby_hazard_count: 0, nearby_fluid_count: 0, safe_candidate: false,
+                })), inventory: { item_count: 0, slots: [] },
+                coverage: { horizontal_radius: 2, vertical_radius: 2, loaded_region_complete: true,
+                  unknown_cell_count: 0, entities_complete: true, hazards_complete: true, omitted_categories: [] },
+                ui_state: { server_container_open: false, same_revision: true, client_screen_state: "unobserved",
+                  input_capture_known: false, input_activity: false, freshness: "unobserved" },
+                world_rules: { keep_inventory: false }, semantic_fingerprint: `sha256:${"f".repeat(64)}`,
+              } }, sensor_scope: "sensor_observable", requires_caveat: false, side_effects_performed: false,
+              commands_executed: [], world_mutation_performed: false, evidence_refs: [], deterministic: true,
+              model_invoked: false, assistant_answer: false, raw_content_included: false,
+              context_policy: "compact_context_pack_only", created_at: new Date().toISOString(),
+            };
+            await submitDurableEnvironmentProbeResult({ claim, adapterAdmission: admission,
+              submission: { schema: HELIX_ENVIRONMENT_PROBE_SUBMISSION_SCHEMA, probe_request_id: dispatched.requestId,
+                probe_attempt_id: lease.probe_attempt_id, lease_token: lease.lease_token, result }, now: new Date() });
+          }
+          return { ok: true, observation: await readDurableEnvironmentProbeObservation(dispatched.requestId) };
+        }),
+        prepare: vi.fn(async (preparation) => {
+          const { context } = preparation;
+          if (scenario === "idle epoch") {
+            const recovered = await recoverEnvironmentSessionGoal(preparation, store as never, {
+              goals, database: async () => getPool(), identity: async () => currentIdentity(context.turnId),
+              perception: readExactEnvironmentPerceptionEvidence,
+            });
+            goal = recovered.goal;
+            expect(goal).toMatchObject({ goal_id: originalGoalId, revision: 5, status: "active", attempt_count: 0 });
+            expect(goal.latest_checkpoint.observation_revision).toBe(NOW.getTime());
+            expect(goal.milestones[0].completed_postcondition_ids).toEqual([]);
+          }
+          const evidence = await readExact(context.probeRequestId, context.priorTurnId);
+          return { readiness: { ready: evidence !== null, valid_until_ms: evidence ? Date.now() + 5000 : null }, repairs: [], execution_authority: false };
+        }),
+      };
+      for (let invocation = 0; invocation < 3; invocation++) {
+        vi.setSystemTime(new Date(NOW.getTime() + invocation * 10_000));
+        const result = await prepareBrowserEnvironmentSession(input, store as never, presence as never, deps as never);
+        expect(result.readiness.ready, `Ready up invocation ${invocation + 1}`).toBe(true);
+        expect(result.repairs).toEqual([]);
+        expect(deps.prepare.mock.calls.at(-1)![0].context).toMatchObject({ goalId: goal.goal_id,
+          expectedRevision: scenario === "idle epoch" && invocation === 0 ? 1 : 5 });
+        await expect(readExact(reads.at(-1)!.requestId, reads.at(-1)!.turnId,
+          { ...exact, subjectNativeId: "player:foreign" })).resolves.toBeNull();
+        await expect(readExact(reads.at(-1)!.requestId, "turn:foreign")).resolves.toBeNull();
+      }
+      expect(new Set(reads.map(read => read.requestId)).size).toBe(3);
+      expect(new Set(reads.map(read => read.turnId)).size).toBe(1);
+      expect(reads.every(read => !read.replayed)).toBe(true);
+      await expect(readExact(reads[0].requestId, reads[0].turnId)).resolves.toBeNull();
+      expect(deps.createGoal).not.toHaveBeenCalled();
+      expect(deps.refreshSubject).not.toHaveBeenCalled();
+      if (scenario === "healthy") expect(goal).toEqual({ goal_id: "goal:unchanged", revision: 5, identity });
+      else expect((await getPool().query(`SELECT sequence FROM helix_environment_durable_goal_events
+        WHERE goal_id=$1 ORDER BY sequence`, [originalGoalId])).rows.map(row => row.sequence)).toEqual([1, 2, 3, 4, 5]);
+    } finally { vi.useRealTimers(); }
+  });
+
   it.each(["captured", "connector", "wrong_player", "missing_player", "wrong_tick", "old_sensor", "expired", "replay", "wrong_source"])(
     "carries opt-in navigation through the broker: %s", async scenario => {
       const connector = await seed();
@@ -962,6 +1123,26 @@ describe("durable environment probe broker", () => {
       SET resolved_subject_binding_id=$2, resolved_subject_native_id=$3
       WHERE probe_request_id=$1`, [dispatched.requestId, exactIdentity.subjectBindingId, exactIdentity.subjectNativeId]);
     await expect(readExact()).resolves.toMatchObject({ probe_request_ref: dispatched.requestId });
+    const expiryDiagnostic = vi.fn();
+    const readAtAge = (age: number, expectedEnvironmentIdentity = exactIdentity) =>
+      readDurableEnvironmentProbeContinuationEvidence({
+        requestId: dispatched.requestId,
+        expectedPriorTurnId: "ask:durable-probe:continuation-evidence",
+        expectedRoomId: ROOM_ID, expectedCapabilityId: HELIX_MINECRAFT_INVENTORY_CHECK_CAPABILITY,
+        expectedEnvironmentIdentity, maxAgeMs: 5000,
+        now: new Date(NOW.getTime() + 500 + age), onExpired: expiryDiagnostic,
+      });
+    await expect(readAtAge(5000)).resolves.not.toBeNull();
+    expect(expiryDiagnostic).not.toHaveBeenCalled();
+    await expect(readAtAge(5001)).resolves.toBeNull();
+    expect(expiryDiagnostic).toHaveBeenCalledTimes(1);
+    expect(expiryDiagnostic).toHaveBeenCalledWith({ evidence_age_ms: 5001, max_age_ms: 5000 });
+    expiryDiagnostic.mockClear();
+    await expect(readAtAge(6000, { ...exactIdentity, subjectNativeId: "wrong:identity" })).resolves.toBeNull();
+    await expect(readAtAge(-1)).resolves.toBeNull();
+    expect(expiryDiagnostic).not.toHaveBeenCalled();
+    expiryDiagnostic.mockImplementation(() => { throw new Error("diagnostic sink failed"); });
+    await expect(readAtAge(6000)).resolves.toBeNull();
     for (const key of Object.keys(exactIdentity) as Array<keyof typeof exactIdentity>) {
       await expect(readExact({ ...exactIdentity, [key]: "wrong:identity" })).resolves.toBeNull();
     }

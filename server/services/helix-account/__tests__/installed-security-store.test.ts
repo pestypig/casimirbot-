@@ -165,12 +165,36 @@ describe("InstalledSecurityStore", () => {
     expect(JSON.stringify(status.recent_events)).not.toContain("receipt");
   });
 
+  it("O5 rejects duplicate and delayed trust decisions against a superseded revision", async () => {
+    await store.registerDevice({ session: OWNER, deviceId: DEVICE_ID });
+    const consent = { session: OWNER, deviceId: DEVICE_ID, trusted: true, expectedPolicyRevision: 0 };
+    const simultaneous = await Promise.allSettled([
+      store.setFullHarnessTrust(consent), store.setFullHarnessTrust(consent),
+    ]);
+    expect(simultaneous.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(simultaneous.find(result => result.status === "rejected")).toMatchObject({
+      reason: { status: 409, code: "device_trust_revision_changed" },
+    });
+    const removed = await store.setFullHarnessTrust({ ...consent, trusted: false, expectedPolicyRevision: 1 });
+    expect(removed).toMatchObject({ trusted: false, policy_revision: 2 });
+    await expect(store.setFullHarnessTrust(consent)).rejects.toMatchObject({
+      status: 409, code: "device_trust_revision_changed",
+    });
+    expect(await store.inspectFullHarnessTrust({ profileId: OWNER.profileId, deviceId: DEVICE_ID }))
+      .toMatchObject({ trusted: false, policy_revision: 2 });
+    const events = await pool.query("SELECT event_type FROM helix_account_events WHERE event_type IN ('full_harness_device_trust_granted', 'full_harness_device_trust_revoked')");
+    expect(events.rows.map(row => row.event_type).sort()).toEqual([
+      "full_harness_device_trust_granted", "full_harness_device_trust_revoked",
+    ]);
+  });
+
   it("persists finite-tunnel trust only for an active developer device session", async () => {
     await store.registerDevice({ session: OWNER, deviceId: DEVICE_ID });
     const granted = await store.setFullHarnessTrust({
       session: OWNER,
       deviceId: DEVICE_ID,
       trusted: true,
+      expectedPolicyRevision: 0,
     });
     expect(granted).toMatchObject({
       trusted: true,
@@ -205,6 +229,7 @@ describe("InstalledSecurityStore", () => {
       session: OWNER,
       deviceId: DEVICE_ID,
       trusted: true,
+      expectedPolicyRevision: 0,
     });
     await store.revokeDevice({ session: OWNER, deviceId: DEVICE_ID });
     await store.recoverDevice({ session: OWNER, deviceId: DEVICE_ID });

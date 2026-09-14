@@ -5,9 +5,9 @@ export type DesktopEphemeralWebCacheSession = Readonly<{
 }>;
 
 /**
- * The packaged desktop serves the UI from a freshly reserved loopback port on
- * every launch. Service-worker registrations and CacheStorage are therefore
- * origin-scoped, unreachable from later launches, and can grow without bound.
+ * The packaged desktop prefers its last healthy loopback port, but upgrades
+ * and occupied-port fallback can leave obsolete origin-scoped service workers
+ * and CacheStorage behind. They can also serve a previous build's renderer.
  * They are mobile/offline accelerators rather than user data or authority
  * state, so clear only those two ephemeral stores before the desktop window is
  * created. Cookies, local storage, IndexedDB, credentials, and session state

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.casimirbot.helixplayer.fabric.ResidentEffectMeasurementsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-09-14T11:19:51.409Z" hostname="LAPTOP-FPCDI341" time="0.02">
+  <properties/>
+  <testcase name="quietFinalPlanPreservesEarlierEffectsWithoutMutatingPlanEvidence()" classname="com.casimirbot.helixplayer.fabric.ResidentEffectMeasurementsTest" time="0.001"/>
+  <testcase name="malformedOrOverflowingCountersDoNotBecomeZero()" classname="com.casimirbot.helixplayer.fabric.ResidentEffectMeasurementsTest" time="0.003"/>
+  <testcase name="invalidExplicitInventoryTotalCannotFallBackToAnApparentlyValidAlias()" classname="com.casimirbot.helixplayer.fabric.ResidentEffectMeasurementsTest" time="0.005"/>
+  <testcase name="nativeInventoryTotalsIncludePlacementAndConsumptionWithoutAliasDuplication()" classname="com.casimirbot.helixplayer.fabric.ResidentEffectMeasurementsTest" time="0.001"/>
+  <testcase name="nullableObservationsSurviveSettlementWithoutRelaxingEffectValidation()" classname="com.casimirbot.helixplayer.fabric.ResidentEffectMeasurementsTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

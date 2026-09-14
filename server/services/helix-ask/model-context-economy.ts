@@ -263,7 +263,13 @@ export const compactMoralGraphReflectionArtifactForModel = (input: {
     cfg.observationMaxProves,
   );
   const proceduralMissing = unique(
-    classifications.map((classification) => readStringArray(classification?.missingEvidence).at(-1)),
+    classifications.flatMap((classification) => {
+      const missing = readStringArray(classification?.missingEvidence);
+      // This review's five distinct checks must survive domain-evidence compression.
+      return readString(classification?.observedPattern) === "principle_method_tension"
+        ? [`Principle and Method Review requires: ${missing.join("; ")}.`]
+        : [missing.at(-1)];
+    }),
     cfg.observationMaxFindings,
   );
   const reflection = readRecord(payload.reflection);

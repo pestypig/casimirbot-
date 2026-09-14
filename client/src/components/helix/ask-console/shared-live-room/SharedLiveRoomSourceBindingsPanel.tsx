@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Copy,
@@ -35,7 +35,7 @@ import type {
 import type {
   HelixSharedRealtimeRoomParticipant,
 } from "@shared/helix-shared-realtime-room";
-import { SharedLiveRoomPlayerEmbodimentPanel } from "./SharedLiveRoomPlayerEmbodimentPanel";
+import { SharedLiveRoomPlayerEmbodimentPanel, type PlayerAuthorityReviewDraft } from "./SharedLiveRoomPlayerEmbodimentPanel";
 import { MinecraftLocalLifecycleCard } from "./MinecraftLocalLifecycleCard";
 
 const sourceBindingsPath = (roomId: string): string =>
@@ -235,6 +235,10 @@ export function SharedLiveRoomSourceBindingsPanel({
   participants?: HelixSharedRealtimeRoomParticipant[];
 }) {
   const [available, setAvailable] = useState<boolean | null>(null);
+  // Retain only unsaved choices while a stale subject temporarily unmounts its
+  // controls. The cache lives only as long as this room panel, never in profile
+  // backup; exact player/owner/source scope prevents accidental transfer.
+  const playerReviewDrafts = useRef(new Map<string, PlayerAuthorityReviewDraft>());
   const [bindings, setBindings] = useState<HelixRoomSourceBinding[]>([]);
   const [pairings, setPairings] = useState<HelixConnectorPairing[]>([]);
   const [pairingCommand, setPairingCommand] = useState<string | null>(null);
@@ -982,6 +986,9 @@ export function SharedLiveRoomSourceBindingsPanel({
               (binding) =>
                 binding.binding_id === environment.room_source_binding_id,
             );
+            const playerReviewKey = JSON.stringify([roomId, selfParticipantId, isOwner,
+              environment.environment_binding_id, environment.room_source_binding_id,
+              environment.source_id, environment.world_id, environment.self_subject_binding?.subject_ref ?? null]);
             const identityBusy =
               busy === `identity:${environmentId}`;
             const commandReceipt = commandState[environmentId];
@@ -1410,11 +1417,21 @@ export function SharedLiveRoomSourceBindingsPanel({
                 {environment.domain_adapter === "minecraft.fabric_mod.v1" ? (
                   environment.self_subject_binding?.status === "active" ? (
                     <SharedLiveRoomPlayerEmbodimentPanel
+                      key={playerReviewKey}
                       roomId={roomId}
                       environment={environment}
                       selfParticipantId={selfParticipantId}
                       sourceBinding={sourceBinding}
                       isOwner={isOwner}
+                      initialReviewDraft={playerReviewDrafts.current.get(playerReviewKey)}
+                      onReviewDraftChange={(draft) => {
+                        playerReviewDrafts.current.delete(playerReviewKey);
+                        if (!draft) return;
+                        playerReviewDrafts.current.set(playerReviewKey, draft);
+                        while (playerReviewDrafts.current.size > 32) {
+                          playerReviewDrafts.current.delete(playerReviewDrafts.current.keys().next().value!);
+                        }
+                      }}
                     />
                   ) : isOwner ? (
                     <div className="mt-2">

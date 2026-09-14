@@ -24,6 +24,7 @@ module.exports = {
         "configs/ideology-verifiers.json",
         "docs/ethos/ideology.json",
         "scripts/helix-minecraft-launch-fabric-loopback.ps1",
+        "scripts/helix-minecraft-start-fabric-server.ps1",
         "codex-marketplace/**",
         "bin/tunnel-client.exe",
         "licenses/openai-tunnel-client-LICENSE",

@@ -43,6 +43,58 @@ const resolveStorePath = (input: {
   );
 };
 
+/** Resolve both directories from one saved revision before any OS effect. */
+export const resolveProfileOwnedMinecraftLifecycleSelection = async (input: {
+  ownerProfileId: string; storePath?: string | null; appDataPath?: string | null;
+}): Promise<{ runDirectory: string; playerGameDirectory: string } | null> => {
+  const storePath = resolveStorePath(input);
+  if (!input.ownerProfileId.trim() || !storePath) return null;
+  try {
+    const details = await stat(storePath);
+    if (!details.isFile() || details.size <= 0 || details.size > MAX_STORE_BYTES) return null;
+    const parsed = JSON.parse(await readFile(storePath, "utf8"));
+    if (parsed.schema !== STORE_SCHEMA || !Array.isArray(parsed.profiles)) return null;
+    const matches = parsed.profiles.filter((entry: unknown): entry is StoreEntry =>
+      Boolean(entry) && typeof entry === "object" && !Array.isArray(entry) &&
+      (entry as StoreEntry).owner_profile_id === input.ownerProfileId.trim());
+    if (matches.length !== 1) return null;
+    const entry = matches[0] as StoreEntry;
+    if (Object.keys(entry).length !== 4 || typeof entry.label !== "string" ||
+        !entry.label.trim() || entry.label.length > 120) return null;
+    const runDirectory = exactLocalWindowsDirectory(entry.run_directory);
+    const playerGameDirectory = exactLocalWindowsDirectory(entry.player_game_directory);
+    if (!runDirectory || !playerGameDirectory) return null;
+    const dirs = await Promise.all([runDirectory, playerGameDirectory,
+      path.join(runDirectory, "config"), path.join(playerGameDirectory, "config"),
+      path.join(playerGameDirectory, "mods")].map(dir => stat(dir)));
+    if (dirs.some(dir => !dir.isDirectory()) ||
+        !(await stat(path.join(runDirectory, "server.properties"))).isFile()) return null;
+    return { runDirectory, playerGameDirectory };
+  } catch { return null; }
+};
+
+/** Read-only setup preview; the fixed OS provider rechecks configuration at execution. */
+export const readProfileOwnedMinecraftLifecycleAddress = async (input: {
+  ownerProfileId: string; storePath?: string | null; appDataPath?: string | null;
+}): Promise<string | null> => {
+  const selection = await resolveProfileOwnedMinecraftLifecycleSelection(input);
+  if (!selection) return null;
+  try {
+    const file = path.join(selection.runDirectory, "server.properties");
+    if ((await stat(file)).size > 65_536) return null;
+    const rows = (await readFile(file, "utf8")).split(/\r?\n/u)
+      .filter(row => row.trim() && !/^\s*[#!]/u.test(row));
+    if (rows.some(row => !/^\s*[A-Za-z0-9_.-]+\s*=/u.test(row) || /(?<!\\)(\\\\)*\\$/u.test(row))) return null;
+    const ips = rows.filter(row => /^\s*server-ip\s*=/u.test(row));
+    const ports = rows.filter(row => /^\s*server-port\s*=/u.test(row));
+    if (ips.length !== 1 || ports.length !== 1) return null;
+    const ip = ips[0].slice(ips[0].indexOf("=") + 1).trim();
+    const port = ports[0].slice(ports[0].indexOf("=") + 1).trim();
+    if (!["127.0.0.1", "::1"].includes(ip) || !/^[0-9]{1,5}$/u.test(port) || Number(port) < 1 || Number(port) > 65535) return null;
+    return `${ip === "::1" ? "[::1]" : ip}:${Number(port)}`;
+  } catch { return null; }
+};
+
 export const resolveProfileOwnedMinecraftRunDirectory = async (input: {
   ownerProfileId: string;
   storePath?: string | null;

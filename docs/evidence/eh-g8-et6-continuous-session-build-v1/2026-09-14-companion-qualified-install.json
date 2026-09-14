@@ -1,0 +1,21 @@
+{
+  "schema": "casimirbot.companion_qualification_install.v1",
+  "observed_at": "2026-09-14T11:23:14.8814027Z",
+  "scope": "Isolated deterministic qualification and installed artifact identity; not loaded-client or live acceptance",
+  "compiler_tests": 4,
+  "java_tests": 68,
+  "failures": 0,
+  "skipped": 0,
+  "simulated_observation_and_input": true,
+  "first_run_failure": "Nine tests rejected an empty fixture-origin environment variable",
+  "first_log": ".tmp/companion-focused-qualification-20260914.log",
+  "corrected_log": ".tmp/companion-focused-qualification-retry-20260914.log",
+  "qualified_sha256": "9e9b6a83cee0f995fc9f0a44b4b35196d32f5d54bffcf4e12de47b38c7ea3b29",
+  "previous_sha256": "bd5b8eb7e0a89a34415d14a97b58722590ab1264bd5d33989b7dcb88f77c550e",
+  "installed_path": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/HelixFabricPlayerAgent-0.4.12.jar",
+  "rollback_path": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\.tmp\\HelixFabricPlayerAgent-0.4.12-before-qualification-20260914.jar",
+  "loaded_client_verified": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false
+}

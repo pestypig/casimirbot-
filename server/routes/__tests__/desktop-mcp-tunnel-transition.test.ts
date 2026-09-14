@@ -250,7 +250,7 @@ describe("desktop MCP tunnel transition consent route", () => {
     const response = await request(app)
       .put("/api/desktop/mcp-tunnel-transition/full-harness-trust")
       .set(headers)
-      .send({ trusted: true });
+      .send({ trusted: true, expected_policy_revision: 0 });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       ok: true,
@@ -268,6 +268,7 @@ describe("desktop MCP tunnel transition consent route", () => {
       session: { sessionId, profileId },
       deviceId: "desktop-device-fixture",
       trusted: true,
+      expectedPolicyRevision: 0,
     });
   });
 

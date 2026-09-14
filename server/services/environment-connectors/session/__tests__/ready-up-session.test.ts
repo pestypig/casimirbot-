@@ -34,7 +34,7 @@ it("three healthy Ready up calls perform no repair", async () => {
   for (let index = 0; index < 3; index++) {
     expect(await f.run()).toMatchObject({ repairs: [], readiness: { ready: true }, execution_authority: false });
   }
-  expect(f.dependencies.inspect).toHaveBeenCalledTimes(6);
+  expect(f.dependencies.inspect).toHaveBeenCalledTimes(3);
   expect(f.dependencies.environments).not.toHaveBeenCalled();
   expect(f.dependencies.refreshSubject).not.toHaveBeenCalled();
 });
@@ -113,7 +113,7 @@ it("reports uncertain partial recovery on a typed conflict and does not retry", 
   expect(result.repairs).toEqual([{ layer: "goal", changed: null,
     reason_code: "durable_goal_revision_conflict" }]);
   expect(f.dependencies.recoverGoal).toHaveBeenCalledTimes(1);
-  expect(f.dependencies.inspect).toHaveBeenCalledTimes(3);
+  expect(f.dependencies.inspect).toHaveBeenCalledTimes(2);
   expect(result.readiness.ready).toBe(false);
 });
 

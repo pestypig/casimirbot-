@@ -23,10 +23,11 @@ vi.mock("@/components/workstation/HelixAskDock", async () => {
     "@/components/helix/ask-console/HelixAskWorkflowSuggestionRuntime"
   );
   return {
-    HelixAskDock: () => ReactModule.createElement(
+    HelixAskDock: ({ onOpenPanel }: { onOpenPanel: (id: string) => void }) => ReactModule.createElement(
       "aside",
       { "data-testid": "mock-helix-ask-dock" },
       ReactModule.createElement(HelixAskWorkflowSuggestionRuntime),
+      ReactModule.createElement("button", { onClick: () => onOpenPanel("agent-access") }, "Open setup fixture"),
     ),
   };
 });
@@ -54,6 +55,23 @@ describe("HelixWorkstationShell mobile navigation", () => {
     cleanup();
     useHelixWorkflowDemoStore.getState().resetDemo();
     useHelixWorkflowDemoStore.getState().clearDebugHistory();
+  });
+
+  it.each(["desktop", "mobile"] as const)("reveals a requested panel above the chat list on %s without switching chats", (layoutVariant) => {
+    const openPanel = vi.fn();
+    render(<HelixWorkstationShell layoutVariant={layoutVariant} onOpenPanel={openPanel} />);
+    if (layoutVariant === "mobile") fireEvent.click(screen.getByRole("button", { name: "Open workstation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open Helix Ask chats" }));
+    expect(screen.getByRole("button", { name: "Return to current Helix Ask chat" })).toBeInTheDocument();
+    if (layoutVariant === "mobile") fireEvent.click(screen.getByTestId("helix-mobile-surface-switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Open setup fixture" }));
+    expect(openPanel).toHaveBeenCalledTimes(1);
+    expect(openPanel).toHaveBeenCalledWith("agent-access");
+    expect(screen.queryByRole("button", { name: "Return to current Helix Ask chat" })).not.toBeInTheDocument();
+    expect(useAgiChatStore.getState().activeId).toBe(chatId);
+    if (layoutVariant === "mobile") {
+      expect(screen.getByTestId("helix-mobile-workstation-shell")).toHaveAttribute("data-mobile-surface", "workstation");
+    }
   });
 
   it("honors a workstation-first mobile entry link", () => {

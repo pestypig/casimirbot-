@@ -11,6 +11,7 @@ const store = new EnvironmentTemporalFrontierStore();
 
 export const publishTemporalPerceptionFrontier = async (
   input: Parameters<typeof resolveTemporalPerceptionContext>[0],
+  frontierStore: Pick<EnvironmentTemporalFrontierStore, "publish"> = store,
 ) => {
   const requestReceived = readTemporalPublicationClock();
   const context = await resolveTemporalPerceptionContext(input);
@@ -42,7 +43,7 @@ export const publishTemporalPerceptionFrontier = async (
     parameter_bounds: {}, missing_observation_kinds: ["action_specific_preconditions", "resident_resource_ownership"],
     evidence_probe_capability_ids: [HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY],
   }));
-  const published = await store.publish({ profileId: input.profileId, participantId: input.participantId,
+  const published = await frontierStore.publish({ profileId: input.profileId, participantId: input.participantId,
     observationEvidenceRef: context.evidence.observation.evidence_ref,
     observationProducerEpochRef: context.observation_producer_epoch_ref,
     retainedUntil: new Date(Date.parse(context.evidence.observation.observed_at) + 60_000).toISOString(),

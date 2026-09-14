@@ -1,0 +1,184 @@
+{
+  "schema": "helix.cs.player_review_recovery_evidence.v1",
+  "recorded_at": "2026-09-14T06:08:30.277Z",
+  "program_gate": "G8",
+  "classification": "presentation",
+  "scope": "Deterministic unsaved same-player review recovery only",
+  "component": {
+    "passed": 15,
+    "files": 2,
+    "duration_seconds": 10.18,
+    "backing": "Actual React parent/child with normalized fixture HTTP responses"
+  },
+  "browser": {
+    "passed": 2,
+    "duration_seconds": 40.8,
+    "input_modes": [
+      "pointer",
+      "keyboard"
+    ],
+    "backing": "Production React controls and CSS with normalized fixture HTTP responses; no real action handler or gameplay"
+  },
+  "verified": [
+    "Same-player active-stale-active re-entry retains selected capabilities and proposed duration",
+    "Consent acknowledgement is cleared and Save is disabled after recovery",
+    "Different player, participant, source, world, room-source binding and environment do not inherit draft choices",
+    "Successful explicit fixture save clears the unsaved draft callback; callback carries no consent, pairing code or authority",
+    "No authority mutation is issued by browser recovery; no player review is written to localStorage"
+  ],
+  "initial_failures": [
+    {
+      "log": "player-review-red-20260914.log",
+      "reason": "Test used a non-owner, whose action controls are correctly hidden; corrected fixture"
+    },
+    {
+      "log": "player-review-red-valid-20260914.log",
+      "reason": "Valid red: Navigate was checked again after stale re-entry despite being deselected"
+    },
+    {
+      "log": "player-review-focused-20260914.log",
+      "reason": "Older activation test failed before acknowledgement; investigated existing fixture"
+    },
+    {
+      "log": "player-review-focused-fixed-20260914.log",
+      "reason": "Gating the readiness reply alone did not repair the older incomplete startup fixture"
+    },
+    {
+      "log": "player-review-browser-20260914.log",
+      "reason": "Browser beforeAll bundle exceeded the original 30-second test setup timeout; bounded test timeout changed to 90 seconds, without changing product budgets"
+    }
+  ],
+  "fixture_repairs": [
+    "Explicit readiness gate separates acknowledgement observation from the next fixture response",
+    "Activation fixture now supplies existing saved-profile selection lookup and strict startup receipt fields"
+  ],
+  "client_build": {
+    "passed": true
+  },
+  "docs_audit": {
+    "passed": true
+  },
+  "discipline_quick": {
+    "passed": true,
+    "classification": "presentation"
+  },
+  "cache": {
+    "lifetime": "Mounted room panel only",
+    "maximum_entries": 32,
+    "identity_fields": [
+      "room",
+      "participant",
+      "owner_role",
+      "environment",
+      "room_source_binding",
+      "source",
+      "world",
+      "subject_ref"
+    ],
+    "retained_fields": [
+      "capabilityIds",
+      "autonomyMode",
+      "manualOverridePolicy",
+      "leaseMs"
+    ],
+    "excludes": [
+      "acknowledgement",
+      "authority",
+      "expiry_timestamp",
+      "credentials",
+      "pairing_codes",
+      "readiness"
+    ],
+    "restart_persistence": false,
+    "profile_backup": false
+  },
+  "source_files": [
+    {
+      "file": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomPlayerEmbodimentPanel.tsx",
+      "sha256": "2805f77f2873e8bb9c651734e70964777f3a48340729b4b9ea9a5b62a32e1341"
+    },
+    {
+      "file": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomSourceBindingsPanel.tsx",
+      "sha256": "b82df9ce90fe399cb2b9ef625e3630782e9973b2c83ad76d19c354b14cec190d"
+    },
+    {
+      "file": "client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPlayerEmbodimentPanel.spec.tsx",
+      "sha256": "00503db4f31d6ec1c46d66df48274b05c5f62d36eff24ff2825631ea4c0e5b0e"
+    },
+    {
+      "file": "client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomSourceBindingsPanel.spec.tsx",
+      "sha256": "b8b9b73636d5d45a56d488a848fd5a4ba9d797346f92e6d6d9f0a98dcba6e07a"
+    },
+    {
+      "file": "client/e2e/onboarding-isolated/player-review-entry.tsx",
+      "sha256": "ea1abf6858d1a6886bf30e8c49300d927e937511669b619e5324fae447310ea8"
+    },
+    {
+      "file": "client/e2e/onboarding-isolated/player-review-recovery.spec.ts",
+      "sha256": "67df27ab267530734d9b230397e7e8d5862d08eebc5c52db5b27ce436078549d"
+    },
+    {
+      "file": "docs/work-packets/eh-g8-cs-player-review-recovery-v1.md",
+      "sha256": "62edf7e97a02e9618c9492d48044f31dbf462339a51003f0c1a5cf3a3f5fc002"
+    }
+  ],
+  "logs": [
+    {
+      "file": ".tmp/player-review-red-20260914.log",
+      "sha256": "b742be6b1417f1296284aad49dcc43250047115d2acb9ff3c25c0bfb5e48ef91"
+    },
+    {
+      "file": ".tmp/player-review-red-valid-20260914.log",
+      "sha256": "b84ee32bb637839425f1612148cccb08618c128d6c1cc903bd05950302318c8b"
+    },
+    {
+      "file": ".tmp/player-review-focused-20260914.log",
+      "sha256": "519e15176e250c93d3c246bd23f89828643cdf0217a276696d639dff15d96a8a"
+    },
+    {
+      "file": ".tmp/player-review-focused-fixed-20260914.log",
+      "sha256": "06fd2b346422b801888fc9934fac8c52d4dab8a98cb15561c88acb16369e5df1"
+    },
+    {
+      "file": ".tmp/player-review-focused-current-fixture-20260914.log",
+      "sha256": "7306a1e5a034b7ab1714ef1492b9c40f0a1131b35a269ed4a23ecc5a1e73183b"
+    },
+    {
+      "file": ".tmp/player-review-focused-final-20260914.log",
+      "sha256": "ca31ecfd69eb2a7a5766e103175d9d8aea40b249adcd05149d95a9d53a6e7f66"
+    },
+    {
+      "file": ".tmp/player-review-browser-20260914.log",
+      "sha256": "7e823976a1dfa469ebc33dfb030e7fa576777e8f944ff9d0633b67170fd46c8e"
+    },
+    {
+      "file": ".tmp/player-review-browser-final-20260914.log",
+      "sha256": "8f060abad14347a8281bf79b8ff6a3e49850c122a6be5f0b4ee1ae6af2e16b66"
+    },
+    {
+      "file": ".tmp/player-review-client-build-20260914.log",
+      "sha256": "06fcfc93ad362de2be18dccf0435c478cebd356d96d22192c9c24dcdb4cd8ce1"
+    },
+    {
+      "file": ".tmp/player-review-docs-audit-20260914.log",
+      "sha256": "325c3ebd15651c8b3d94ef1d090f08dbe5103822f6c81c54a25a866f44bbc980"
+    },
+    {
+      "file": ".tmp/player-review-discipline-quick-20260914.log",
+      "sha256": "3dbf3f3229f0c44f5dcf9f2398f2a348662da0b8a173746353e1bd55cd8e093c"
+    }
+  ],
+  "live_gameplay_approved": false,
+  "gameplay_effects": 0,
+  "live_repair_rehearsal": false,
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "original_et6_passed": false,
+  "nav1_qualified": false,
+  "casimir_verification": {
+    "applicable": false,
+    "reason": "Presentation/application change; no physics, adapter contract, certificate or certified status change"
+  }
+}

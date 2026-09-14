@@ -48,6 +48,8 @@ import {
 } from "./agentConnectionSetupState";
 import { CASIMIRBOT_PUBLIC_ORIGIN } from "@/lib/agent-access/agentAccessContent";
 import { useAgiChatStore } from "@/store/useAgiChatStore";
+import { useWorkspaceMemoryRegistryStore } from "@/store/useWorkspaceMemoryRegistryStore";
+import { HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT } from "@/lib/workstation/accountCapabilityPolicy";
 import {
   inspectLatestReasoningBinding,
   inspectReasoningBinding,
@@ -93,6 +95,7 @@ const parseFullHarnessTrust = (value: unknown): FullHarnessTrust | null => {
     typeof candidate.trusted !== "boolean" ||
     typeof candidate.device_ref !== "string" ||
     typeof candidate.policy_revision !== "number" ||
+    !Number.isSafeInteger(candidate.policy_revision) || candidate.policy_revision < 0 ||
     candidate.authority_limited_to_tunnel_transport !== true ||
     candidate.environment_authority_granted !== false ||
     candidate.trading_authority_granted !== false ||
@@ -156,10 +159,19 @@ export function AgentConnectionSetup() {
   const [onboardingTunnel, setOnboardingTunnel] =
     useState<DesktopMcpTunnelState | null>(null);
   const [diagnosticStatus, setDiagnosticStatus] = useState<string | { kind: "binding_check" } | null>(null);
+  const [diagnosticPreview, setDiagnosticPreview] = useState<string | null>(null);
+  const diagnosticGeneration = useRef(0);
+  useEffect(() => () => { diagnosticGeneration.current++; }, []);
   const [fullHarnessTrust, setFullHarnessTrust] =
     useState<FullHarnessTrust | null>(null);
   const [trustBusy, setTrustBusy] = useState(false);
   const [trustStatus, setTrustStatus] = useState<string | null>(null);
+  const [trustRecoveryPanel, setTrustRecoveryPanel] = useState<"account-session" | "connections-billing-security" | null>(null);
+  const [trustReadBusy, setTrustReadBusy] = useState(false);
+  const [trustReadFailed, setTrustReadFailed] = useState(false);
+  const [trustNeedsRecheck, setTrustNeedsRecheck] = useState(false);
+  const trustRead = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
+  const trustMutation = useRef<{ generation: number; controller?: AbortController }>({ generation: 0 });
   const setupTitleRef = useRef<HTMLHeadingElement | null>(null);
   const previousViewedStep = useRef(setup.viewedStep);
   const skipNextProfileRefresh = useRef(false);
@@ -170,13 +182,30 @@ export function AgentConnectionSetup() {
   useEffect(() => () => {
     readinessRead.current.generation++;
     readinessRead.current.controller?.abort();
+    trustMutation.current.generation++;
+    trustMutation.current.controller?.abort();
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      AGENT_CONNECTION_SETUP_STORAGE_KEY,
-      JSON.stringify(persistableAgentConnectionSetup(setup)),
-    );
+    const serialized = JSON.stringify(persistableAgentConnectionSetup(setup));
+    const registry = useWorkspaceMemoryRegistryStore.getState();
+    const artifactId = "agent-connection-setup:preferences";
+    const previous = registry.artifacts[artifactId];
+    if (previous && window.localStorage.getItem(AGENT_CONNECTION_SETUP_STORAGE_KEY) === serialized) return;
+    window.localStorage.setItem(AGENT_CONNECTION_SETUP_STORAGE_KEY, serialized);
+    // Only the selected application and viewed step are profile preferences.
+    // Consent, presence, claims and authority remain outside this snapshot.
+    registry.upsertArtifact({
+      artifact_id: artifactId,
+      artifact_type: "workstation_session_draft",
+      storage_key: AGENT_CONNECTION_SETUP_STORAGE_KEY,
+      storage_backend: "localStorage",
+      owner_scope: previous?.owner_scope ?? "browser_guest",
+      profile_id: previous?.profile_id ?? null,
+      sync_status: previous?.sync_status ?? "profile_candidate",
+      title: "Agent connection preferences",
+      size_bytes: new TextEncoder().encode(serialized).byteLength,
+    });
   }, [setup]);
 
   useEffect(() => {
@@ -288,6 +317,15 @@ export function AgentConnectionSetup() {
   );
   const guidanceRefresh = useRef(refresh);
   guidanceRefresh.current = refresh;
+  useEffect(() => {
+    if (!setup.selectedProfile) return;
+    // Account events invalidate observations only. Never accept event identity,
+    // start transport, or infer consent; refresh validates the server response
+    // and supersedes any older in-flight readiness request.
+    const recheckAccount = () => { void guidanceRefresh.current(); };
+    window.addEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, recheckAccount);
+    return () => window.removeEventListener(HELIX_ACCOUNT_CAPABILITY_POLICY_EVENT, recheckAccount);
+  }, [setup.selectedProfile]);
   const refreshBusy = useRef(false);
   const readinessRefreshing = remote.kind === "loading" ||
     (remote.kind === "loaded" && remote.refreshing === true);
@@ -391,6 +429,13 @@ export function AgentConnectionSetup() {
           .then(parseDesktopMcpTunnelState)
           .then((tunnel) => {
             if (cancelled || generation !== presentationGeneration) return;
+            if (tunnel?.ready && tunnel.scope !== "full_helix_agent") {
+              setOnboardingTunnel(tunnel);
+              reportPresentationFailure(
+                "The native connection is ready for Device Check and supervisor coordination. Full Harness scope is not active. Use Start Harness to request the finite Full Harness lease; this does not approve task pairing or game actions.",
+              );
+              return;
+            }
             if (!tunnel?.ready || tunnel.scope !== "full_helix_agent") {
               if (attempt >= 20) {
                 reportPresentationFailure(
@@ -457,27 +502,64 @@ export function AgentConnectionSetup() {
     };
   }, []);
 
+  const readFullHarnessTrust = useCallback(async () => {
+    if (trustRead.current.controller || trustMutation.current.controller) return;
+    const controller = new AbortController();
+    const generation = ++trustRead.current.generation;
+    trustRead.current.controller = controller;
+    let timeoutId: number | undefined;
+    setTrustReadBusy(true);
+    try {
+      // Bound both response and body reads. Retrying this observation never
+      // submits trust, starts transport or retries an unknown consent mutation.
+      const trust = await Promise.race([
+        (async () => {
+          const response = await fetch(FULL_HARNESS_TRUST_ENDPOINT, {
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          });
+          if (!response.ok) throw new Error("trust_read_unavailable");
+          const body = (await response.json()) as { trust?: unknown };
+          const parsed = parseFullHarnessTrust(body?.trust);
+          if (!parsed) throw new Error("trust_read_invalid");
+          return parsed;
+        })(),
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(() => {
+            controller.abort();
+            reject(new Error("trust_read_timeout"));
+          }, 10_000);
+        }),
+      ]);
+      if (generation !== trustRead.current.generation) return;
+      setFullHarnessTrust(trust);
+      setTrustReadFailed(false);
+      setTrustNeedsRecheck(false);
+      setTrustStatus(null);
+    } catch {
+      if (generation !== trustRead.current.generation) return;
+      setFullHarnessTrust(null);
+      setTrustReadFailed(true);
+    } finally {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      if (generation === trustRead.current.generation) {
+        trustRead.current.controller = undefined;
+        setTrustReadBusy(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window.casimirDesktop?.getRuntimeSnapshot !== "function") return;
-    let cancelled = false;
-    void fetch(FULL_HARNESS_TRUST_ENDPOINT, {
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const body = (await response.json()) as { trust?: unknown };
-        return parseFullHarnessTrust(body.trust);
-      })
-      .then((trust) => {
-        if (!cancelled && trust) setFullHarnessTrust(trust);
-      })
-      .catch(() => undefined);
+    void readFullHarnessTrust();
     return () => {
-      cancelled = true;
+      trustRead.current.generation++;
+      trustRead.current.controller?.abort();
+      trustRead.current.controller = undefined;
     };
-  }, []);
+  }, [readFullHarnessTrust]);
 
   useEffect(() => {
     if (setup.selectedProfile !== "codex_app") return;
@@ -498,15 +580,33 @@ export function AgentConnectionSetup() {
     ? HELIX_AGENT_CLIENT_PROFILES[setup.selectedProfile]
     : null;
   const status = remote.kind === "loaded" ? remote.status : null;
+  const acceptedDurablePolling = Boolean(reasoningBinding?.pairing_id &&
+    reasoningBinding.status === "active" && reasoningBinding.continuation_transport === "polling" &&
+    reasoningBinding.helix_conversation_id === activeChatId &&
+    reasoningBinding.service_instance_ref === status?.service_instance_ref &&
+    reasoningBinding.expires_at && Date.parse(reasoningBinding.expires_at) > Date.now());
+  const connectedToolActivityOnly = remote.kind === "loaded" && !remote.readFailed &&
+    status?.readiness.client_presence === "online" &&
+    status.readiness.continuation_readiness === "unavailable" &&
+    status.thread_observability_bridge.negotiated_level === "tool_activity_only";
+  const continuationRecovery = connectedToolActivityOnly
+    ? "This task is connected, but its client has declared tool activity only. Repeating the same presence refresh cannot enable steering. The AI client must support and declare steering pickup; durable pairing also requires a registered destination. Keep any existing pairing while the integration is checked."
+    : "This task's continuation was unavailable at the last check. Ask that same AI task to refresh its CasimirBot presence. While this panel is visible, it checks automatically every five seconds and enables binding when the server confirms readiness.";
   // Connection guidance follows the latest read; operation receipts such as
   // copying diagnostics remain separate strings, not cached readiness proof.
   const diagnosticMessage = typeof diagnosticStatus === "string" ? diagnosticStatus : diagnosticStatus
-    ? status?.readiness.agent_ready && status.readiness.continuation_readiness !== "unavailable"
-      ? "Connection checked. Review the exact-task binding below; Start Harness has not approved it for you."
-      : "The connection is visible, but this exact task's continuation is unavailable. Ask that same AI task to refresh its CasimirBot presence, then recheck here."
+    ? status?.readiness.agent_ready && acceptedDurablePolling
+      ? "Approved task pairing checked. The same task can pick up steering while running; this check does not renew pairing or environment permissions."
+      : status?.readiness.agent_ready && status.readiness.continuation_readiness !== "unavailable"
+        ? "Connection checked. Review the exact-task binding below; Start Harness has not approved it for you."
+        : continuationRecovery
     : null;
-  const bindingGuidanceLabel = status?.readiness.continuation_readiness === "unavailable"
-    ? "Recheck this AI task's connection before binding."
+  const bindingGuidanceLabel = acceptedDurablePolling
+    ? "Keep the approved exact-task pairing. Polling pickup requires the AI task to run."
+    : status?.readiness.continuation_readiness === "unavailable"
+    ? connectedToolActivityOnly
+      ? "This connected AI client has not declared steering pickup support."
+      : "Recheck this AI task's connection before binding."
     : !status?.verified_run_association
       ? "For Minecraft, prepare a room below and wait for a verified run before binding. Chat-only binding remains optional."
       : "Review and bind the current Helix chat to this exact AI task. This is a user consent action.";
@@ -732,23 +832,38 @@ export function AgentConnectionSetup() {
   };
 
   const updateFullHarnessTrust = async (trusted: boolean): Promise<void> => {
-    if (trustBusy) return;
+    if (trustBusy || trustReadBusy || fullHarnessTrust === null || trustMutation.current.controller) return;
+    const controller = new AbortController();
+    const generation = ++trustMutation.current.generation;
+    trustMutation.current.controller = controller;
+    let timeoutId: number | undefined;
     setTrustBusy(true);
     setTrustStatus(null);
+    setTrustRecoveryPanel(null);
     let parsed: FullHarnessTrust | null = null;
     try {
-      const response = await fetch(FULL_HARNESS_TRUST_ENDPOINT, {
-        method: "PUT",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ trusted }),
-      });
-      if (!response.ok) throw new Error("full harness trust update failed");
-      const body = (await response.json()) as { trust?: unknown };
+      const { response, body } = await Promise.race([
+        (async () => {
+          const response = await fetch(FULL_HARNESS_TRUST_ENDPOINT, {
+            method: "PUT",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({ trusted, expected_policy_revision: fullHarnessTrust.policy_revision }),
+          });
+          const body = (await response.json()) as { trust?: unknown; error?: unknown };
+          return { response, body };
+        })(),
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(() => {
+            controller.abort();
+            reject(new Error("trust_save_timeout"));
+          }, 10_000);
+        }),
+      ]);
+      if (generation !== trustMutation.current.generation) return;
+      if (!response.ok) throw new Error(typeof body?.error === "string" ? body.error : "trust_update_unavailable");
       parsed = parseFullHarnessTrust(body.trust);
       if (!parsed) throw new Error("invalid full harness trust projection");
       setFullHarnessTrust(parsed);
@@ -757,12 +872,47 @@ export function AgentConnectionSetup() {
           ? "Trusted-device tunnel approval is on. Every lease remains finite, logged, and revocable."
           : "Trusted-device tunnel approval is off.",
       );
-    } catch {
-      setTrustStatus(
-        "CasimirBot could not change trusted-device approval. Sign in with a developer account and verify this installed device.",
-      );
+    } catch (error) {
+      if (generation !== trustMutation.current.generation) return;
+      // Render fixed guidance only. A server message may contain private detail,
+      // and a failed/unknown response is not proof that the user is signed out.
+      switch (error instanceof Error ? error.message : "") {
+        case "device_not_registered":
+          setTrustStatus("This device is not registered or is no longer active. Open Connections, Billing & Security, choose Device & Security, and complete registration or recovery with MFA. Then return here to approve Full Harness trust.");
+          setTrustRecoveryPanel("connections-billing-security");
+          break;
+        case "session_required":
+        case "transition_account_session_required":
+          setTrustStatus("Your profile session is no longer active. Open Account & Sessions to sign in before approving device trust.");
+          setTrustRecoveryPanel("account-session");
+          break;
+        case "transition_developer_account_required":
+          setTrustStatus("Full Harness device trust requires a developer account. Check the account type in Account & Sessions.");
+          setTrustRecoveryPanel("account-session");
+          break;
+        case "transition_same_origin_required":
+          setTrustStatus("The trust request did not pass the installed app's same-origin check. The approval was rejected; signing in again does not repair this request.");
+          break;
+        case "transition_native_trust_unavailable":
+          setTrustStatus("The installed device-trust service is unavailable. Open Connections, Billing & Security to check native runtime status.");
+          setTrustRecoveryPanel("connections-billing-security");
+          break;
+        case "device_trust_revision_changed":
+          setFullHarnessTrust(null);
+          setTrustNeedsRecheck(true);
+          setTrustStatus("Device trust changed after you reviewed it. Your earlier decision was rejected. Recheck device trust before another decision.");
+          break;
+        default:
+          setFullHarnessTrust(null);
+          setTrustNeedsRecheck(true);
+          setTrustStatus("CasimirBot could not confirm the trusted-device change. It may have completed. Recheck device trust to read its current state; the change will not be resubmitted automatically.");
+      }
     } finally {
-      setTrustBusy(false);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      if (generation === trustMutation.current.generation) {
+        trustMutation.current.controller = undefined;
+        setTrustBusy(false);
+      }
     }
     if (!parsed?.trusted || !pendingHarnessStart.current) return;
 
@@ -791,12 +941,22 @@ export function AgentConnectionSetup() {
   };
 
   const copyOnboardingDiagnostic = async (): Promise<void> => {
+    const generation = ++diagnosticGeneration.current;
     setDiagnosticStatus(null);
+    setDiagnosticPreview(null);
+    let collected: string | null = null;
+    let timeoutId: number | undefined;
     try {
       let tunnel = onboardingTunnel;
       const inspectTunnel = window.casimirDesktop?.getMcpTunnelState;
       if (inspectTunnel) {
-        tunnel = parseDesktopMcpTunnelState(await inspectTunnel());
+        tunnel = parseDesktopMcpTunnelState(await Promise.race([
+          inspectTunnel(),
+          new Promise<never>((_, reject) => {
+            timeoutId = window.setTimeout(() => reject(new Error("diagnostic_timeout")), 5000);
+          }),
+        ]));
+        if (generation !== diagnosticGeneration.current) return;
         setOnboardingTunnel(tunnel);
       }
       const diagnostic = buildAgentHarnessOnboardingDiagnostic({
@@ -809,12 +969,21 @@ export function AgentConnectionSetup() {
         tunnel,
         reasoningBinding,
       });
+      collected = JSON.stringify(diagnostic, null, 2);
+      if (generation !== diagnosticGeneration.current) return;
       if (!navigator.clipboard?.writeText)
         throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(JSON.stringify(diagnostic, null, 2));
+      await navigator.clipboard.writeText(collected);
+      if (generation !== diagnosticGeneration.current) return;
       setDiagnosticStatus("Sanitized onboarding diagnostics copied.");
     } catch {
-      setDiagnosticStatus("Diagnostics could not be copied on this surface.");
+      if (generation !== diagnosticGeneration.current) return;
+      setDiagnosticPreview(collected);
+      setDiagnosticStatus(collected
+        ? "Clipboard unavailable. Sanitized diagnostics are shown below for manual selection."
+        : "Diagnostics could not be collected. Native transport state remains unverified.");
+    } finally {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     }
   };
 
@@ -828,7 +997,7 @@ export function AgentConnectionSetup() {
       case "account":
         return {
           title: "Sign in to CasimirBot",
-          body: "Use the workstation account menu to sign in, then retry this check.",
+          body: "Open account sign-in below. After signing in, return here and retry this check.",
         };
       case "authorize":
         return {
@@ -998,7 +1167,7 @@ export function AgentConnectionSetup() {
             </span>
             <button
               type="button"
-              disabled={trustBusy || fullHarnessTrust === null}
+              disabled={trustBusy || trustReadBusy || fullHarnessTrust === null}
               onClick={() =>
                 void updateFullHarnessTrust(fullHarnessTrust?.trusted !== true)
               }
@@ -1023,6 +1192,40 @@ export function AgentConnectionSetup() {
           <p className="mt-2 text-[11px] leading-4 text-cyan-100" role="status">
             {trustStatus}
           </p>
+        ) : null}
+        {trustReadFailed || trustNeedsRecheck ? (
+          <div className="mt-2 text-[11px] leading-4 text-cyan-100">
+            <p role="status">{trustReadFailed
+              ? "CasimirBot could not read this device's current trust status. Recheck device trust to retry the status read; this does not change approval."
+              : "Read the current device trust status before another decision. Rechecking does not repeat the change."}</p>
+            <button
+              type="button"
+              disabled={trustReadBusy || trustBusy}
+              onClick={() => void readFullHarnessTrust()}
+              className="mt-2 rounded border border-cyan-200/30 px-2.5 py-1.5 disabled:opacity-50"
+            >
+              {trustReadBusy ? "Checking device trust…" : "Recheck device trust"}
+            </button>
+          </div>
+        ) : trustReadBusy ? (
+          <p className="mt-2 text-[11px] leading-4 text-cyan-100" role="status">Checking device trust…</p>
+        ) : null}
+        {trustRecoveryPanel ? (
+          <button
+            type="button"
+            className="mt-2 rounded border border-cyan-200/30 px-2.5 py-1.5 text-[11px] text-cyan-100"
+            onClick={() => requestWorkstationGuidance({
+              kind: "user_attention",
+              panelId: trustRecoveryPanel,
+              label: trustRecoveryPanel === "account-session"
+                ? "Check the profile session and account type."
+                : "Choose Device & Security to check registration and recovery.",
+            })}
+          >
+            {trustRecoveryPanel === "account-session"
+              ? "Open Account & Sessions"
+              : "Open Connections, Billing & Security"}
+          </button>
         ) : null}
       </div>
     ) : null;
@@ -1154,6 +1357,20 @@ export function AgentConnectionSetup() {
         </div>
       ) : null}
 
+      {setup.viewedStep === "account" ? (
+        <button
+          type="button"
+          className="mt-4 rounded border border-cyan-700 px-3 py-2 text-sm text-cyan-100"
+          onClick={() => requestWorkstationGuidance({
+            kind: "user_attention",
+            panelId: "account-session",
+            label: "Choose how to sign in to your CasimirBot account.",
+          })}
+        >
+          Open account sign-in
+        </button>
+      ) : null}
+
       {setup.viewedStep === "authorize" ? (
         <div className="mt-4">
           <AgentAccountBindingReadiness />
@@ -1242,7 +1459,7 @@ export function AgentConnectionSetup() {
           <div className="text-xs leading-5 text-emerald-50/85">
             <p>
               Catalog probe: current. Chat attachment: current. Continuation:{" "}
-              {status.readiness.continuation_readiness.replace("_", " ")}.
+              {acceptedDurablePolling ? "polling under the approved pairing" : status.readiness.continuation_readiness.replace("_", " ")}.
             </p>
             <p className="mt-1">
               Thread visibility:{" "}
@@ -1258,7 +1475,9 @@ export function AgentConnectionSetup() {
               .
             </p>
             <p className="mt-1">
-              {continuationExplanation(status.readiness.continuation_readiness)}
+              {acceptedDurablePolling
+                ? "The approved task can pick up queued steering when running. This does not wake an idle task or enable automatic delivery."
+                : continuationExplanation(status.readiness.continuation_readiness)}
             </p>
             <p className="mt-1">
               This proves connection readiness only. It does not expose private
@@ -1273,6 +1492,7 @@ export function AgentConnectionSetup() {
           onRuntimeBinding={(binding, pairingId) => {
             setReasoningBinding(current => binding ?? (current?.pairing_id === pairingId ? null : current));
             if (binding) rememberReasoningTaskBinding(binding);
+            else useAgiChatStore.getState().forgetPairedReasoningTaskBinding(activeChatId, pairingId);
           }}
           environment={status.verified_run_association ? {
             roomId: status.verified_run_association.room_id, runId: status.verified_run_association.run_id,
@@ -1292,6 +1512,7 @@ export function AgentConnectionSetup() {
             reasoningBinding?.status === "active" ? "true" : "false"
           }
           data-helix-guidance-label={bindingGuidanceLabel}
+          data-helix-guidance-integration-blocked={connectedToolActivityOnly && !acceptedDurablePolling ? "true" : undefined}
         >
           <p className="font-semibold text-cyan-100">
             Bind the current Helix chat to this exact AI task
@@ -1308,21 +1529,20 @@ export function AgentConnectionSetup() {
           {reasoningBinding?.status === "active" ? (
             <div className="mt-3 rounded border border-white/15 p-3" aria-label="Session recovery status">
               <p>Chat binding: active. A missing heartbeat does not revoke this binding.</p>
-              <p>AI availability: {status.readiness.agent_ready && status.readiness.continuation_readiness !== "unavailable"
+              <p>AI availability: {status.readiness.agent_ready && (acceptedDurablePolling || status.readiness.continuation_readiness !== "unavailable")
                 ? "current connection check passed; polling pickup still requires the AI task to run."
-                : "waiting for a fresh connection check from the same AI task."}</p>
+                : connectedToolActivityOnly
+                  ? "connected for tool activity only; steering pickup has not been declared."
+                  : "waiting for a fresh connection check from the same AI task."}</p>
               <p>An associated run does not by itself prove current game connectivity or action permission.</p>
               <EnvironmentSessionReadyUp key={`${reasoningBinding.reasoning_binding_id}:${reasoningBinding.binding_epoch}`}
                 binding={reasoningBinding} />
               <p className="mt-2">Keep this binding while recovering the session. Do not replace it just because task presence or game permissions expired.</p>
             </div>
           ) : null}
-          {status.readiness.continuation_readiness === "unavailable" ? (
+          {status.readiness.continuation_readiness === "unavailable" && !acceptedDurablePolling ? (
             <p className="mt-2 text-amber-100">
-              This task's continuation was unavailable at the last check.
-              Ask that same AI task to refresh its CasimirBot presence.
-              While this panel is visible, it checks automatically every five seconds
-              and enables binding when the server confirms readiness.
+              {continuationRecovery}{" "}
               Recheck connection only checks status: it cannot wake an idle task
               or renew binding and environment permissions. Do not create another task.
             </p>
@@ -1566,6 +1786,8 @@ export function AgentConnectionSetup() {
         ) : null}
       </div>
 
+      {diagnosticPreview ? <textarea aria-label="Sanitized onboarding diagnostics" readOnly value={diagnosticPreview}
+        className="w-full min-h-40 rounded border p-2 text-xs" /> : null}
       {diagnosticStatus ? (
         <p className="mt-2 text-xs text-slate-300" role="status">
           {diagnosticMessage}

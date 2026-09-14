@@ -7,6 +7,7 @@ import { helixEnvironmentDurableGoalSha256 } from "@shared/helix-environment-dur
 import { recoverEnvironmentSessionGoal } from "../../session/recover-session-goal";
 import {
   EnvironmentDurableGoalStore,
+  EnvironmentDurableGoalError,
   resolveCurrentEnvironmentDurableGoalIdentity,
   resolveEnvironmentDurableGoalEvidence,
   type EnvironmentDurableGoalEvidenceResolution,
@@ -140,6 +141,35 @@ const createHarness = async () => {
   };
 };
 
+it("preserves the durable goal through an explicit owner checkpoint in a new run context", async () => {
+  const harness = await createHarness();
+  try {
+    const store = harness.makeStore();
+    const request = { ownerProfileId: identity.owner_profile_id, roomId: identity.room_id,
+      participantId: identity.participant_id, environmentBindingId: identity.environment_binding_id,
+      subjectNativeId: identity.subject_native_id, actionAuthorityId: identity.action_authority_id,
+      runId: identity.run_id, turnId: "turn:create" };
+    const original = await store.create({ ...request, objective });
+    const facts = { health: 20 };
+    const next = { ...request, runId: "run:prepared-next", turnId: "turn:checkpoint-next",
+      goalId: original.goal_id, expectedRevision: original.revision, evidenceRefs: ["digest:one"],
+      payload: { kind: "checkpoint_verified" as const, checkpoint_id: "checkpoint:run-continuation",
+        milestone_id: null, observation_revision: 1, verified_facts: facts,
+        completed_postcondition_ids: [], incomplete_postcondition_ids: [],
+        checkpoint_evidence_hash: checkpointHash(facts, ["digest:one"], 1, [], []) } };
+    await expect(store.append({ ...next, ownerProfileId: "profile:two" })).rejects.toMatchObject({ code: "durable_goal_forbidden" });
+    await expect(store.append({ ...next, evidenceRefs: ["digest:wrong"] })).rejects.toMatchObject({ code: "durable_goal_evidence_identity_mismatch" });
+    const continued = await store.append(next);
+    expect(continued).toMatchObject({ goal_id: original.goal_id, revision: 2, status: "active",
+      objective: original.objective, milestones: original.milestones, attempt_count: 0,
+      identity: { ...original.identity, run_id: next.runId, turn_id: next.turnId } });
+    await expect(store.append(next)).rejects.toMatchObject({ code: "durable_goal_revision_conflict" });
+    const lookup = { roomId: identity.room_id, profileId: identity.owner_profile_id, participantId: identity.participant_id };
+    await expect(harness.makeStore().findForSession({ ...lookup, runId: next.runId })).resolves.toMatchObject({ goal_id: original.goal_id, revision: 2 });
+    await expect(harness.makeStore().findForSession({ ...lookup, runId: identity.run_id })).resolves.toBeNull();
+  } finally { await harness.pool.end(); }
+});
+
 it.each(["unchanged", "canceled"] as const)("first-session preparation preserves %s goal after a committed response loss", async disposition => {
   const harness = await createHarness();
   try {
@@ -205,7 +235,8 @@ it.each(["unchanged", "canceled"] as const)("first-session preparation preserves
   } finally { await harness.pool.end(); }
 });
 
-it("Ready up recovers through the real ledger once without completing milestones", async () => {
+it.each(["recorded restart", "unrecorded idle epoch", "lost marker reply", "lost rebound reply",
+  "lost checkpoint reply", "lost resume reply"])("Ready up recovers %s through the real ledger once without completing milestones", async scenario => {
   const harness = await createHarness();
   try {
     const store = harness.makeStore();
@@ -213,9 +244,12 @@ it("Ready up recovers through the real ledger once without completing milestones
       environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one",
       runId: "run:one", turnId: "turn:one" };
     const created = await store.create({ ...request, objective });
-    const recovering = await store.append({ ...request, goalId: created.goal_id, expectedRevision: created.revision,
-      payload: { kind: "recovery_required", reason: "fabric_restart", last_recoverable_checkpoint_id: null } });
-    const current = { ...identity, producer_epoch_ref: "epoch:two", authority_policy_version: 2 };
+    const recovering = scenario === "recorded restart"
+      ? await store.append({ ...request, goalId: created.goal_id, expectedRevision: created.revision,
+        payload: { kind: "recovery_required", reason: "fabric_restart", last_recoverable_checkpoint_id: null } })
+      : created;
+    const current = { ...identity, producer_epoch_ref: "epoch:two",
+      authority_policy_version: scenario === "recorded restart" ? 2 : 1 };
     harness.setCurrentIdentity(current);
     const input = { context: { profileId: "profile:owner", participantId: "participant:one", roomId: "room:one",
       runId: "run:one", goalId: created.goal_id, expectedRevision: recovering.revision,
@@ -225,16 +259,33 @@ it("Ready up recovers through the real ledger once without completing milestones
         helixConversationId: "chat:one", missionId: null },
       environmentBindingId: "environment:one", sourceId: "source:one", worldId: "minecraft:overworld",
       subjectBindingId: "subject:one", actionAuthorityId: "authority:one" };
-    const dependencies = { goals: store, database: async () => harness.pool as unknown as Queryable,
+    const lostReplyStep = ["lost marker reply", "lost rebound reply", "lost checkpoint reply", "lost resume reply"].indexOf(scenario) + 1;
+    let writes = 0;
+    const dependencies = { goals: {
+      inspect: store.inspect.bind(store), resolveTemporalAdmissionContext: store.resolveTemporalAdmissionContext.bind(store),
+      append: async (value: Parameters<EnvironmentDurableGoalStore["append"]>[0]) => {
+        const committed = await store.append(value);
+        if (++writes === lostReplyStep) throw new Error("simulated committed recovery reply loss");
+        return committed;
+      },
+    }, database: async () => harness.pool as unknown as Queryable,
       identity: async () => current,
-      perception: async () => ({ evidence: { observation: { evidence_ref: "digest:two",
-        result: { observation_revision: 2 } } } }) as never };
+      perception: async () => ({ evidence: { observation: { evidence_ref: "digest:two", observation_revision: 2,
+        result: { observation_revision: 100 } } } }) as never };
     // Exact binding and connector/probe readers are fixture ports; ledger and
     // reducer, evidence-hash validation and revision checks are real here.
     const bindingStore = { verifyTaskAssociation: () => ({}) as never };
+    if (lostReplyStep) {
+      await expect(recoverEnvironmentSessionGoal(input, bindingStore, dependencies))
+        .rejects.toThrow("simulated committed recovery reply loss");
+      expect(await store.inspect(input.context)).toMatchObject({ revision: created.revision + lostReplyStep,
+        status: lostReplyStep === 4 ? "active" : "recovery_required", attempt_count: 0 });
+    }
     const first = await recoverEnvironmentSessionGoal(input, bindingStore, dependencies);
-    expect(first.goal).toMatchObject({ status: "active", revision: recovering.revision + 3,
+    expect(first.goal).toMatchObject({ status: "active", revision: 5,
       recovery: { required: false } });
+    expect(first.goal.identity).toEqual({ ...current, turn_id: input.context.turnId });
+    expect(first.goal.attempt_count).toBe(0);
     expect(first.goal.milestones[0].completed_postcondition_ids).toEqual([]);
     const before = await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events WHERE goal_id=$1 ORDER BY sequence", [created.goal_id]);
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -243,6 +294,99 @@ it("Ready up recovers through the real ledger once without completing milestones
     }
     const after = await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events WHERE goal_id=$1 ORDER BY sequence", [created.goal_id]);
     expect(after.rows).toEqual(before.rows);
+  } finally { await harness.pool.end(); }
+});
+
+it.each([
+  ["authority ID", { action_authority_id: "authority:other" }],
+  ["policy version", { authority_policy_version: 2 }],
+  ["authority deadline", { authority_expires_at: "2026-08-25T00:00:00.000Z" }],
+  ["profile", { owner_profile_id: "profile:two" }],
+  ["host", { host_ref: "environment_device:other" }],
+  ["installation", { connector_installation_id: "installation:two" }],
+  ["device", { device_id: "device:two" }],
+  ["source binding", { room_source_binding_id: "source-binding:other" }],
+  ["world", { world_id: "minecraft:other" }],
+  ["player", { subject_native_id: "player:other" }],
+  ["subject binding", { subject_binding_id: "subject:two" }],
+  ["authority participant", { authority_participant_id: "participant:two" }],
+  ["goal owner", { goal_owner_participant_id: "participant:two" }],
+  ["participant", { participant_id: "participant:two" }],
+  ["source", { source_id: "source:other" }],
+  ["environment", { environment_binding_id: "environment:two" }],
+  ["room", { room_id: "room:other" }],
+  ["run", { run_id: "run:other" }],
+  ["expired evidence", {}],
+  ["revoked binding", {}],
+  ["authority unavailable", {}],
+  ["identity changes at commit", {}],
+  ["identity changes at rebound", {}],
+  ["identity changes at checkpoint", {}],
+  ["identity changes at resume", {}],
+  ["manual_override", {}],
+  ["emergency_stop", {}],
+  ["authority_revoked", {}],
+  ["death", {}],
+  ["goal_paused", {}],
+  ["goal_canceled", {}],
+] as const)("idle epoch recovery rejects %s without completing or resuming work", async (scenario, drift) => {
+  const harness = await createHarness();
+  try {
+    const store = harness.makeStore();
+    const request = { ownerProfileId: "profile:owner", roomId: "room:one", participantId: "participant:one",
+      environmentBindingId: "environment:one", subjectNativeId: "player:one", actionAuthorityId: "authority:one",
+      runId: "run:one", turnId: "turn:one" };
+    let goal = await store.create({ ...request, objective });
+    if (["manual_override", "emergency_stop", "authority_revoked", "death"].includes(scenario)) {
+      goal = await store.append({ ...request, goalId: goal.goal_id, expectedRevision: goal.revision,
+        payload: { kind: "recovery_required", reason: scenario as "manual_override",
+          last_recoverable_checkpoint_id: null } });
+    } else if (scenario === "goal_paused" || scenario === "goal_canceled") {
+      goal = await store.append({ ...request, goalId: goal.goal_id, expectedRevision: goal.revision,
+        payload: { kind: scenario, reason: "Operator stopped work" } });
+    }
+    const current = { ...identity, producer_epoch_ref: "epoch:two", ...drift } as typeof identity;
+    harness.setCurrentIdentity(current);
+    const input = { context: { profileId: "profile:owner", participantId: "participant:one", roomId: "room:one",
+      runId: "run:one", goalId: goal.goal_id, expectedRevision: goal.revision,
+      turnId: "turn:recovery", probeRequestId: "probe:recovery", priorTurnId: "turn:prior" },
+      binding: { profileRef: "profile:owner", runId: "run:one" },
+      environmentBindingId: "environment:one", sourceId: "source:one", worldId: "minecraft:overworld",
+      subjectBindingId: "subject:one", actionAuthorityId: "authority:one" };
+    let observationReads = 0;
+    const committedSteps = scenario === "identity changes at rebound" ? 1
+      : scenario === "identity changes at checkpoint" ? 2 : scenario === "identity changes at resume" ? 3 : 0;
+    const dependencies = { goals: store, database: async () => harness.pool as unknown as Queryable,
+      identity: async () => {
+        if (scenario === "authority unavailable") throw new EnvironmentDurableGoalError(
+          "durable_goal_authority_stale", 409, "Authority unavailable");
+        return current;
+      },
+      perception: async () => {
+        observationReads++;
+        if (scenario === "expired evidence") throw new EnvironmentDurableGoalError(
+          "durable_goal_evidence_identity_mismatch", 409, "Expired exact evidence");
+        if (scenario.startsWith("identity changes at") && observationReads === committedSteps + 2)
+          harness.setCurrentIdentity({ ...current,
+          authority_policy_version: 2 } as typeof identity);
+        return { evidence: { observation: { evidence_ref: "digest:two", observation_revision: 2, result: { observation_revision: 100 } } } } as never;
+      } };
+    const binding = { verifyTaskAssociation: vi.fn().mockImplementation(() => {
+      if (scenario === "revoked binding" && binding.verifyTaskAssociation.mock.calls.length > 1)
+        throw new EnvironmentDurableGoalError("durable_goal_forbidden", 403, "Binding revoked");
+      return {} as never;
+    }) };
+    const code = scenario === "revoked binding" ? "durable_goal_forbidden"
+      : scenario === "expired evidence" ? "durable_goal_evidence_identity_mismatch"
+      : Object.keys(drift).length > 0 ? "durable_goal_identity_mismatch" : "durable_goal_authority_stale";
+    await expect(recoverEnvironmentSessionGoal(input as never, binding, dependencies)).rejects.toMatchObject({ code });
+    const after = await store.inspect(input.context);
+    if (committedSteps === 0) expect(after).toEqual(goal);
+    else expect(after).toMatchObject({ status: "recovery_required", revision: goal.revision + committedSteps,
+      recovery: { required: true }, attempt_count: 0 });
+    expect(after.milestones[0].completed_postcondition_ids).toEqual([]);
+    expect((await harness.pool.query("SELECT * FROM helix_environment_durable_goal_events")).rows)
+      .toHaveLength(goal.revision + committedSteps);
   } finally { await harness.pool.end(); }
 });
 

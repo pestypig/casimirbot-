@@ -1,0 +1,13 @@
+# Keyboard setup entry and recovery refusal cases
+
+Supplement to [the setup-entry package](2026-09-13-setup-entry-package.md), under [the onboarding plan](../../work-packets/eh-g8-cs-onboarding-pairing-plan-v1.md). This retains all original CS1–CS4 exits and does not substitute for integrated acceptance.
+
+The ordinary `release-setup-entry-20260913` EXE remained at Sign in to CasimirBot when reobserved. After opening Activity & setup with the pointer, native Tab navigation visibly focused Activity, Technical and External agent setup. Enter expanded the disclosure; Tab visibly focused Open Agent Access; Enter activated it. A subsequent state capture confirmed the drawer closed and the existing Agent Access panel remained visible. The accessibility focus field reported the root document rather than the focused HTML control, so screenshot focus rings supplied the focus evidence. Immediate post-input captures sometimes showed the prior frame; a fresh observation established the settled result before the next activation. No authentication or consent control was activated.
+
+This adds ordinary native keyboard activation evidence for the repaired setup entry. It does not prove keyboard operation of pairing/permission checkboxes, the full browser matrix, exact delivery, or successful authentication. The earlier pointer and byte-comparison evidence remains separately scoped.
+
+The recovery-supervisor fixture now explicitly exercises missing account, user account without developer access, and changed account. Each rejects with its exact reason, no start or stop call, no queued retry, and manual intervention required. Four further deferred-account cases resolve a previously pending account check after operator stop, credentials cleared, credentials reconfigured or scope transition. Each preserves the cancellation projection and produces no subsequent tunnel start, stop, retry or projection.
+
+`tests/desktop-mcp-tunnel-recovery-supervisor.spec.ts` passed 10/10; `tests/desktop-active-account-session.spec.ts` passed 6/6. These use the actual supervisor/account helper with deterministic controller and account fixtures. They do not establish cross-process recovery, remote MCP socket reconnection, or cookie persistence through the ordinary EXE. No production code changed in this increment and no additional rebuild was necessary.
+
+Authentication remains pending human action. The live MCP transport has not been re-established or assigned a new binding by these tests. Next work must preserve the full CS5 requirement inventory and distinguish component, isolated browser, packaged rehearsal and live evidence. ET6 and NAV1 are unchanged.

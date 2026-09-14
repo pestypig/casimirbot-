@@ -1,0 +1,30 @@
+{
+  "schema": "casimirbot.trust_save_renderer_evidence.v1",
+  "observed_at": "2026-09-13T21:58:27.432Z",
+  "service_bundle_sha256": "218b475d950a3fdb4f1e5ba1ef4d9147c9e07c72c5021a47db4cc72298571fd3",
+  "service_revision_guard_markers_present": true,
+  "artifact_root": "C:\\Users\\dan\\Desktop\\RESEARCH 1,0\\research\\Alcubierre drive\\casimirbot.com\\versions\\CasimirBot (9-3-25)\\CasimirBot (9-3-25)\\CasimirBot\\apps\\desktop\\release-trust-save-recovery-20260913\\win-unpacked\\resources\\runtime\\dist\\public",
+  "manifest_encoding": "JSON sorted [relative POSIX path, SHA256] pairs",
+  "files": 635,
+  "renderer_manifest_sha256": "27e306b74814e5bfc36691a8dc777d6771ab5a5d6ad56ccb9f0be54e932f37af",
+  "production_control_assets": [
+    {
+      "path": "assets/AgentConnectionSetup-bOfzHWgb.js",
+      "sha256": "7dc7e7f6b81e0b7cc6d5a0235f7de87f7a6202bce0bec4a4ac6dc394bae50bd4"
+    }
+  ],
+  "fixture_markers": [
+    "fixtureTrustSessions",
+    "fixture-trust-browser-session",
+    "onboarding-trust-handlers-",
+    "isolated-trust-account-resolver",
+    "fixture-private-read-failure",
+    "private-transport-detail",
+    "fixture-browser-session",
+    "fixture_human_route_required",
+    "ephemeralPairingVault",
+    "onboarding-real-handlers-"
+  ],
+  "fixture_content_hits": [],
+  "scope": "Candidate renderer identity and known fixture-marker exclusion only; not native launch or live consent acceptance"
+}

@@ -51,6 +51,22 @@ final class ResidentEffectMeasurementsTest {
     }
 
     @Test
+    void nullableObservationsSurviveSettlementWithoutRelaxingEffectValidation() {
+        Map<String, Object> current = new LinkedHashMap<>(sample(false, 0, 0));
+        current.put("optional_observation", null);
+        current.put("completed_sequence_measurements", List.of(sample(true, 0, 0)));
+        Map<String, Object> result = ResidentEffectMeasurements.resultView(current);
+        assertTrue(result.containsKey("optional_observation"));
+        assertNull(result.get("optional_observation"));
+        assertEquals(true, result.get("player_motion_performed"));
+        assertThrows(UnsupportedOperationException.class, () -> result.put("extra", true));
+        current.put("optional_observation", "later");
+        assertNull(result.get("optional_observation"));
+        current.put("world_mutations_performed", null);
+        assertThrows(IllegalArgumentException.class, () -> ResidentEffectMeasurements.resultView(current));
+    }
+
+    @Test
     void malformedOrOverflowingCountersDoNotBecomeZero() {
         for (Object invalid : List.of(-1, 1.5, Double.NaN, "2")) {
             Map<String, Object> bad = new LinkedHashMap<>(sample(false, 0, 0));

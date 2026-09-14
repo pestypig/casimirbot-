@@ -1,0 +1,24 @@
+{
+  "observed_at": "2026-09-13T11:01:47.3586028Z",
+  "fabric_profiles": [
+    "fabric-loader-1.21.8",
+    "helix-combat-c0-isolated"
+  ],
+  "java_processes": [],
+  "installed_companions": [
+    {
+      "path": "C:\\Users\\dan\\AppData\\Roaming\\.minecraft\\mods\\HelixFabricPlayerAgent-0.4.0.jar",
+      "sha256": "ace92bc3d8b6c93dc6b12c94673d4d9c6ac4962bd2545b42bf5153ae3cea1ccf",
+      "bytes": 402357
+    },
+    {
+      "path": "C:\\Users\\dan\\AppData\\Roaming\\.minecraft-helix-c0\\mods\\HelixFabricPlayerAgent-0.4.12.jar",
+      "sha256": "bd5b8eb7e0a89a34415d14a97b58722590ab1264bd5d33989b7dcb88f77c550e",
+      "bytes": 543285
+    }
+  ],
+  "new_companion_sha256": "9e9b6a83cee0f995fc9f0a44b4b35196d32f5d54bffcf4e12de47b38c7ea3b29",
+  "selected_rehearsal_profile": null,
+  "deployment_performed": false,
+  "launch_performed": false
+}

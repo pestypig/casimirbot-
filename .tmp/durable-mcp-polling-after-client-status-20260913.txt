@@ -1,0 +1,561 @@
+ M apps/desktop/electron-builder.config.cjs
+ M apps/desktop/package.json
+ M apps/desktop/scripts/stage-runtime.mjs
+ M apps/desktop/scripts/verify-runtime-tree.mjs
+ M apps/desktop/src/main.ts
+ M apps/desktop/src/security.ts
+ M client/e2e/onboarding-isolated/binding-input.spec.ts
+ M client/e2e/onboarding-isolated/durable-pairing.spec.ts
+ M client/src/components/__tests__/helix-workstation-shell-mobile.spec.tsx
+ M client/src/components/agent-access/AgentAccountBindingReadiness.tsx
+ M client/src/components/agent-access/AgentConnectionSetup.tsx
+ M client/src/components/agent-access/DurableTaskPairing.tsx
+ M client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx
+ M client/src/components/agent-access/__tests__/AgentConnectionSetup.spec.tsx
+ M client/src/components/agent-access/__tests__/DurableTaskPairing.spec.tsx
+ M client/src/components/agent-access/agentConnectionSetupState.ts
+ M client/src/components/helix/HelixAskPill.tsx
+ M client/src/components/helix/ask-console/BoundAgentPromptDisplay.tsx
+ M client/src/components/helix/ask-console/HelixAskConsoleRuntimeShell.tsx
+ M client/src/components/helix/ask-console/__tests__/BoundAgentPromptDisplay.spec.tsx
+ M client/src/components/helix/ask-console/__tests__/HelixAskConsoleLayout.spec.tsx
+ M client/src/components/helix/ask-console/shared-live-room/MinecraftLocalLifecycleCard.tsx
+ M client/src/components/workstation/HelixWorkstationShell.tsx
+ M client/src/components/workstation/WorkstationGuidanceOverlay.tsx
+ M client/src/components/workstation/__tests__/WorkstationGuidanceOverlay.spec.tsx
+ M client/src/lib/agent-access/__tests__/durablePairing.spec.ts
+ M client/src/lib/agent-access/durablePairing.ts
+ M client/src/lib/docs/docMetadata.generated.ts
+ M client/src/lib/workstation/__tests__/profileStorageSync.spec.ts
+ M client/src/lib/workstation/profileStorageSync.ts
+ M client/src/store/useAgiChatStore.ts
+ M docs/helix-ask/workstation-tool-contracts/environment-connector.local-lifecycle.md
+ M docs/helix-environment-harness-work-program-v1.md
+ M docs/research/controlled-stellar-composition-transport-white-paper-outline.md
+ M docs/research/controlled-stellar-composition-transport-work-program.md
+ M docs/starsim/mesa-gyre-worker.md
+ M docs/work-packets/eh-g8-environment-spatial-navigation-v1.md
+ M docs/work-packets/eh-g8-nav1o-admitted-collision-observation-v1.md
+ M minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/PlayerActionController.java
+ M minecraft/helix-fabric-player-agent/src/main/java/com/casimirbot/helixplayer/fabric/ResidentEffectMeasurements.java
+ M minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/FluidSequenceEngineTest.java
+ M minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/PlayerActionRuntimeTransportTest.java
+ M minecraft/helix-fabric-player-agent/src/test/java/com/casimirbot/helixplayer/fabric/ResidentEffectMeasurementsTest.java
+ M minecraft/helix-minecraft-connector-core/.gradle/8.14.3/executionHistory/executionHistory.lock
+ M minecraft/helix-minecraft-connector-core/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+ M minecraft/helix-minecraft-connector-core/.gradle/file-system.probe
+ M minecraft/helix-minecraft-connector-core/build/libs/HelixMinecraftConnectorCore-0.2.0.jar
+ M scripts/helix-minecraft-launch-fabric-loopback.ps1
+ M server/__tests__/account-session-panel.test.ts
+ M server/__tests__/helix.ask.turn.live-source-continuation-routing.test.ts
+ M server/db/__tests__/pairing-ledger-snapshot.test.ts
+ M server/db/client.ts
+ M server/db/migrator.ts
+ M server/mcp/__tests__/helix-mcp-local-supervisor-coordination.test.ts
+ M server/mcp/__tests__/helix-mcp-minecraft-local-lifecycle.test.ts
+ M server/mcp/helix-mcp-server.ts
+ M server/routes/__tests__/agent-connections.test.ts
+ M server/routes/__tests__/desktop-mcp-tunnel-transition.test.ts
+ M server/routes/__tests__/minecraft-local-lifecycle-route.test.ts
+ M server/routes/__tests__/pairing-rendered-workflow.test.ts
+ M server/routes/account-session.ts
+ M server/routes/agent-connections.ts
+ M server/routes/desktop-mcp-tunnel-transition.ts
+ M server/routes/environment-connector-platform.ts
+ M server/services/environment-connectors/actions/__tests__/temporal-delivery-status.test.ts
+ M server/services/environment-connectors/actions/action-broker.ts
+ M server/services/environment-connectors/actions/authority-store.ts
+ M server/services/environment-connectors/actions/temporal-delivery-status.ts
+ M server/services/environment-connectors/events/__tests__/native-temporal-publication.test.ts
+ M server/services/environment-connectors/installations/minecraft-fabric-loopback-lifecycle.ts
+ M server/services/environment-connectors/pairing/__tests__/local-minecraft-run-profile-store.test.ts
+ M server/services/environment-connectors/pairing/local-minecraft-run-profile-store.ts
+ M server/services/environment-connectors/session/__tests__/session-readiness.test.ts
+ M server/services/environment-connectors/session/preparation-intent-store.ts
+ M server/services/environment-connectors/subjects/index.ts
+ M server/services/environment-connectors/subjects/subject-binding-store.ts
+ M server/services/environment-connectors/temporal-plans/__tests__/native-handoff-fixture.test.ts
+ M server/services/environment-connectors/temporal-plans/temporal-frontier-publisher.ts
+ M server/services/helix-account/__tests__/installed-security-store.test.ts
+ M server/services/helix-account/__tests__/profile-storage-native-broker.test.ts
+ M server/services/helix-account/installed-security-store.ts
+ M server/services/helix-account/profile-storage-store.ts
+ M server/services/helix-ask/workstation-tool-gateway/__tests__/minecraft-local-lifecycle.test.ts
+ M server/services/helix-ask/workstation-tool-gateway/minecraft-local-lifecycle.ts
+ M server/services/local-supervisor/__tests__/durable-reasoning-binding-access.test.ts
+ M server/services/local-supervisor/__tests__/pairing-ledger-repository.test.ts
+ M server/services/local-supervisor/__tests__/pairing-runtime-binding.test.ts
+ M server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts
+ M server/services/local-supervisor/durable-reasoning-binding-access.ts
+ M server/services/local-supervisor/pairing-invitation-service.ts
+ M server/services/local-supervisor/pairing-ledger-contract.ts
+ M server/services/local-supervisor/pairing-ledger-repository.ts
+ M server/services/local-supervisor/pairing-transition-service.ts
+ M server/services/local-supervisor/reasoning-task-binding-store.ts
+ M shared/helix-minecraft-local-lifecycle.ts
+ M shared/helix-profile-storage.ts
+ M tests/desktop-host-security.spec.ts
+ M tests/desktop-mcp-tunnel-recovery-supervisor.spec.ts
+ M tests/desktop-mcp-tunnel-transition-executor.spec.ts
+?? .tmp/compare-account-entry-20260913.cjs
+?? .tmp/compare-account-scope-20260913.cjs
+?? .tmp/compare-durable-polling-20260913.cjs
+?? .tmp/compare-frontier-lease-20260913.cjs
+?? .tmp/compare-guidance-recovery-20260913.cjs
+?? .tmp/compare-launcher-diagnostic-20260913.cjs
+?? .tmp/compare-launcher-native-20260913.cjs
+?? .tmp/compare-launcher-profile-20260913.cjs
+?? .tmp/compare-oauth-callback-20260913.cjs
+?? .tmp/compare-oauth-dispatch-20260913.cjs
+?? .tmp/compare-oauth-expiry-20260913.cjs
+?? .tmp/compare-oauth-journal-20260913.cjs
+?? .tmp/compare-oauth-open-wait-20260913.cjs
+?? .tmp/compare-oauth-request-recovery-20260913.cjs
+?? .tmp/compare-oauth-status-recovery-20260913.cjs
+?? .tmp/compare-oauth-wait-20260913.cjs
+?? .tmp/compare-onboarding-clipboard-20260912.cjs
+?? .tmp/compare-onboarding-delivery-20260912.cjs
+?? .tmp/compare-onboarding-display-20260912.cjs
+?? .tmp/compare-onboarding-guidance-20260912.cjs
+?? .tmp/compare-onboarding-pairing-20260912.cjs
+?? .tmp/compare-onboarding-recovery-20260912.cjs
+?? .tmp/compare-onboarding-replacement-20260912.cjs
+?? .tmp/compare-onboarding-visibility-20260912.cjs
+?? .tmp/compare-owner-recovery-20260913.cjs
+?? .tmp/compare-pending-bootstrap-20260913.cjs
+?? .tmp/compare-pg-recovery-20260913.cjs
+?? .tmp/compare-profile-recovery-20260913.cjs
+?? .tmp/compare-profile-settlement-20260913.cjs
+?? .tmp/compare-saved-server-20260913.cjs
+?? .tmp/compare-saved-server-properties-20260913.cjs
+?? .tmp/compare-setup-entry-20260913.cjs
+?? .tmp/compare-trust-read-recovery-20260913.cjs
+?? .tmp/compare-trust-recovery-20260913.cjs
+?? .tmp/compare-trust-save-recovery-20260913.cjs
+?? .tmp/continuous-broker-lost-batch-ack-20260913.json
+?? .tmp/continuous-broker-lost-batch-ack-retry-20260913.json
+?? .tmp/continuous-broker-lost-third-20260913.json
+?? .tmp/continuous-broker-manual-observation-20260913.json
+?? .tmp/continuous-broker-manual-observation-repair-20260913.json
+?? .tmp/continuous-broker-manual-observation-valid-reason-20260913.json
+?? .tmp/continuous-broker-positive-20260913.json
+?? .tmp/continuous-newer-observation-red-20260913.json
+?? .tmp/continuous-newer-observation-repair-20260913.json
+?? .tmp/durable-mcp-polling-after-client-status-20260913.txt
+?? .tmp/durable-mcp-polling-prebuild-status-20260913.txt
+?? .tmp/launcher-diagnostic-verification-request-20260913.json
+?? .tmp/launcher-native-verification-request-20260913.json
+?? .tmp/launcher-profile-verification-request-20260913.json
+?? .tmp/local-server-desktop-deps-20260913.json
+?? .tmp/local-server-final-tests-20260913.json
+?? .tmp/local-server-properties-verification-request-20260913.json
+?? .tmp/local-server-verification-request-20260913.json
+?? .tmp/oauth-browser-handoff-probe.cjs
+?? .tmp/onboarding-real-handlers-qIC76V/
+?? .tmp/pairing-browser-authority-20260913.json
+?? .tmp/pairing-core-reconciliation-20260913.json
+?? .tmp/pairing-default-browser-isolation-20260913.json
+?? .tmp/pairing-keyloss-contract-20260913.json
+?? .tmp/read-uia-assembly.ps1
+?? .tmp/ready-up-core-reconciliation-20260913.json
+?? .tmp/scan-clipboard-package-fixtures.cjs
+?? .tmp/scan-delivery-package-fixtures.cjs
+?? .tmp/scan-display-package-fixtures.cjs
+?? .tmp/scan-durable-polling-fixtures.cjs
+?? .tmp/scan-guidance-package-fixtures.cjs
+?? .tmp/scan-guidance-renderer-20260913.cjs
+?? .tmp/scan-launcher-diagnostic-fixtures.cjs
+?? .tmp/scan-launcher-native-fixtures.cjs
+?? .tmp/scan-launcher-profile-fixtures.cjs
+?? .tmp/scan-pending-bootstrap-fixtures.cjs
+?? .tmp/scan-pg-recovery-package-fixtures.cjs
+?? .tmp/scan-saved-server-fixtures.cjs
+?? .tmp/scan-saved-server-properties-fixtures.cjs
+?? .tmp/scan-trust-read-renderer-20260913.cjs
+?? .tmp/scan-trust-save-renderer-20260913.cjs
+?? .tmp/sysinternals-process-monitor/
+?? .tmp/temporal-frontier-lease-regressions-20260913.json
+?? .tmp/verify-launcher-diagnostic-adapter-20260913.ts
+?? .tmp/verify-launcher-native-adapter-20260913.ts
+?? .tmp/verify-launcher-profile-adapter-20260913.ts
+?? .tmp/verify-saved-server-adapter-20260913.ts
+?? .tmp/verify-saved-server-properties-adapter-20260913.ts
+?? apps/desktop/BUILD_RETENTION.md
+?? apps/desktop/scripts/check-build-retention.mjs
+?? apps/desktop/src/oauth-diagnostic-journal.ts
+?? client/e2e/onboarding-isolated/durable-real-entry.tsx
+?? client/e2e/onboarding-isolated/durable-real-handlers.spec.ts
+?? client/e2e/onboarding-isolated/oauth-wait-recovery.spec.ts
+?? client/e2e/onboarding-isolated/origin-recovery-boundary.spec.ts
+?? client/e2e/onboarding-isolated/profile-origin-recovery.spec.ts
+?? client/e2e/onboarding-isolated/profile-recovery-entry.tsx
+?? client/e2e/onboarding-isolated/profile-recovery-exports.ts
+?? client/e2e/onboarding-isolated/real-handler-exports.ts
+?? client/e2e/onboarding-isolated/trust-real-handler-exports.ts
+?? client/e2e/onboarding-isolated/trust-real-handlers.spec.ts
+?? client/e2e/onboarding-isolated/trust-session-fixture.ts
+?? client/src/components/helix/ask-console/shared-live-room/__tests__/MinecraftLocalLifecycleCard.spec.tsx
+?? client/src/store/useAgiChatStore.pairedBinding.spec.ts
+?? configs/research/controlled-stellar-composition-transport-g1-acceptance-design.v1.json
+?? configs/research/controlled-stellar-composition-transport-g1-model-design.v1.json
+?? configs/research/controlled-stellar-composition-transport-g1-neutrino-source.v1.json
+?? configs/research/controlled-stellar-composition-transport-g1-source-intake.v1.json
+?? configs/research/controlled-stellar-composition-transport-g1-structural-source.v1.json
+?? docs/evidence/eh-g8-environment-spatial-navigation-v1/2026-09-13-nav1o-deterministic-acceptance.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-atomic-pairing-snapshot-integration.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-automatic-browser-prompt-chain.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-automatic-delivery-feasibility.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-automatic-delivery-http-integration.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-automatic-delivery-ui-choice.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-automatic-real-browser-integration.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-automatic-ui-late-response.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-browser-account-cookie-switch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-browser-clock-skew-pairing.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-browser-durable-steering-chain.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-browser-late-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-browser-steering-recovery-display.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-chromium-real-pairing-handlers.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-clipboard-ordinary-native.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-clipboard-package-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-baseline.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-baseline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-cancel.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-emergency.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-native-publications.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-settlement-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-settlement.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-broker-settlement.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-chain-compiled.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-chain-engine.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-chain-stops.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-native-cancel.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-native-emergency.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-runtime-compiled.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-runtime-publication.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-runtime-settlement.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-continuous-stop-retirement.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-cs5-onboarding-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-current-package-regression-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-current-task-pairing-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-account-race-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-concurrent-acceptance.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-deadline-revocation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-discovery-pagination.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-encrypted-repository.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-environment-admission-races.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-invitation-deadline-matrix.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-package-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-package-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-package-ordinary-start.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-process-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-provider-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-public-route-browser-regression.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-delivery-transition-contract.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-diagnostic-read-timeout.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-display-package-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-display-package-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-display-package-ordinary-start.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-delivery-consent-discovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-access-integration.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-error-contract.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-pagination.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-policy.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-public-regressions.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-service.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-durable-steering-storage-primitive.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-embedded-replacement-commit-primitive.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-emergency-stop-disk-reload.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-emergency-stop-persistence.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-emergency-stop-retry.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-guidance-ordinary-native.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-guidance-package-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-guidance-transport-scope.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-initial-storage-blocker-presentation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-late-reconciliation-account-switch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-late-runtime-recovery-ui.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-late-successful-runtime-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-mcp-native-control-guidance.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-broker-fixture-revalidation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-broker-normal-baseline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-broker-normal-timing.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-clipboard-permission.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-diagnostic-copy-fallback.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-guidance-scope-repair.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-native-recovery-panel-guidance.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-clipboard-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-clipboard-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-delivery-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-delivery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-display-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-display-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-guidance-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-guidance-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-pairing-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-pairing-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-recovery-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-replacement-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-visibility-package-checks.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-onboarding-visibility-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-ordinary-agent-access-presence-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-package-fixture-isolation-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-pairing-catalog-contract-recheck.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-pairing-deadline-transition-matrix.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-pairing-storage-recovery-diagnostics.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-persisted-pairing-projection-invalidation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-preparation-presence-error-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-preparation-typed-refusals.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-prompt-display-read-deadline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-provider-verification-admission-race.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-published-pairing-catalog-refresh.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-real-invitation-clipboard.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-recovery-ordinary-start.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-rejected-replacement-preserves-binding.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-rendered-replacement-review.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-replacement-mcp-and-disk-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-replacement-package-validation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-replacement-policy-full-discipline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-replacement-storage-atomicity-probe.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-replacement-straddled-read-replay.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-replacement-transition-service.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-retired-broker-cancel.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-retired-broker-emergency.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-retired-native-cancel.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-retired-native-emergency.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-reviewed-replacement-issuance.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-runtime-projection-invalidation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-runtime-recovery-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-runtime-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-runtime-recovery-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-runtime-recovery-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-setup-and-accept-revoke-race.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-setup-guidance-and-panel-visibility.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-immutable-ack-write.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-native-broker-snapshot.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-process-expiry.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-process-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-process-revocation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-restart-invariant-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-steering-revision-validation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-typed-steering-visible-dedupe.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-visibility-ordinary-native-rehearsal.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-12-visible-agent-prompt-browser.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-entry-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-entry-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-entry-repair.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-entry-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-event-browser-integration.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-readiness-stale-body.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-recovery-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-scope-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-scope-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-account-scope-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-actual-host-delivery-feasibility.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-browser-connection-recovered.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-browser-dispatch-recovered.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-browser-dispatch-recovered.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-browser-protocol-probe-incomplete.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-browser-restart-followup.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-chrome-dispatch-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-com-sta-dispatch-control.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-companion-installation-inventory.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-companion-installation-inventory.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-batch-ack-broker.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-batch-ack-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-batch-ack.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-deadline-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-deadline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-real-broker-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-real-broker-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-real-broker.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third-real-broker.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-lost-third.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-manual-observation-broker.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-manual-observation-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-continuous-manual-observation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-device-registration-accepted.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-dispatch-startup-observation-limits.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-frontier-lease-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-frontier-lease-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-frontier-lease-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-frontier-lease-smoke.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-guidance-recovery-launch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-guidance-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-guidance-renderer.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-keyboard-and-recovery-negatives.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-diagnostic-adapter-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-diagnostic-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-diagnostic-launch.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-diagnostic-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-native-adapter-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-native-cs5-handoff.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-native-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-native-launch.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-native-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-profile-adapter-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-profile-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-profile-launch.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-launcher-profile-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-manual-browser-dispatch-correlation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-manual-observation-companion.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-manual-observation-companion.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-manual-repair-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-mcp-transport-prerequisite.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-native-callback-negative-probe.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-native-oauth-link-accepted.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-native-room-preparation.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-newer-observation-broker.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-newer-observation-lease-rejection.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-newer-observation-native.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-callback-diagnostics.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-callback-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-dispatch-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-expiry-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-journal-native-probe.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-journal-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-native-open-wait-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-open-wait-launch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-open-wait-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-recovery-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-request-recovery-launch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-request-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-start-request-deadline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-status-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-wait-browser-input.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-wait-deadline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-wait-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-oauth-wait-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-ordinary-recovery-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-origin-recovery-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-owner-recovery-cs5-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-owner-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-owner-recovery-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-owner-recovery-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-package-memory-preflight.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pairing-clipboard-failure-real-handlers.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pairing-core-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pairing-core-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pairing-default-browser-isolation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pairing-idle-input-verification.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pairing-prerequisite-reasons.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pending-bootstrap-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pending-bootstrap-launch.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pending-bootstrap-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pg-recovery-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-pg-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-post-click-account-check.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-post-reboot-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-post-restart-dispatch-reproduced.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-post-sign-in-transport-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-procmon-stale-handler.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-procmon-stale-handler.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-account-event-invalidation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-account-observation-order.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-artifact-owner-admission.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-preferences-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-queued-owner-recheck.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-recovery-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-recovery-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-restore-failure-repair.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-settlement-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-settlement-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-settlement-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-stale-upload-receipt.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-profile-write-account-precondition.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-ready-up-composition.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-real-postgres-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-rendered-pairing-reconciliation.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-restored-mcp-boundaries.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-adapter-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-cs5-handoff.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-launch.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-properties-adapter-verification.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-properties-fixture-scan.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-properties-launch.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-saved-server-properties-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-setup-account-event-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-setup-entry-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-setup-entry-package.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-setup-entry-repair.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-setup-entry-smoke.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-status-read-deadline.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-status-recovery-packaged-launch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-read-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-read-renderer.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-ready-up-startup-boundary.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-recovery-launch.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-registration-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-save-recovery-package.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-save-recovery.md
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-save-renderer.json
+?? docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-13-trust-status-read-recovery.md
+?? docs/research/controlled-stellar-composition-transport-3d-convection-plan.md
+?? docs/research/controlled-stellar-composition-transport-g1-image-install-2026-09-13.md
+?? docs/research/controlled-stellar-composition-transport-g1-preflight-2026-09-13.md
+?? docs/research/controlled-stellar-composition-transport-g1-preparation-v1.md
+?? docs/research/controlled-stellar-composition-transport-g1-source-validation-v1.md
+?? docs/work-packets/eh-g8-cs-durable-mcp-polling-v1.md
+?? docs/work-packets/eh-g8-cs-durable-pairing-replacement-v1.md
+?? docs/work-packets/eh-g8-cs-durable-steering-recovery-v1.md
+?? docs/work-packets/eh-g8-cs-local-server-lifecycle-v1.md
+?? minecraft/helix-fabric-player-agent/logs/2026-09-07-2.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-12-1.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-12-2.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-12-3.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-12-4.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-12-5.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-12-6.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-1.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-2.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-3.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-4.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-5.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-6.log.gz
+?? minecraft/helix-fabric-player-agent/logs/2026-09-13-7.log.gz
+?? ops/mesa/g1-preparation-v1/
+?? scripts/helix-minecraft-start-fabric-server.ps1
+?? scripts/test-onboarding-postgres.ps1
+?? server/db/__tests__/emergency-stop-snapshot.test.ts
+?? server/db/__tests__/fixtures/
+?? server/db/__tests__/pairing-atomic-snapshot.test.ts
+?? server/db/__tests__/steering-process-recovery.test.ts
+?? server/db/migrations/090_durable_steering.ts
+?? server/db/migrations/091_pairing_delivery.ts
+?? server/mcp/__tests__/helix-mcp-minecraft-pending-bootstrap.test.ts
+?? server/routes/__tests__/desktop-trust-registration.test.ts
+?? server/routes/__tests__/profile-storage-recovery.test.ts
+?? server/services/environment-connectors/actions/__tests__/emergency-stop-persistence.test.ts
+?? server/services/environment-connectors/installations/__tests__/minecraft-local-lifecycle-orchestration.test.ts
+?? server/services/environment-connectors/installations/__tests__/minecraft-local-server-lifecycle.test.ts
+?? server/services/environment-connectors/installations/minecraft-local-server-lifecycle.ts
+?? server/services/local-supervisor/__tests__/durable-steering-contract.test.ts
+?? server/services/local-supervisor/__tests__/durable-steering-repository.test.ts
+?? server/services/local-supervisor/__tests__/embedded-pairing-replacement-commit.test.ts
+?? server/services/local-supervisor/__tests__/pairing-delivery-contract.test.ts
+?? server/services/local-supervisor/__tests__/pairing-delivery-repository.test.ts
+?? server/services/local-supervisor/__tests__/pairing-replacement-policy.test.ts
+?? server/services/local-supervisor/__tests__/pairing-replacement-storage-mechanics.test.ts
+?? server/services/local-supervisor/durable-steering-contract.ts
+?? server/services/local-supervisor/durable-steering-projection.ts
+?? server/services/local-supervisor/durable-steering-repository.ts
+?? server/services/local-supervisor/durable-steering-service.ts
+?? server/services/local-supervisor/embedded-pairing-replacement-commit.ts
+?? server/services/local-supervisor/pairing-delivery-contract.ts
+?? server/services/local-supervisor/pairing-delivery-repository.ts
+?? server/services/local-supervisor/pairing-delivery-service.ts
+?? shared/helix-pairing-storage-error.ts
+?? tests/fixtures/minecraft-launcher-native-observation.ps1
+?? tests/fixtures/minecraft-launcher-observation-window.ps1
+?? tests/fixtures/minecraft-launcher-profile-selection.ps1
+?? tests/fixtures/minecraft-local-server-lifecycle.ps1
+?? tests/fixtures/minecraft-server-mutex-holder.ps1
+?? tests/integration/
+?? tests/minecraft-launcher-native-observation.spec.ts
+?? tests/minecraft-launcher-profile-selection.spec.ts
+?? tests/minecraft-local-server-lifecycle.spec.ts
+?? tests/oauth-diagnostic-journal.spec.ts

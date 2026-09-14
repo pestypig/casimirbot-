@@ -30,6 +30,7 @@ export type EnvironmentDurableGoalErrorCode =
   | "durable_goal_revision_conflict"
   | "durable_goal_evidence_missing"
   | "durable_goal_evidence_identity_mismatch"
+  | "durable_goal_evidence_stale"
   | "durable_goal_event_invalid"
   | "durable_goal_terminal"
   | "durable_goal_request_conflict"
@@ -42,6 +43,10 @@ export class EnvironmentDurableGoalError extends Error {
     message: string,
     readonly evidenceRefs: string[] = [],
     readonly mismatchReasons: string[] = [],
+    readonly evidenceExpiry?: {
+      evidence_age_ms: number; max_age_ms: number;
+      context_stage_ms?: { goal: number; catalog: number; perception: number };
+    },
   ) {
     super(message);
     this.name = "EnvironmentDurableGoalError";
@@ -845,6 +850,8 @@ export class EnvironmentDurableGoalStore {
   async append(input: EnvironmentDurableGoalIdentityRequest & {
     goalId: string;
     expectedRevision: number;
+    /** Internal recovery precondition; checked against current authority in this transaction. */
+    expectedCurrentIdentity?: HelixEnvironmentDurableGoalIdentity;
     payload: HelixEnvironmentDurableGoalEventPayload;
     evidenceRefs?: string[];
     occurredAt?: string;
@@ -877,6 +884,13 @@ export class EnvironmentDurableGoalStore {
         authorityParticipantId: goal.participant_id,
         subjectNativeId: goal.subject_native_id,
       };
+      const currentIdentity = input.payload.kind !== "recovery_required" || input.expectedCurrentIdentity
+        ? await this.resolveIdentity(db, identityRequest) : null;
+      if (input.expectedCurrentIdentity && helixEnvironmentDurableGoalSha256(currentIdentity) !==
+          helixEnvironmentDurableGoalSha256(input.expectedCurrentIdentity)) {
+        throw new EnvironmentDurableGoalError("durable_goal_authority_stale", 409,
+          "Current identity changed after the recovery observation; acquire fresh exact evidence.");
+      }
       let identityValue: HelixEnvironmentDurableGoalIdentity;
       if (input.payload.kind === "recovery_required") {
         identityValue = {
@@ -886,7 +900,7 @@ export class EnvironmentDurableGoalStore {
           turn_id: input.turnId,
         };
       } else {
-        identityValue = await this.resolveIdentity(db, identityRequest);
+        identityValue = currentIdentity!;
         if (
           runtimeIdentityChanged(previousIdentity, identityValue) &&
           input.payload.kind !== "authority_rebound"

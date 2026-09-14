@@ -100,7 +100,7 @@ describe("desktop service environment", () => {
     expect(environment.HELIX_LOCAL_PROFILE_PASSWORD).toBeUndefined();
   });
 
-  it("pins local state beneath Electron userData with immediate persistence", () => {
+  it("pins local state beneath Electron userData with bounded deferred telemetry persistence", () => {
     const userDataPath = path.resolve("C:\\Users\\person\\CasimirBot");
     const environment = buildDesktopServiceEnvironment({
       processEnv: {},
@@ -117,7 +117,11 @@ describe("desktop service environment", () => {
     expect(relative.startsWith("..")).toBe(false);
     expect(path.isAbsolute(relative)).toBe(false);
     expect(environment.HELIX_LOCAL_PG_MEM_PERSIST).toBe("1");
-    expect(environment.HELIX_LOCAL_PG_MEM_WRITE_MODE).toBe("immediate");
+    // The committed desktop configuration coalesces telemetry; authority writes
+    // separately require a strict durability barrier before acknowledgement.
+    expect(environment.HELIX_LOCAL_PG_MEM_WRITE_MODE).toBe("deferred");
+    expect(environment.HELIX_LOCAL_PG_MEM_IDLE_FLUSH_MS).toBe("2500");
+    expect(environment.HELIX_LOCAL_PG_MEM_MAX_FLUSH_MS).toBe("15000");
     expect(environment.HELIX_DESKTOP_MINECRAFT_PROFILE_STORE).toBe(
       path.join(userDataPath, "state", "local-minecraft-run-profiles.json"),
     );

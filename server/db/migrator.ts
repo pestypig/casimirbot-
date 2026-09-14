@@ -88,6 +88,8 @@ import { migration086 } from "./migrations/086_environment_temporal_resident_act
 import { migration087 } from "./migrations/087_pairing_ledger";
 import { migration088 } from "./migrations/088_pairing_destinations";
 import { migration089 } from "./migrations/089_pairing_destination_identity";
+import { migration090 } from "./migrations/090_durable_steering";
+import { migration091 } from "./migrations/091_pairing_delivery";
 import type { MigrationContext } from "./migrations/migration";
 
 const MIGRATIONS = [
@@ -180,6 +182,8 @@ const MIGRATIONS = [
   migration087,
   migration088,
   migration089,
+  migration090,
+  migration091,
 ];
 
 export async function runMigrations(pool: Pool): Promise<void> {

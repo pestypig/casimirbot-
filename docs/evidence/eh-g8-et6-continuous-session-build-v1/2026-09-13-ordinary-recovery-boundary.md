@@ -1,0 +1,15 @@
+# Ordinary package recovery boundary
+
+This supplements [the runtime/recovery package](2026-09-12-runtime-recovery-package.md) under [the continuous-session packet](../../work-packets/eh-g8-et6-continuous-session-build-v1.md) and [onboarding plan](../../work-packets/eh-g8-cs-onboarding-pairing-plan-v1.md). It is an observed setup boundary, not integrated acceptance.
+
+The earlier package-switch launch call was interrupted after the old EXE closed. A fresh process inspection found no CasimirBot process; native window enumeration also found no CasimirBot window. This establishes absence, not an application crash or its cause.
+
+The replacement `apps/desktop/release-runtime-recovery-20260912/win-unpacked/CasimirBot.exe` was rehashed before launch: SHA256 `de7f33876c58a69d48632a8dad19c3bf0e0583f754f37a4158e746e275b563f1`. It launched through the supported native application API into the ordinary profile. The startup log reported full API readiness at 2026-09-13T07:24:54.211Z. The rendered workstation and subsequent Activity & setup drawer were inspected. The prior package remains available for rollback.
+
+The ordinary renderer opened on New chat and the activity panel displayed `Sign in to inspect Helix activity.` No old chat, room, task binding, or action permission was silently selected. Expanding External agent setup exposed no usable setup content in this account state. This is a reproducible presentation/recovery gap to inspect, not proof that the pairing checkbox is repaired. Source inspection locates the drawer content in AgentRunObserverBindingSurface, whose availability is account-policy gated.
+
+The current external catalog now exposes destination registration and pairing acceptance, in addition to Ready up and binding/steering tools. Actual authenticated supervisor presence calls from this exact continuation returned `McpServerError: Session terminated` on two attempts. No registration or accepted binding is claimed. The catalog gap from earlier snapshots has changed; successful transport invocation remains unproven. The local MCP HTTP route is stateless (`sessionIdGenerator: undefined`), so this remote error alone does not identify a local HTTP session-store bug. No new tunnel health artifact was observed after launch; existing files are historical and do not prove a live tunnel.
+
+The existing recovery-supervisor component suite passed 4/4 tests on this checkout. Its scope is deterministic retry/cancellation and account/scope checks, not ordinary-profile sign-in persistence or external MCP reconnection. No production credential store was inspected, no consent was automated, and no replacement task or unkeyed service was created.
+
+Still required: diagnose ordinary account recovery and blank setup guidance, restore authenticated transport through supported workflows, register the exact current task, and obtain genuine scoped pairing approval before integrated Ready up/prompt/pickup/ack rehearsal. All original CS1–CS4 and O1–O6 exits remain subject to their full evidence requirements. ET6 and NAV1 are not advanced by this record.

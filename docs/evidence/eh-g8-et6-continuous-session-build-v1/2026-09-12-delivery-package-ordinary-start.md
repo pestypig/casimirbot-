@@ -1,0 +1,11 @@
+# Delivery package ordinary startup checkpoint
+
+O6 artifact rehearsal under the [onboarding plan](../../work-packets/eh-g8-cs-onboarding-pairing-plan-v1.md). This is not integrated acceptance.
+
+Closed the prior display package normally with Alt+F4 and verified its processes had exited. Verified the delivery EXE SHA256 against `0d163316135ecd0a4146e32ae28fd7480306f3dac4ec305b01bf872fb7fe7ac3`, then launched `apps/desktop/release-onboarding-delivery-20260912/win-unpacked/CasimirBot.exe` once with the ordinary retained profile. Main PID was 12100. No duplicate launch was used while startup completed.
+
+The readiness receipt reported ready at 2026-09-12T20:10:36.145Z, service PID 19116 and loopback origin `http://127.0.0.1:51080`. Authenticated supervisor presence succeeded at 20:10:48.354Z against new service instance `service_instance:5a4e96f8fef15358b9a37e33c2b3dcdf`. Server-verified profile and native MCP client matched the preceding service. The exact continuation remained `codex:thread:01a081e3-1973-76a3-b35b-0bd6d541933d`, client-declared with tool-activity-only observability and empty resource claims. No old room, run or execution lease was restored.
+
+Supported human-control presentation brought native window 7343130 forward and opened Agent Access without invoking consent. Native accessibility inspection confirmed the retained Continuous session recovery chat, exact chat ID `3486258f-c99e-467b-b925-bdce86ec040f`, retained Full Harness device trust, invitation-expiry/pairing-duration controls, no registered destination, automatic delivery unavailable, and disabled legacy binding/run association. The new package was identified by its exact executable path. Initial Full Harness scope was inactive; this checkpoint does not claim restoration of that finite lease.
+
+Current task catalog still includes Ready up, prompt submit, legacy claim, steering read and acknowledgement, but lacks destination register, pairing accept and pairing recover. Publication in source is not callable catalog adoption. No refresh/reconnect workaround, replacement task, production consent, invitation acceptance, automatic delivery or gameplay was performed. All full CS1–CS4/O1–O6 criteria and original ET6 remain open. Documentation audit passed immediately before this checkpoint; rerun accompanies its addition.

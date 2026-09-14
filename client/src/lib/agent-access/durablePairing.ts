@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isPairingStorageErrorCode } from "../../../../shared/helix-pairing-storage-error";
 import { helixReasoningTaskBindingProjectionSchema } from "../../../../shared/helix-reasoning-task-binding";
 
 const ref = z.string().min(3).max(320);
@@ -8,7 +9,9 @@ const flags = { execution_authority: z.literal(false), answer_authority: z.liter
 export const pairingStatusSchema = z.object({
   schema: z.literal("helix.pairing_status.v1"), id: ref, revision: z.number().int().positive(),
   destinationDigest: digest,
-  chatId: ref, environment, state: z.enum(["pending", "accepted", "expired", "revoked"]),
+  chatId: ref, environment, state: z.enum(["pending", "accepted", "expired", "revoked", "superseded"]),
+  replacement: z.object({ pairingId: ref, revision: z.number().int().positive() }).strict().optional(),
+  supersession: z.object({ pairingId: ref, at: z.string().datetime() }).strict().optional(),
   createdAt: z.string().datetime(), invitationExpiresAt: z.string().datetime(),
   pairingExpiresAt: z.string().datetime(), acceptedAt: z.string().datetime().nullable(),
   revokedAt: z.string().datetime().nullable(), executionAuthority: z.literal(false),
@@ -18,8 +21,11 @@ export const pairingInvitationRequestSchema = z.object({
   requestId: z.string().min(3).max(120), registrationId: ref, chatId: ref, environment,
   invitationSeconds: z.union([z.literal(300), z.literal(900), z.literal(3600)]),
   pairingSeconds: z.union([z.literal(3600), z.literal(28800), z.literal(86400)]),
+  invitationDelivery: z.literal("automatic").optional(),
+  replacement: z.object({ pairingId: ref, revision: z.number().int().positive() }).strict().optional(),
 }).strict();
 const destinationsSchema = z.object({ ok: z.literal(true), ...flags,
+  automatic_delivery_available: z.boolean().optional(),
   destinations: z.array(z.object({ registrationId: ref, expiresAt: z.string().datetime(),
     destinationDigest: digest,
     proofBasis: z.literal("authenticated_client_declaration"), currentPresence: z.literal(false),
@@ -57,7 +63,17 @@ async function request<T>(path: string, schema: z.ZodType<T>, body?: unknown): P
           credentials: "same-origin", cache: "no-store", signal: controller.signal,
           ...(mutation ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
         });
-        if (!response.ok) throw new PairingRequestError(`pairing_http_${response.status}`, mutation);
+        if (!response.ok) {
+          let code = `pairing_http_${response.status}`;
+          if (response.status === 503 || response.status === 409 || response.status === 403) {
+            const failure = await response.json().catch(() => null);
+            if (failure?.schema === "helix.reasoning_task_binding_error.v1" && failure.ok === false &&
+                (isPairingStorageErrorCode(failure.error) ||
+                  ["pairing_environment_unavailable", "pairing_request_cancelled", "pairing_account_link_required",
+                    "pairing_device_identity_mismatch", "pairing_device_trust_required"].includes(failure.error))) code = failure.error;
+          }
+          throw new PairingRequestError(code, mutation);
+        }
         const parsed = schema.safeParse(await response.json());
         if (!parsed.success) throw new PairingRequestError("pairing_response_invalid", mutation);
         return parsed.data;
@@ -81,6 +97,14 @@ export const reconcilePairingInvitation = (requestId: string) =>
     z.object({ ok: z.literal(true), ...flags, pairing: pairingStatusSchema.nullable() }).strict());
 export const issuePairingInvitation = (input: PairingInvitationRequest) =>
   request("/reasoning-invitations", issuedSchema, pairingInvitationRequestSchema.parse(input));
+export async function cancelPairingInvitation(requestId: string) {
+  const id = z.string().min(3).max(120).parse(requestId);
+  const result = await request(`/reasoning-invitations/${encodeURIComponent(id)}/cancel`,
+    z.object({ ok: z.literal(true), ...flags, request_id: z.literal(id), cancelled: z.literal(true),
+      pairing: pairingStatusSchema.nullable(), }).strict(), {});
+  if (result.pairing && result.pairing.state !== "revoked") throw new PairingRequestError("pairing_cancellation_invalid", true);
+  return result;
+}
 export const inspectPairing = (id: string) =>
   request(`/reasoning-pairings/${encodeURIComponent(ref.parse(id))}`, statusSchema);
 export const revokePairing = (id: string) =>
@@ -98,4 +122,19 @@ export async function inspectPairedRuntimeBinding(pairing: PairingStatus, profil
     throw new PairingRequestError("pairing_runtime_binding_mismatch", false);
   }
   return binding;
+}
+
+
+export async function deliverPairingInvitation(pairing: PairingStatus) {
+  const result = await request(`/reasoning-deliveries/${encodeURIComponent(ref.parse(pairing.id))}`,
+    z.object({ ok: z.literal(true), ...flags, delivery: z.object({
+      schema: z.literal("helix.pairing_delivery.v1"), id: ref, pairingId: ref, destinationDigest: digest,
+      revision: z.number().int().positive(), state: z.enum(["pending", "unknown", "delivered"]),
+      createdAt: z.string().datetime(), updatedAt: z.string().datetime(), providerMessageId: ref.nullable(),
+    }).strict() }).strict(), {});
+  if (result.delivery.pairingId !== pairing.id || result.delivery.destinationDigest !== pairing.destinationDigest ||
+      (result.delivery.state === "delivered") !== (result.delivery.providerMessageId !== null)) {
+    throw new PairingRequestError("pairing_delivery_response_mismatch", true);
+  }
+  return result.delivery;
 }

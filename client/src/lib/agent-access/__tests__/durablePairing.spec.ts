@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { inspectPairing, inspectPairedRuntimeBinding, issuePairingInvitation, listPairingDestinations, revokePairing, pairingStatusSchema } from "../durablePairing";
+import { cancelPairingInvitation, inspectPairing, inspectPairedRuntimeBinding, issuePairingInvitation, listPairingDestinations, revokePairing, pairingStatusSchema } from "../durablePairing";
 
 const selection = { requestId: "request-original", registrationId: "registration-exact", chatId: "chat-exact",
   environment: null, invitationSeconds: 900 as const, pairingSeconds: 28800 as const };
@@ -14,6 +14,39 @@ const respond = (body: unknown) => vi.fn().mockResolvedValue(new Response(JSON.s
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("O4 durable pairing browser transport", () => {
+  it("preserves fixed account/device denials and the unknown request outcome without exposing server text", async () => {
+    for (const code of ["pairing_account_link_required", "pairing_device_identity_mismatch", "pairing_device_trust_required", "private-arbitrary-message"]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        schema: "helix.reasoning_task_binding_error.v1", ok: false, error: code, message: "fixture-secret",
+      }), { status: 403 })));
+      await expect(issuePairingInvitation(selection)).rejects.toMatchObject({
+        code: code === "private-arbitrary-message" ? "pairing_http_403" : code, outcomeUnknown: true,
+      });
+    }
+  });
+  it("requires a confirmed cancellation of the exact request before releasing review", async () => {
+    const result = { ok: true, execution_authority: false, answer_authority: false,
+      request_id: selection.requestId, cancelled: true, pairing: null };
+    const fetch = respond(result); vi.stubGlobal("fetch", fetch);
+    expect(await cancelPairingInvitation(selection.requestId)).toEqual(result);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0]).toContain(`/reasoning-invitations/${selection.requestId}/cancel`);
+    expect(fetch.mock.calls[0][1]).toMatchObject({ method: "POST", body: "{}", credentials: "same-origin" });
+    for (const mismatch of [{ request_id: "request-other" }, { cancelled: false }, { pairing }, { execution_authority: true }]) {
+      vi.stubGlobal("fetch", respond({ ...result, ...mismatch }));
+      await expect(cancelPairingInvitation(selection.requestId)).rejects.toMatchObject({ outcomeUnknown: true });
+    }
+  });
+  it("O5 admits only fixed storage diagnostics and preserves unknown mutation outcomes", async () => {
+    for (const code of ["pairing_storage_unreadable", "pairing_storage_invalid", "private-arbitrary-message"]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+        schema: "helix.reasoning_task_binding_error.v1", ok: false, error: code, message: "fixture-secret",
+      }), { status: 503 })));
+      await expect(issuePairingInvitation(selection)).rejects.toMatchObject({
+        code: code.startsWith("pairing_storage_") ? code : "pairing_http_503", outcomeUnknown: true,
+      });
+    }
+  });
   it("links only the exact accepted pairing to a fresh runtime projection", async () => {
     const accepted = pairingStatusSchema.parse({ ...pairing, state: "accepted" });
     const binding = { schema: "helix.reasoning_task_binding.v1", reasoning_binding_id: "binding:current",

@@ -1,0 +1,44 @@
+{
+  "schema": "casimirbot.native_pairing_issuer_boundary.v1",
+  "recorded_at_utc": "2026-09-14 04:28:33 UTC",
+  "package": "apps/desktop/release-cancellation-20260913/win-unpacked",
+  "user_reported_both_boxes_and_approval_clicked": true,
+  "native_ui_checked_and_submitted": true,
+  "human_only_initial_consent_automated": false,
+  "approved_request": {
+    "requestId": "157d43b8-ed73-4ff6-95e3-06b6d1ab5bd5",
+    "registrationId": "pairing_destination:4e1c49b385d9ef121d3a90ecd843527b741d7cda8e657fae719e97463f016c92",
+    "chatId": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+    "environment": {
+      "roomId": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+      "runId": "run_08dbe0eb-32fd-4869-a7b4-6a6970988cdb"
+    },
+    "invitationSeconds": 900,
+    "pairingSeconds": 28800
+  },
+  "reconciliation": {
+    "agent_retried_same_approved_request_once": true,
+    "get_status": 200,
+    "post_status": 403,
+    "error": "pairing_account_link_required",
+    "no_invitation_displayed": true
+  },
+  "diagnosis": {
+    "native_principal_issuer": "urn:casimirbot:desktop-session",
+    "browser_code": "server/routes/agent-connections.ts",
+    "failure": "Requires a linked HTTPS OAuth issuer to equal the native principal's distinct issuer. The same mistaken OAuth issuer would then be used for native run ownership.",
+    "credential_or_private_account_contents_inspected": false
+  },
+  "repair_packet": "docs/work-packets/eh-g8-cs-native-pairing-issuer-v1.md",
+  "limits": {
+    "human_approval_is_not_server_acceptance": true,
+    "task_binding_verified": false,
+    "gameplay_actions": 0,
+    "cs1_complete": false,
+    "cs2_complete": false,
+    "cs3_complete": false,
+    "cs4_complete": false,
+    "et6_passed": false,
+    "nav1_unlocked": false
+  }
+}

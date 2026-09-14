@@ -21,7 +21,8 @@
     "smoke:agent-onboarding": "node scripts/smoke-agent-onboarding.mjs",
     "build": "npm run build:host",
     "pack:dir": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --dir",
-    "dist:win": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --win nsis"
+    "dist:win": "npm run build:host && npm run stage:runtime && electron-builder --config electron-builder.config.cjs --win nsis",
+    "prepack:dir": "node scripts/check-build-retention.mjs"
   },
   "dependencies": {
     "electron-updater": "6.8.9",

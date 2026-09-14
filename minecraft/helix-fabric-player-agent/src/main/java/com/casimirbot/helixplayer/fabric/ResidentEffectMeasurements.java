@@ -69,6 +69,7 @@ final class ResidentEffectMeasurements {
             throw new IllegalArgumentException("resident_effect_history_invalid");
         Map<String, Object> result = new LinkedHashMap<>(measurements);
         result.putAll(totals(measurements, history));
-        return Map.copyOf(result);
+        // Optional observation fields may be null; effect counters were validated above.
+        return java.util.Collections.unmodifiableMap(result);
     }
 }

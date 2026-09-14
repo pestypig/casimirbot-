@@ -1,0 +1,15 @@
+# Continuous runtime chain and terminal settlement repair
+
+Scoped CS3 component evidence under the [continuous-session packet](../../work-packets/eh-g8-et6-continuous-session-build-v1.md). Classification: evidence normalization. This does not advance live acceptance or original ET6.
+
+The production TypeScript compiler generated four linked plans. The production Java runtime polled three successors, admitted them to one resident controller, and maintained forward movement for ticks 0–83 using simulated clock and player observations. An isolated HTTP fixture supplied leases and acknowledged publications; it was not the production broker. No Minecraft process, model sampling, human consent, or production authority was involved.
+
+The runtime test first exposed a terminal-window fixture error: the final plan stopped at tick 83 before its last motion tick. This separate fixture now keeps the first three handoff boundaries at 21/42/63 and gives the terminal plan stop/committed ticks 85/86, allowing completion at tick 84. The earlier [engine evidence](2026-09-12-continuous-chain-engine.md) and its artifact remain immutable. This fixture correction establishes no measured live transport budget.
+
+After all 84 movement ticks and three handoffs passed, terminal publication failed with NullPointerException in ResidentEffectMeasurements.resultView, called by PlayerActionRuntime.result. Capacity telemetry legitimately includes null values for unobserved timings. Map.copyOf rejected those optional nulls, turning completed execution into an executor failure. The repair returns an unmodifiable copy that preserves optional nulls after the existing strict effect-counter validation. It does not turn unknown timings into zero or relax malformed/overflow counter rejection.
+
+The arithmetic regression checks nullable observation preservation, detached immutable output, retained historical motion, and continued rejection of a null required effect counter. The runtime regression additionally requires exactly one root-owned successful terminal result, released controls, recorded motion, and no automatic replay, plus queued-successor duplicate-poll suppression.
+
+Verification: JDK 21 / Gradle 8.14.3 with HELIX_NATIVE_COMPILED_HANDOFF=1, `test -x runGameTest --tests '*PlayerActionRuntimeTransportTest' --tests '*FluidSequenceEngineTest' --tests '*ResidentEffectMeasurementsTest'`: 64 tests passed (15 runtime, 44 engine, 5 arithmetic), zero failures/errors/skips; final run completed in 31 seconds. Documentation audit passed. [Compiled chain](2026-09-12-continuous-runtime-compiled.json) and [runtime publications](2026-09-12-continuous-runtime-publication.json) preserve the generated fixture evidence. The latter contains one /requests/result and 17 each of /events/batch and /requests/event.
+
+Full broker admission for this four-plan chain, fresh live perception, adversarial transport/authority cases, useful Minecraft movement, packaged deployment of this repair and CS1–CS4 qualification remain open. The running ordinary EXE was not rebuilt for this source repair.

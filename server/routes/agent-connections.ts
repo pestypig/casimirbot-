@@ -2,12 +2,15 @@ import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import crypto from "node:crypto";
 import { DurableReasoningBindingAccess } from "../services/local-supervisor/durable-reasoning-binding-access";
+import type { DurableSteeringRepository } from "../services/local-supervisor/durable-steering-repository";
+import type { PairingDeliveryService } from "../services/local-supervisor/pairing-delivery-service";
 import { PairingTransitionService } from "../services/local-supervisor/pairing-transition-service";
 import { projectPairingLedgerRow } from "../services/local-supervisor/pairing-ledger-contract";
 import { PairingInvitationService, PairingInvitationError } from "../services/local-supervisor/pairing-invitation-service";
-import { createNativePairingLedgerRepository, type PairingLedgerRepository } from "../services/local-supervisor/pairing-ledger-repository";
+import { createNativePairingLedgerRepository, PairingStorageError, type PairingLedgerRepository } from "../services/local-supervisor/pairing-ledger-repository";
 import { installedSecurityStore } from "../services/helix-account/installed-security-store";
 import { isPairingEnvironmentEligible } from "../services/local-supervisor/pairing-environment-eligibility";
+import { resolvePairingAccountIssuer } from "../services/local-supervisor/pairing-account-authority";
 import { createPairingDestinationRegistrationStore, PairingDestinationRegistrationError, type PairingDestinationRegistrationStore } from "../services/local-supervisor/pairing-destination-registration";
 import { dispatchExactChatSteering, steeringDispatchSchema } from "../services/local-supervisor/exact-chat-steering-dispatch";
 import {
@@ -60,6 +63,9 @@ type PresenceStore = {
 };
 
 export type AgentConnectionsRouterDependencies = {
+  // Trusted server adapter only. Never selected by a request header or env flag.
+  pairingDeliveryService?: PairingDeliveryService<SessionRecord>;
+  durableSteeringRepository?: DurableSteeringRepository;
   destinationRegistrationStore?: Pick<PairingDestinationRegistrationStore, "listOwned" | "resolveOwned">;
   pairingLedgerRepository?: PairingLedgerRepository;
   readPairingDeviceTrust?: typeof installedSecurityStore.inspectFullHarnessTrust;
@@ -298,7 +304,7 @@ export const createAgentConnectionsRouter = (
   };
   const reasoningFailure = (res: Response, error: unknown): void => {
     setPrivateHeaders(res);
-    if (error instanceof HelixReasoningTaskBindingError || error instanceof PairingDestinationRegistrationError || error instanceof PairingInvitationError) {
+    if (error instanceof HelixReasoningTaskBindingError || error instanceof PairingDestinationRegistrationError || error instanceof PairingInvitationError || error instanceof PairingStorageError) {
       res.status(error.status).json({
         schema: "helix.reasoning_task_binding_error.v1",
         ok: false,
@@ -336,10 +342,12 @@ export const createAgentConnectionsRouter = (
       const trust = await (dependencies.readPairingDeviceTrust ?? installedSecurityStore.inspectFullHarnessTrust.bind(installedSecurityStore))({ profileId, deviceId });
       if (!trust.trusted) throw new HelixReasoningTaskBindingError("pairing_device_trust_required", 403);
       const linked = await bindingStore.listBindings({ session: { sessionId: session.session_id, profileId } });
-      if (!linked.bindings.some(binding => binding.status === "active" && opaque("issuer", binding.issuer) === destination.issuer)) {
+      if (!await resolvePairingAccountIssuer({ destination, profileId, deviceId, bindings: linked.bindings,
+        delegatedAccountSessionId: trust.delegated_account_session_id, resolveSession })) {
         throw new HelixReasoningTaskBindingError("pairing_account_link_required", 403);
       }
-    }, async () => dependencies.pairingLedgerRepository ?? await createNativePairingLedgerRepository());
+    }, async () => dependencies.pairingLedgerRepository ?? await createNativePairingLedgerRepository(),
+    undefined, dependencies.durableSteeringRepository ? async () => dependencies.durableSteeringRepository! : undefined);
   };
   const browserReasoningAccess = (session: SessionRecord) => {
     const store = dependencies.reasoningBindingStore;
@@ -353,7 +361,8 @@ export const createAgentConnectionsRouter = (
       const store = dependencies.destinationRegistrationStore ?? await createPairingDestinationRegistrationStore();
       const destinations = await store.listOwned(session.profile.profile_id);
       setPrivateHeaders(res);
-      res.status(200).json({ ok: true, destinations, execution_authority: false, answer_authority: false });
+      res.status(200).json({ ok: true, destinations, automatic_delivery_available: Boolean(dependencies.pairingDeliveryService),
+        execution_authority: false, answer_authority: false });
     } catch (error) { reasoningFailure(res, error); }
   });
 
@@ -389,6 +398,23 @@ export const createAgentConnectionsRouter = (
     } catch (error) { reasoningFailure(res, error); }
   });
 
+  router.post("/session/agent-connections/reasoning-invitations/:requestId/cancel", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      z.object({}).strict().parse(req.body ?? {});
+      const requestId = z.string().min(3).max(120).parse(req.params.requestId);
+      const repository = dependencies.pairingLedgerRepository ?? await createNativePairingLedgerRepository();
+      const transitions = new PairingTransitionService(repository, {
+        destination: async () => { throw new Error("pairing_destination_required"); },
+        humanOwner: async () => session.profile.profile_id,
+      });
+      const result = await transitions.cancelRequest(session, requestId);
+      setPrivateHeaders(res);
+      res.status(200).json({ ok: true, request_id: requestId, ...result,
+        execution_authority: false, answer_authority: false });
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
   router.post("/session/agent-connections/reasoning-pairings/:id/revoke", async (req, res) => {
     try {
       const session = await resolveBrowserIdentity(req);
@@ -417,38 +443,76 @@ export const createAgentConnectionsRouter = (
       const registrations = dependencies.destinationRegistrationStore ?? await createPairingDestinationRegistrationStore();
       const repository = dependencies.pairingLedgerRepository ?? await createNativePairingLedgerRepository();
       const invitations = new PairingInvitationService(repository, async (_credential: SessionRecord, selection) => {
-        const profileId = session.profile.profile_id;
-        const registered = await registrations.resolveOwned(profileId, selection.registrationId);
-        const destination = registered.destination;
-        const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
-        const deviceId = process.env.HELIX_DESKTOP_DEVICE_ID?.trim();
-        if (!deviceId || destination.installationId !== opaque("installation", deviceId)) {
-          throw new HelixReasoningTaskBindingError("pairing_device_identity_mismatch", 403);
-        }
-        const trust = await (dependencies.readPairingDeviceTrust ?? installedSecurityStore.inspectFullHarnessTrust.bind(installedSecurityStore))({ profileId, deviceId });
-        if (!trust.trusted) throw new HelixReasoningTaskBindingError("pairing_device_trust_required", 403);
-        const authorization = await bindingStore.listBindings({ session: { sessionId: session.session_id, profileId } });
-        const account = authorization.bindings.find(binding => binding.status === "active" &&
-          opaque("issuer", binding.issuer) === destination.issuer);
-        if (!account) throw new HelixReasoningTaskBindingError("pairing_account_link_required", 403);
-        if (selection.environment) {
-          const membership = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({
-            profileId, roomId: selection.environment.roomId });
-          if (!membership || membership.roomStatus === "closed" ||
-            !await (dependencies.validatePairingEnvironment ?? isPairingEnvironmentEligible)({ profileId,
-              issuer: account.issuer, roomId: selection.environment.roomId, runId: selection.environment.runId,
-              participantId: membership.participantId })) {
-            throw new HelixReasoningTaskBindingError("pairing_environment_unavailable", 409);
+        const resolveApproval = async () => {
+          const profileId = session.profile.profile_id;
+          const registered = await registrations.resolveOwned(profileId, selection.registrationId);
+          const destination = registered.destination;
+          const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
+          const deviceId = process.env.HELIX_DESKTOP_DEVICE_ID?.trim();
+          if (!deviceId || destination.installationId !== opaque("installation", deviceId)) {
+            throw new HelixReasoningTaskBindingError("pairing_device_identity_mismatch", 403);
           }
+          const trust = await (dependencies.readPairingDeviceTrust ?? installedSecurityStore.inspectFullHarnessTrust.bind(installedSecurityStore))({ profileId, deviceId });
+          if (!trust.trusted) throw new HelixReasoningTaskBindingError("pairing_device_trust_required", 403);
+          const authorization = await bindingStore.listBindings({ session: { sessionId: session.session_id, profileId } });
+          const accountIssuer = await resolvePairingAccountIssuer({ destination, profileId, deviceId,
+            bindings: authorization.bindings, delegatedAccountSessionId: trust.delegated_account_session_id,
+            resolveSession });
+          if (!accountIssuer) throw new HelixReasoningTaskBindingError("pairing_account_link_required", 403);
+          if (selection.environment) {
+            const membership = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({
+              profileId, roomId: selection.environment.roomId });
+            if (!membership || membership.roomStatus === "closed" ||
+              !await (dependencies.validatePairingEnvironment ?? isPairingEnvironmentEligible)({ profileId,
+                issuer: accountIssuer, roomId: selection.environment.roomId, runId: selection.environment.runId,
+                participantId: membership.participantId })) {
+              throw new HelixReasoningTaskBindingError("pairing_environment_unavailable", 409);
+            }
+          }
+          return { approval: { destination, chatId: selection.chatId, environment: selection.environment,
+            ...(selection.invitationDelivery ? { invitationDelivery: selection.invitationDelivery } : {}),
+            scope: "exact_chat_steering" as const, policyRevision: selection.replacement ? 2 as const : 1 as const,
+            ...(selection.replacement ? { replacement: selection.replacement } : {}),
+            invitationSeconds: selection.invitationSeconds, pairingSeconds: selection.pairingSeconds },
+            consentReceiptId: opaque("pairing_consent", JSON.stringify([profileId, selection.requestId])) };
+        };
+        const reviewed = await resolveApproval();
+        if (selection.invitationDelivery !== "automatic") return reviewed;
+        if (!dependencies.pairingDeliveryService) throw new PairingInvitationError("pairing_delivery_provider_unavailable", 503);
+        await dependencies.pairingDeliveryService.verifyDestination(session, reviewed.approval.destination);
+        // Provider I/O cannot freeze device, account, registration or run authority.
+        const current = await resolveApproval();
+        if (JSON.stringify(current.approval) !== JSON.stringify(reviewed.approval)) {
+          throw new PairingInvitationError("pairing_approval_scope_mismatch");
         }
-        return { approval: { destination, chatId: selection.chatId, environment: selection.environment,
-          scope: "exact_chat_steering" as const, policyRevision: 1 as const,
-          invitationSeconds: selection.invitationSeconds, pairingSeconds: selection.pairingSeconds },
-          consentReceiptId: opaque("pairing_consent", JSON.stringify([profileId, selection.requestId])) };
+        return current;
       });
       const issued = await invitations.issue(session, req.body);
       setPrivateHeaders(res);
       res.status(200).json({ ok: true, ...issued, execution_authority: false, answer_authority: false });
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
+  router.get("/session/agent-connections/reasoning-deliveries", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      const query = z.object({ after: z.string().min(3).max(320).optional() }).strict().parse(req.query);
+      if (!dependencies.pairingDeliveryService) throw new PairingInvitationError("pairing_delivery_provider_unavailable", 503);
+      const candidates = await dependencies.pairingDeliveryService.discoverPending(session, query.after ?? null);
+      setPrivateHeaders(res);
+      res.json({ ok: true, ...candidates, execution_authority: false, answer_authority: false });
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
+  router.post("/session/agent-connections/reasoning-deliveries/:pairingId", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      z.object({}).strict().parse(req.body ?? {});
+      const id = z.string().min(3).max(320).parse(req.params.pairingId);
+      if (!dependencies.pairingDeliveryService) throw new PairingInvitationError("pairing_delivery_provider_unavailable", 503);
+      const delivery = await dependencies.pairingDeliveryService.deliver(session, id);
+      setPrivateHeaders(res);
+      res.json({ ok: true, delivery, execution_authority: false, answer_authority: false });
     } catch (error) { reasoningFailure(res, error); }
   });
 

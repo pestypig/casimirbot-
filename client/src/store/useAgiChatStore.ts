@@ -12,6 +12,7 @@ export type AppendAgiChatMessageOnceResult = {
 
 export type AgiReasoningTaskBinding = Readonly<{
   reasoning_binding_id: string;
+  pairing_id?: string;
   helix_conversation_id: string;
   status: "pending_claim" | "active" | "revoked" | "expired" | "superseded";
   continuation_transport: "polling" | "monitor_only" | "unavailable";
@@ -25,6 +26,7 @@ interface AgiChatStore {
   hydrated: boolean;
   setHydrated: (hydrated: boolean) => void;
   rememberReasoningTaskBinding: (binding: AgiReasoningTaskBinding) => void;
+  forgetPairedReasoningTaskBinding: (chatId: string, pairingId: string) => void;
   newSession: (title?: string, contextId?: string) => string;
   setActive: (id: string) => void;
   addMessage: (
@@ -392,6 +394,12 @@ export const useAgiChatStore = createWithEqualityFn<AgiChatStore>()(
           [binding.helix_conversation_id]: binding,
         },
       })),
+      forgetPairedReasoningTaskBinding: (chatId, pairingId) => set((state) => {
+        if (state.reasoningTaskBindings[chatId]?.pairing_id !== pairingId) return state;
+        const reasoningTaskBindings = { ...state.reasoningTaskBindings };
+        delete reasoningTaskBindings[chatId];
+        return { reasoningTaskBindings };
+      }),
       newSession: (title?: string, contextId?: string) => {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();

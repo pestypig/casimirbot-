@@ -1,0 +1,14 @@
+const fs = require('node:fs');
+const file='client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPlayerEmbodimentPanel.spec.tsx';
+let s=fs.readFileSync(file,'utf8');
+const start=s.indexOf('  it("creates a finite exact-capability lease and a separately scoped client pairing"');
+const end=s.indexOf('\n  it(',start+5);
+let part=s.slice(start,end<0?s.length:end);
+if (!part.includes('        isOwner\n')) throw new Error('fixture_render_anchor_missing');
+part=part.replace('        isOwner\n','        isOwner\n        onReviewDraftChange={reviewChanges}\n');
+const needle='    const save = screen.getByRole("button", { name: "Save player authority" });';
+part=part.replace(needle,'    expect(reviewChanges).toHaveBeenLastCalledWith({ capabilityIds: [...HELIX_MINECRAFT_PLAYER_ACTION_CAPABILITY_IDS],\n      autonomyMode: "approved_capabilities", manualOverridePolicy: "cancel", leaseMs: 30 * 24 * 60 * 60_000 });\n'+needle);
+const needle2='    fireEvent.click(save);';
+part=part.replace(needle2,needle2+'\n    await waitFor(() => expect(reviewChanges).toHaveBeenLastCalledWith(null));\n    expect(JSON.stringify(reviewChanges.mock.calls)).not.toMatch(/acknowledged|pairing_code|action_authority_id/);');
+s=s.slice(0,start)+part+(end<0?'':s.slice(end));
+fs.writeFileSync(file,s);

@@ -1,0 +1,75 @@
+{
+  "schema": "casimirbot.continuous_session_source_checks.v1",
+  "observed_at": "2026-09-14T11:07:23.435Z",
+  "classification": "evidence re-entry",
+  "scope": "Isolated repository/access and route/readiness component evidence, static classifier, documentation audit and server build. Not packaged or live acceptance.",
+  "regression": {
+    "red": {
+      "failed": 2,
+      "passed": 5
+    },
+    "green": {
+      "passed": 8
+    },
+    "broader": {
+      "passed": 159,
+      "files": 7
+    }
+  },
+  "preserved_checks": [
+    "fresh destination authorization",
+    "strict durability confirmation for every read",
+    "fresh encrypted ledger row",
+    "trust revocation",
+    "grant revocation",
+    "expiry",
+    "failed initialization rejects current callers"
+  ],
+  "logs": {
+    "red": {
+      "path": ".tmp/ready-up-durability-cost-red-20260914.log",
+      "sha256": "4bdbbd03ad8433eedd3ab4dbb68fff2ca5c957cfcf72bf60b4093d61edf63784"
+    },
+    "green": {
+      "path": ".tmp/ready-up-durability-cost-green-20260914.log",
+      "sha256": "c89d2e60ad49b6fb8502896b0c03ac222f84b2b4f4664f45f65d09039bee471d"
+    },
+    "focused": {
+      "path": ".tmp/ready-up-durability-cost-focused-20260914.log",
+      "sha256": "805cad4509ada288ca45dc114aa464c9a4dd5b72406a0df81e830721f197f848"
+    },
+    "quick": {
+      "path": ".tmp/ready-up-durability-cost-quick-20260914.log",
+      "sha256": "a9f3b4566b59002a3bc787940885f0bfa38adf0f0de5aaf01606b184830cdcbe"
+    },
+    "docs": {
+      "path": ".tmp/ready-up-durability-cost-docs-20260914.log",
+      "sha256": "325c3ebd15651c8b3d94ef1d090f08dbe5103822f6c81c54a25a866f44bbc980"
+    },
+    "server": {
+      "path": ".tmp/ready-up-durability-cost-server-20260914.log",
+      "sha256": "889ea37c6e0978867fff30749ce6bf9dfbaa4e34add3f9973af129d4e3d6ce3c"
+    }
+  },
+  "source_sha256": {
+    "server/services/local-supervisor/durable-reasoning-binding-access.ts": "7903807e59b8f9563faa5ca770308aa6e67f3d347404d92affde9d6d8cc0067d",
+    "server/services/local-supervisor/__tests__/durable-reasoning-binding-access.test.ts": "1e09788474ec594244f06b0fe39505ce31e9b9f6737522490408325aa66939bb"
+  },
+  "discipline_full": {
+    "run_for_this_patch": false,
+    "reason": "Initialization reuse does not change live-source identity or continuation semantics; prior broker-revision full suite is separate evidence."
+  },
+  "server_build": {
+    "passed": true,
+    "existing_duplicate_key_warnings": 4
+  },
+  "cs1_complete": false,
+  "cs2_complete": false,
+  "cs3_complete": false,
+  "cs4_complete": false,
+  "et6_passed": false,
+  "nav1_qualified": false,
+  "casimir_verification_run": false,
+  "credential_included": false,
+  "hidden_reasoning_included": false
+}
