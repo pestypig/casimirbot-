@@ -11,9 +11,13 @@ freshness, and probe-readiness observations. It does not return credentials,
 device public keys, raw observations, assistant answers, or terminal-eligible
 content.
 
-The endpoint advertises only that one tool. Broader Helix run, room, source,
-and command tools are not part of this plugin and require a separate capability
-profile and explicit consent.
+The current server registration also advertises two read-only support tools:
+`helix_public_ui_catalog` returns the public-user UI and capability projection,
+and `helix_evidence_observation_get` retrieves one still-valid, owner-scoped
+evidence observation for Codex to examine. Neither grants an action or produces
+an assistant answer. Broader Helix run, room, source, and command tools are not
+part of this plugin and require a separate capability profile and explicit
+consent.
 
 The connector remains outbound-only: paired environment adapters contact the
 CasimirBot service, and Codex contacts the HTTPS MCP endpoint. The desktop

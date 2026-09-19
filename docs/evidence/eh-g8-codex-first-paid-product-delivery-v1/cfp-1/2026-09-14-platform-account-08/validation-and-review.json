@@ -1,0 +1,49 @@
+{
+  "captured_utc": "2026-09-14T18:40:49.717Z",
+  "scope": "Documentation-only CFP-1 platform account/connection preparation",
+  "docs_audit": {
+    "exit_code": 0,
+    "output": "\n> rest-express@1.0.0 helix:environment-harness:docs-audit\n> tsx scripts/audit-environment-harness-work-program.ts\n\n{\n  \"schema\": \"casimirbot.environment_harness_work_program_audit.v1\",\n  \"work_program\": \"docs/helix-environment-harness-work-program-v1.md\",\n  \"active_gate\": \"G8\",\n  \"backlink_files_checked\": 6,\n  \"canonical_link_targets_checked\": 7,\n  \"capability_status_rows_checked\": 40,\n  \"allowed_maturity_terms\": [\n    \"projected\",\n    \"specified\",\n    \"implemented\",\n    \"deterministically verified\",\n    \"live accepted\",\n    \"integrated accepted\",\n    \"release-ready\"\n  ],\n  \"acceptance_claims_checked\": 14,\n  \"ok\": true,\n  \"failures\": []\n}\n"
+  },
+  "independent_review": {
+    "agent": "/root/platform_identity_audit",
+    "verdict": "accepted",
+    "scope": "New source-backed account/connection sections in domain/account plan",
+    "corrections": "Separated identity linking from device enrollment; precise binding revocation wording verified"
+  },
+  "runtime_tests_run": false,
+  "runtime_changes": false,
+  "cfp1_closed": false,
+  "link_validation": {
+    "relative_links_checked": 48,
+    "missing": []
+  },
+  "documents": [
+    {
+      "path": "docs/architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md",
+      "sha256": "932480c4bc888662c427b709f29d895770a194d4f3ee1c11f57b1f65629ea9af"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md",
+      "sha256": "28611f52b669b431f13e16a6f330582e883cb3436c6f8a58abfb13dc9ec3d900"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md",
+      "sha256": "fa42d316da58c7cd5af0e29c94212e3f22c88368507d072b37f48f38502bd34d"
+    },
+    {
+      "path": "docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md",
+      "sha256": "9aff0cf9638ff2cf7ea57c01c2e39f8481f8a5d4ec55cbab20051488ac5cb678"
+    },
+    {
+      "path": "docs/helix-environment-harness-work-program-v1.md",
+      "sha256": "1fe6edfec4f9fcebd17bdabc1bcd339f151ee973b688c9e1c218bba026543459"
+    }
+  ],
+  "source_capture": "source-capture.json",
+  "unresolved": [
+    "Hosted payer/guest and commercial terms",
+    "Rights and selected artifact/publication evidence",
+    "Final selected release acceptance freeze and integrated CFP-1 review"
+  ]
+}

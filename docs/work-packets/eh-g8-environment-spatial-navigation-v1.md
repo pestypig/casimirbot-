@@ -298,6 +298,36 @@ invalidates the corridor. Re-enter a semantic route-change observation before
 executing a materially different corridor. Repeated failure against an
 unchanged revision and unchanged approach is rejected as duplicate behavior.
 
+For an admitted `navigate_to` skill operation, a corridor change can be a
+qualified **local repair** when the request explicitly permits it and the
+destination, traversal classes, hard prohibitions, effect/risk ceilings,
+deadline, actor and current authority remain unchanged. Publish the route-change
+reason and bound the replacement segment to the parent operation, fresh
+topology/observation, predecessor checkpoint, expected start and planner
+version. Recheck those inputs before dispatch. Re-entry means the current
+principal receives truthful evidence; it is not automatically a remote
+approval round trip for every authorized detour. A new traversal class,
+mutation capability, group route policy, destination or wider risk requires a
+new principal decision and Helix admission. If no qualified repair remains,
+hold or release according to the admitted transition and report the blocker.
+
+Policy must distinguish a hard constraint from a preference. “Do not enter
+water” excludes water edges at admission and repair; “prefer dry routes” may
+price water edges only when water traversal was separately allowed. A route
+planner cannot trade away a prohibition for distance or speed. Following a
+moving person needs its own qualified target-freshness, allowed-region,
+distance, deadline and target-loss policy; reaching a fixed coordinate does
+not establish that following profile.
+
+Navigation feedback should make the ongoing operation explainable: operation
+and actor identity, active corridor/trajectory revisions, actual checkpoint,
+control state, observed obstruction or hazard, applicable policy, performed
+effects, evidence freshness and whether local repair or a principal decision
+is next. Reconcile these associations with the existing feedback schema rather
+than minting a second operation status writer. A retained route/checkpoint
+after reconnect is history, not renewed movement authority. NAV-EQ and NAV8
+still require their own live executor evidence.
+
 ### Game-AI execution hierarchy — procedural first (2026-09-12)
 
 This refinement is `specified`. Established game-AI navigation methods inform

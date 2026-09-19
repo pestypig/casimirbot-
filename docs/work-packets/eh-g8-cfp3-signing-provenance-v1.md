@@ -6,7 +6,7 @@ Reaction timescale: durable implementation planning; runtime limits must be froz
 Authority owner: Release signing implementer; independent artifact/provenance reviewer; one signing-run operator; product owner retains commercial and release decisions
 Current maturity: specified
 Target maturity: deterministically verified within frozen scope, with separately labeled installed/sandbox acceptance where required
-Required evidence: CFP-1 closure, CFP-2 completion, rights and terms freeze, exact source/artifact manifest, targeted checks and bounded acceptance artifacts
+Required evidence: CFP-1 closure, CFP-2 completion, rights and terms freeze for the planned component scope, then exact source/built-artifact manifest, targeted checks and bounded acceptance artifacts produced in CFP-3
 Explicit non-goals: no dispatch from this draft, no production charging/publication, source privatization, automatic rights clearance, capability promotion, or replacement agent runtime
 Downstream gate unlocked: CFP-4 integrated same-signed-artifact acceptance only after parent CFP-3 evidence closure
 
@@ -51,7 +51,22 @@ Owner/reviewer responsibilities: Release signing implementer; independent artifa
 
 Allowed files: apps/desktop/scripts/release-signing-config.cjs; apps/desktop/scripts/release-preflight.mjs; apps/desktop/scripts/verify-release-artifacts.mjs; apps/desktop/electron-builder.config.cjs; tests/desktop-release-signing.spec.ts; a precisely enumerated release workflow after its current path and ownership are inspected; new release evidence only. No signing account purchase, production publication, visibility change, policy downgrade or ad hoc certificate substitution.
 
-Reverify provider provisioning through an authorized read-only path; freeze source/dirty-file manifest and shipped tree, rights-cleared SBOM/notices, toolchain and client/connector versions. Produce immutable signed Windows installer plus Authenticode publisher/hash evidence and package manifest. Apply existing release Casimir checks to the exact artifact. No existing certificate or earlier unpacked build accepts changed bytes. Coordinate artifact version and immutable identifiers with DISTRIBUTION.
+Reverify provider provisioning through an authorized read-only path. At entry,
+consume the CFP-1 planned source/component inclusion and notice contract and
+freeze the source/dirty-file and toolchain/client/connector inputs. During the
+CFP-3 build, capture and inspect the actual shipped tree and dependency closure;
+complete its rights-cleared SBOM/notices before signing acceptance. Produce an
+immutable signed Windows installer plus Authenticode publisher/hash evidence and
+package manifest. Apply existing release Casimir checks to the exact artifact.
+No existing certificate or earlier unpacked build accepts changed bytes.
+Coordinate artifact version and immutable identifiers with DISTRIBUTION.
+
+Consume the CFP-1 [planned release inclusion selector](eh-g8-cfp1-planned-release-inclusion-and-rights-review-v1.md),
+the rights-reviewed component/inclusion matrix and its
+release-time inspection rules. The final source/build/EXE/JAR/profile hashes
+are CFP-3 output evidence, not a retroactive CFP-1 entry prerequisite. Reject
+any actual included component or notice obligation outside the approved scope;
+return that delta for rights review before accepting the signed cohort.
 
 The coordinator freezes exact file ownership before dispatch. Shared builder,
 schema or handler files have one writer; changes required by another packet
@@ -105,4 +120,3 @@ Production charging, feed publication, release publication and source visibility
 changes require separately recorded owner authorization for the concrete action;
 those actions are not granted by this planning packet. Sandbox attendance uses
 the designated owner/operator; no agent invents payment authorization.
-

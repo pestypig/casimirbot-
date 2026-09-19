@@ -7,6 +7,8 @@
   "source": "https://arxiv.org/html/0905.0651v2",
   "pdfSource": "https://arxiv.org/pdf/0905.0651v2",
   "artifactRoot": "artifacts/research/g1-source-validation-v1/bison13-intake-20260913",
+  "trackedTable": "configs/research/controlled-stellar-composition-transport-g1-bison13-table3.v1.csv",
+  "comparisonMethodPacket": "docs/research/controlled-stellar-composition-transport-g1-structural-comparison-method-v1.md",
   "table": "Table 3, BiSON-13; absolute inferred solar profiles",
   "rows": 37,
   "csvSha256": "3831ccfee250ce4398c54c8aa65b081160eaaf4587c287786ffbc2a2dfc571a6",

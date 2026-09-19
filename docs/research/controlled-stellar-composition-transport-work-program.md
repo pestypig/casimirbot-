@@ -4,7 +4,7 @@ Status: canonical program-control document.
 
 Active program gate: **G1 — real calibrated solar baseline (image installed; science preparation and run-capacity checks pending)**
 
-Status date: **September 13, 2026**
+Status date: **September 19, 2026**
 
 This document is the sole current dependency and status roadmap for the solar
 restoration deep-mixing research branch. Dated audits, solver receipts, UI
@@ -33,9 +33,20 @@ freeze is not. The current [source and input validation work](./controlled-stell
 binds structural inversion data and checks zero-transport input dependencies
 without stellar evolution. The numerical structural table is retained and
 cross-checked, with `BLOCK_SOURCE_BINDING` for unresolved resolution/systematics.
-The 73 inlist assignments pass a static namelist-group check; installed parser
-and microphysics dependency checks await recovery of Docker's recurring
-inference-socket startup failure. G1 and its launch prerequisites remain open.
+The [G1 structural comparison method decision](./controlled-stellar-composition-transport-g1-structural-comparison-method-v1.md)
+records the fixed-reference-kernel and source-matched re-inversion routes; it
+does not admit either route or close the source blocker.
+The [G1 no-run launcher preflight](./controlled-stellar-composition-transport-g1-launcher-preflight-v1.md)
+adds tested fail-closed host/input checks and a pure calibration objective;
+the execution adapter is not implemented and launch remains disabled.
+The 73 inlist assignments pass a static group check and an independent
+namelist parse with selected zero-transport invariants. A read-only inventory
+hashes 3,552 installed MESA files and 885 SDK files; all 13 selected upstream
+source hashes match the installed image. MESA's native reader and the exact
+loaded microphysics subset await an execution attempt. The Docker socket
+startup issue was recoverably repaired on September 19. Free space was about
+14.4 GB at the last check, below the frozen 25 GB science-start threshold.
+G1 and its launch prerequisites remain open.
 The bounded infrastructure response is specified in
 [`controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md`](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md):
 a Google Drive archival connector is the primary recovery path, and a narrow

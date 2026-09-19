@@ -229,6 +229,26 @@ Behavioral binding:
 - Missing evidence for repo-attributed mission claims should suppress or downgrade certainty.
 - Suppression responses should carry stable deterministic reason labels.
 
+## Shared-room skill-operation explanations — specified handoff
+
+For a shared room observing a bounded environment skill operation, GPT Live
+may explain a permitted material reason record: the exact actor/operation and
+revision, observed condition, governing policy, measured checkpoint/effects,
+native control state and next decision owner. Speech certainty cannot exceed
+that record's freshness or provenance. A current `held` observation may support
+“the controller stopped at this checkpoint”; a queued cancellation or
+`awaiting_agent_pickup` event cannot. Never attribute an unobserved motive to
+the external principal.
+
+An owner stop or revoke uses the direct control path. A room request for a new
+goal or materially changed group route is attributed steering to the exact
+principal under the existing pickup/acknowledgement contract. Supporting
+workers may return bounded, non-mutating route analysis with its observation
+and mission revision; a late result is rechecked before speech or dispatch.
+No narration, read-only helper, playback receipt or steering acknowledgement
+becomes environment action or terminal answer authority. These requirements
+are a specified presentation handoff, not evidence of a three-player live run.
+
 ## GPT Realtime grounded worker relay (additive)
 
 Each finalized GPT Realtime utterance receives one server-owned interaction

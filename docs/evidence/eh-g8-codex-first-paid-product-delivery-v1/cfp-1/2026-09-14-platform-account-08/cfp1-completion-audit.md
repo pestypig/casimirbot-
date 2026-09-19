@@ -1,0 +1,24 @@
+# CFP-1 completion audit — 2026-09-14
+
+Scope: specification only, assessed against the canonical CFP-1 objective and handoff. This is a dated evidence snapshot, not a replacement stage ledger. The preceding goal turn made progress by creating the platform work packet and canonical backlinks; this turn adds current account/connection source evidence, a reviewed lifecycle handoff and operative offer reconciliation.
+
+## Requirement-by-requirement decision
+
+| Goal requirement | Evidence inspected or prepared | Completion judgment / remaining work |
+| --- | --- | --- |
+| Product scope | CFP-1 selected offer, canonical product goal, platform build plan and owner decisions D18–D21 | Platform direction is specified. Exact selected-release claims and useful-task acceptance still need freeze; the eventual Minecraft feature set may continue evolving. |
+| Claims and evidence limits | Platform build plan; current work-program NAV/CS/ET separation; domain/account source map | Intended journeys and present component limits are distinguished. No installed, cross-device, hosted or general developer acceptance is inferred. Final advertised claim set remains open. |
+| Account policy | Domain/account journey, public identity-mode inspection, server-expiry gap, explicit login linking and separate device trust; independent account review | Specification advanced with concrete source/test handoff. Public ownership checks, issuer namespaces, session/callback lifetime and selected ordinary-user permissions must be frozen in the dependent contract; no runtime fix is claimed. |
+| Entitlement and offer policy | Free personal/paid hosted boundary in CFP-1, parent delivery packet and CFP-3 work-program row; updated owner-decision capture | Obsolete personal trial/purchase requirements reconciled. Hosted payer/guest policy, benefits/interval, limits, retention and effective cancellation/refund terms remain unselected. One concrete payer-scope question has been submitted to the owner; no answer is inferred. |
+| Rights inventory | Existing component rights matrix R-OWN-01, R-MC-01, R-BIN-01, R-NOTICE-01, R-LGPL-01, R-ASSET-01, R-PUBLIC-01 and R-MAP-01; selected per-component review method | Inventory and questions exist; reviewed permission/ownership and artifact-specific disposition evidence remain incomplete. This account/platform pass adds no legal clearance. Public interface publication still requires exact paths and applicable licenses. |
+| Distribution contract | Domain/delivery plan, existing signing and distribution packets, dated GitHub/Replit audit | Delivery mechanisms and intended source boundary are specified. Current signing provisioning, selected release files/notices, source-independent update migration and contract compatibility evidence remain to freeze/review with their owners. September 8 deployed identity is historical, not reverified here. |
+| Owner decisions | New owner-decisions.json preserves selected scope, supersedes unselected personal commercial proposals, records Google/domain/platform direction and pending payer question | Partial. Do not reinstate credits, personal trials or paid personal access while waiting for remaining hosted terms or rights evidence. |
+| Validation and independent review | Documentation audit/path checks and bounded source review of account/connection sections, captured in validation-and-review.json | Covers this specification change only. Does not substitute for rights review or the final integrated CFP-1 review. |
+| Stage decision and implementation handoff | Existing CFP-2/3 candidates, platform work items, account/connection owner/files/failure matrix | Preparation progressed; final parent closure and candidate dispatch remain unadmitted. G8 and CFP-1 retain their canonical states. |
+| No runtime/production changes | This task changed documentation/evidence only in a shared dirty checkout | Satisfied for this patch. Other tasks' changes are neither reverted nor attributed to this audit. No live account probe, payment, deployment, visibility or license mutation occurred. |
+
+## Stage decision
+
+CFP-1 is not complete. Keep its specification work active and do not dispatch dependent implementation from this evidence. The account/connection review is bounded preparation; rights/offer decisions and final acceptance freeze remain independent closure requirements. There is useful next work on hosted participant lifecycle and developer-publication handoffs while the requested payer decision is pending. No goal-blocked or goal-complete operation is justified by this snapshot.
+
+Historical rights inventory: `docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/rights-draft-2026-09-06/rights-component-matrix.md`. Current decision capture and validation live alongside this snapshot. Future acceptance must use current source/artifact evidence; these filenames are not proof of the proposed product working.

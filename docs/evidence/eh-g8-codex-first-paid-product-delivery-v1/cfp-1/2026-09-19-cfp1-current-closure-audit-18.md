@@ -1,0 +1,37 @@
+# CFP-1 current closure audit — 2026-09-19
+
+Status: current requirement-by-requirement checkpoint following the
+[earlier closure-readiness addendum](2026-09-19-cfp1-closure-readiness-addendum-16.md).
+It preserves that dated snapshot and does not replace the [CFP-1 working
+contract](../../../work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md)
+or the [environment work program](../../../helix-environment-harness-work-program-v1.md),
+which remains the sole G8 stage and maturity authority. Source HEAD inspected:
+`256554ca2637b2978a83616d9f9670069fdfd8c4`, with uncommitted CFP and
+unrelated changes in the shared worktree. This review made no runtime,
+account, billing, repository-visibility, deployment or release change.
+
+| CFP-1 closure requirement | Current evidence | Judgment and exact remaining acceptance |
+| --- | --- | --- |
+| Product scope and first useful task | The [selected offer](../../../work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md#selected-offer-free-personal-tools-paid-hosted-collaboration) is free supported personal MCP use, paid hosted collaboration and user-supplied external reasoning. The [bounded two-block proposal](../../../work-packets/eh-g8-cfp1-bounded-assistance-acceptance-v1.md) is the first Minecraft technical pilot. | Direction is selected. The product/capability owners must select the exact advertised operations, artifact/client versions and numeric pilot contract; the two-block proposal and broader G8 work remain unaccepted. No Minecraft-only paid SKU or funded inference is selected. |
+| Supported personal and hosted operation register | The [104-name source worksheet](../../../work-packets/eh-g8-cfp1-mcp-offer-context-triage-v1.csv) remains wholly `unselected`/`not_run`. Its [context triage and first-release decision slate](../../../work-packets/eh-g8-cfp1-mcp-offer-context-triage-v1.md) distinguish wizard-internal steps, personal reads/effects, safety, non-game candidates and hosted counterparts. | No source name or candidate lane is an accepted offer. The product/MCP/account owners must select operation-by-context rows with capability IDs/versions, exact surface and ordinary-user installed positive/negative evidence; the selected personal set must all be free. The paid room benefit set is a separate O-02 decision. |
+| Personal connection and account policy | The [source-backed connection checkpoint](2026-09-19-free-personal-connection-dependency-17.md) shows an installed loopback service, scope-routed tunnel and developer-only full tunnel admission. The [personal/hosted boundary](../../../work-packets/eh-g8-cfp1-personal-hosted-capability-boundary-v1.md) identifies current room/source and lifecycle gates. Its transport claims passed independent source review after corrections. | CFP-1 must select a compatible ordinary-user full-tool client profile and an owner-only personal source/context policy. A direct loopback client or ordinary-user tunnel can qualify only through actual signed-artifact catalog, identity, effect, restart and outage evidence in CFP-2. Neither is proven today. The local listener and tunnel Ready state are insufficient. |
+| Hosted account and entitlement contract | The [hosted lifecycle](../../../work-packets/eh-g8-cfp1-hosted-participant-entitlement-lifecycle-v1.md) separates payment eligibility, membership, consent and program-owner effect grants. The [O-01–07 owner brief](../../../work-packets/eh-g8-cfp1-hosted-offer-owner-decision-brief-v1.md) gives recommendations and cost inputs. The [commerce handoff](../../../work-packets/eh-g8-cfp3-software-commerce-v1.md) now names the legacy sandbox UI/credit cutover and its unresolved file-ownership seam. | O-01–07 remain unselected: payer/guest/transfer, first benefit, verified SKU/price/interval, limits, trial/outage, cancellation/refund and retention/support. Current Stripe source admits test keys and sandbox events, stores credits and renders sandbox credit checkout; it cannot establish a current hosted SKU or the reported $5/$10 prices. A read-only browser inspection attempt failed before page access, so it supplied no dashboard or Replit-cost evidence. |
+| Rights, ownership and publication | The [component matrix](rights-draft-2026-09-06/rights-component-matrix.md), [current rights delta](2026-09-19-rights-distribution-delta-09.md), [publication/provenance checkpoint](2026-09-19-source-publication-provenance-14.md), [public-interface proposal](../../../work-packets/eh-g8-cfp1-public-interface-and-source-boundary-v1.md) and [payment-to-effect map](2026-09-19-payment-to-minecraft-effect-source-map-15.md) are prepared. | R-OWN/R-MC/R-PUBLIC need actual contribution/prior-publication records, owner publication choices and a qualified file- and offer-specific rights disposition. Removing evaluation mods does not classify the first-party connector plus paid-room relationship. The public repository's MIT manifest is not proof of every file's ownership or a blanket right to relicense. |
+| Binary distribution and notices | The [tunnel notice checkpoint](2026-09-19-tunnel-redistribution-closure-12.md), [desktop media crosswalk](2026-09-19-desktop-media-byte-crosswalk-13.md) and [distribution packet](../../../work-packets/eh-g8-cfp3-distribution-migration-v1.md) identify missing notices, media review and the current source-tied feed. | R-BIN/NOTICE/LGPL/ASSET/MAP and an exact signed release cohort remain open. A source-independent customer feed and updater migration are specified, not delivered. No current local ASAR/JAR combination is a coherent reviewed release. |
+| Claims and dependent implementation | The [claims register](../../../work-packets/eh-g8-cfp1-claims-evidence-register-v1.md) preserves all twelve G8 obligations. CFP-2.PUBLIC/ONBOARD/CAPABILITY and CFP-3.LICENSE/COMMERCE/SIGNING/DISTRIBUTION are linked from the [CFP-1 contract](../../../work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md#delegation-and-handoff). | Source-backed handoffs exist, including exact personal transport and legacy-commerce UI seams, but the owner selections, rights decisions and supported register are prerequisites to executable dispatch. A final independent CFP-1 freeze review must check the selected terms, tests and every dependent packet. Prior bounded reviews do not satisfy that final review. |
+
+Validation for this checkpoint: `npm run helix:environment-harness:docs-audit`
+passes with G8 active, six backlink files, seven canonical link targets, forty
+capability rows and fourteen claims; scoped Markdown links and whitespace
+checks pass. The review scope is documentation/source consistency, not an
+installed product, qualified rights opinion or Stripe account verification.
+
+**Stage decision: CFP-1 remains active as specification work.** Neither
+CFP-2 nor CFP-3 is admitted by this checkpoint. The next owner-facing action
+is to decide the [O-01–07 brief](../../../work-packets/eh-g8-cfp1-hosted-offer-owner-decision-brief-v1.md),
+the ordinary-user personal connection route and advertised operation set,
+then supply first-party contribution/publication evidence and commission the
+qualified rights review for the selected payment-to-effect map. Once those
+decisions and dispositions are recorded, freeze the exact acceptance manifest,
+obtain independent final review and update the canonical stage ledger. The
+parallel NAV/ET/CS G8 work retains its own admission and maturity evidence.

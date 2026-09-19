@@ -41,6 +41,21 @@ respond; any environment operation still passes through the existing Helix
 capability admission, connector, lease, observation, re-entry, and terminal
 contracts.
 
+## Ongoing operation reason and revision delivery
+
+For an ongoing skill operation, a material reason event can be observed and
+explained from its permitted checkpoint and control evidence without claiming
+the external principal has received a new instruction. An attributed group
+proposal that changes the objective or policy becomes a steering event for the
+exact bound principal. Keep `provider_session` push, exact client polling and
+`unavailable` as distinct delivery paths. A queued or picked-up proposal does
+not approve a revision, extend an operation lease, prove native control was
+released or authorize an effect. The principal's returned decision must be
+separately admitted against current grants, operation/mission revision and
+observations; a late analysis or pickup from a superseded revision is stale.
+This is a documentation alignment for future operation-level delivery, not a
+new continuation transport or a claim that every client supports steering.
+
 ## First-divergence classification
 
 The first current divergence is presentation backed by unsupported continuation

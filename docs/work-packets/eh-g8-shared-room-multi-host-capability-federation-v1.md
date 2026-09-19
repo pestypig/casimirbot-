@@ -111,6 +111,29 @@ client, account, or local computer. Each player can pause, revoke, manually
 override, or Emergency Stop their own embodiment independently. A cooperative
 goal must remain correct when one participant withdraws.
 
+### Cooperative skill-operation handoff — 2026-09-19 specification
+
+A future cooperative objective may reference separate bounded skill operations
+for each actor. Each child retains its own owner grant, subject, node, lease,
+operation revision, native control resources, measured checkpoint and takeover
+path. The principal may propose dependencies such as rendezvous, separation
+range or wait-on-withdrawal only as explicit admitted group policy. A room
+utterance or one member's grant cannot silently set those parameters for the
+others. A moving-person following profile also needs its own target freshness
+and loss behavior; three `navigate_to` calls to fixed coordinates do not prove
+cooperative following.
+
+At the current federation boundary, player mutations still serialize through
+the room/world arbiter. A group request is not atomic: record which child was
+admitted, started, held, stopped or completed, and preserve partial effects.
+If one owner withdraws, that actor's direct stop/revoke path takes effect
+without model pickup. Other actors use only their pre-admitted dependency
+behavior; whether the mission splits, waits or changes goal belongs to the
+principal and group. Qualify genuinely concurrent mutation only through a
+later resource-lock, conflict, interruption and partial-outcome contract.
+This paragraph specifies the handoff for M5/M6 and later work; it does not
+advance those stages or claim three-player acceptance.
+
 ## Programs and devices beyond Minecraft
 
 The same room may eventually consume capabilities from different programs or

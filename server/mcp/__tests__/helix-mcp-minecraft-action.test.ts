@@ -530,6 +530,11 @@ describe("Helix MCP Minecraft action boundary", () => {
         readOnlyHint: true,
         destructiveHint: false,
       });
+      expect(actorStatus.inputSchema).toMatchObject({
+        properties: {
+          include_navigation_collision: { type: "boolean" },
+        },
+      });
       expect(situationProbe.annotations).toMatchObject({
         readOnlyHint: true,
         destructiveHint: false,
@@ -740,6 +745,39 @@ describe("Helix MCP Minecraft action boundary", () => {
       expect(actorStatusWithUnsupportedSelector.isError).toBe(true);
       expect(executeProbe).toHaveBeenCalledTimes(2);
 
+      const actorStatusWithNavigationCollision = await connection.client.callTool({
+        name: "helix_minecraft_actor_status",
+        arguments: { room_id: ROOM_ID, include_navigation_collision: true },
+      });
+      expect(actorStatusWithNavigationCollision.isError).not.toBe(true);
+      expect(actorStatusWithNavigationCollision.structuredContent).toMatchObject({
+        perception_snapshot_compatibility: {
+          ok: true,
+          observation: {
+            capability_id: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+            answer_authority: false,
+            terminal_eligible: false,
+          },
+        },
+      });
+      expect(executeProbe).toHaveBeenLastCalledWith(expect.objectContaining({
+        capabilityId: HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY,
+        arguments: {
+          horizontal_radius: 7,
+          vertical_radius: 8,
+          freshness_requirement_ms: 30_000,
+          include_navigation_collision: true,
+        },
+      }));
+      expect(executeProbe).toHaveBeenCalledTimes(4);
+
+      const actorStatusWithInvalidNavigationCollision = await connection.client.callTool({
+        name: "helix_minecraft_actor_status",
+        arguments: { room_id: ROOM_ID, include_navigation_collision: "true" },
+      });
+      expect(actorStatusWithInvalidNavigationCollision.isError).toBe(true);
+      expect(executeProbe).toHaveBeenCalledTimes(4);
+
       const situationCases = [
         {
           probe: { kind: "inventory" },
@@ -855,7 +893,7 @@ describe("Helix MCP Minecraft action boundary", () => {
         },
       });
       expect(missingPosition.isError).toBe(true);
-      expect(executeProbe).toHaveBeenCalledTimes(10);
+      expect(executeProbe).toHaveBeenCalledTimes(12);
 
       const result = await connection.client.callTool({
         name: "helix_minecraft_player_action",

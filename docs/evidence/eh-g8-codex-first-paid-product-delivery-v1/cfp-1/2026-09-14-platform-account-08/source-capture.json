@@ -1,0 +1,116 @@
+{
+  "dirty_status_entries": 6,
+  "sources": [
+    {
+      "path": "client/src/App.tsx",
+      "sha256": "cd5d7324fb47438b28a35bef481a39918991c58dad5ec9f9b730bfe75de19a4e"
+    },
+    {
+      "path": "client/src/components/auth/GoogleSignInButton.tsx",
+      "sha256": "70f41b7e4c8995417eea62289ce27cf7bc1a185007cc41cdbc38ba41da902d3c"
+    },
+    {
+      "path": "client/src/components/agent-access/AgentConnectionSetup.tsx",
+      "sha256": "101bb68fa3f02df9a4abdd13e93bc73a83aacf0848353dc278f967bf72259db9"
+    },
+    {
+      "path": "client/src/components/agent-access/agentConnectionSetupState.ts",
+      "sha256": "60415448986d04aaee9080fa2a1394a11a216d225bfc48b408ef853bdec2dbb8"
+    },
+    {
+      "path": "shared/helix-account-session.ts",
+      "sha256": "b11ed6a8e419af3a8b55f15586e45fd0f1839ddffb261524bcbcf2174694dee4"
+    },
+    {
+      "path": "shared/helix-agent-client-profile.ts",
+      "sha256": "4793b4aad4f26c96c4a613a2a45c85f37204b66d9a9e4c7f7aaa4cb4a810b9a6"
+    },
+    {
+      "path": "shared/helix-agent-client-readiness.ts",
+      "sha256": "28ca2fd85c79f991cf63fab2cad61401d75417f84b6e2c5bc6da15478553190f"
+    },
+    {
+      "path": "shared/desktop-auth0-account-link.ts",
+      "sha256": "a589f1ed76f7c9a59f24bf6c848fee4987535af14d2dcdcf066b334cfd07bee7"
+    },
+    {
+      "path": "server/routes/google-auth.ts",
+      "sha256": "32f1eacd86efadb24acfe99a5ee556cefc044581154870745fe513ec762215e2"
+    },
+    {
+      "path": "server/routes/account-session.ts",
+      "sha256": "b7799a594d6166aaa44d963a7aae998c1f5c8407490971cf42571d682f8231d3"
+    },
+    {
+      "path": "server/routes/desktop-auth0-account-link.ts",
+      "sha256": "843cf988c2430ab621bba2355f62f7d676b3f8d70c30370abf5d7ebd7b5dad33"
+    },
+    {
+      "path": "server/routes/desktop-auth0-step-up.ts",
+      "sha256": "a364b59e14532899e328e4e5fbeac6d4ab6ce103852706dc3f8edbdfbb394c12"
+    },
+    {
+      "path": "server/routes/agent-connections.ts",
+      "sha256": "03674ede840bb475f6b3da1df3f05c7a82039ee65241ed2c1c9f270a0e396b98"
+    },
+    {
+      "path": "server/routes/stripe-sandbox-webhook.ts",
+      "sha256": "f70d2171f663907e08362ce22af824ad930b526ea1c1e4454122b3930f64e3ff"
+    },
+    {
+      "path": "server/services/helix-account/account-session-store.ts",
+      "sha256": "29fc227aab9e46f95c89bb2d12ea3d1e96c190c5328a625270d863dd7c1bb7a2"
+    },
+    {
+      "path": "server/services/helix-account/auth0-web-account-session.ts",
+      "sha256": "031e9292c11093de9195362e0b6e8c3f501dde68196167c85321034d02cabb81"
+    },
+    {
+      "path": "server/services/helix-account/auth0-native-account-link.ts",
+      "sha256": "8148547b533a82e201db793090f557bd10f4185d0045f6b459f9decf05aed4e6"
+    },
+    {
+      "path": "server/services/helix-account/agent-account-link-store.ts",
+      "sha256": "abac0e5000661d7be92fbf3604d1a1553bba16283697720ef956ad648f7cbf24"
+    },
+    {
+      "path": "server/services/helix-account/installed-security-store.ts",
+      "sha256": "5bf7884b4a4f509d980908819dd131a67e912ccf3f2ab14ec979bbdffdd5867b"
+    },
+    {
+      "path": "server/services/helix-account/billing-entitlement-store.ts",
+      "sha256": "82ecd2751826e9f0f5fb4ce457d9e0608ab8ec205ba0f6ec955c7cca3886e9db"
+    },
+    {
+      "path": "server/services/shared-live-room-control/service.ts",
+      "sha256": "35bf083ce913b4db2ee029630929723815a6cdc7446564b0439089df9db0ea48"
+    },
+    {
+      "path": "server/db/client.ts",
+      "sha256": "73335e3bedd9b78633dbb7795f235149c87fb43a8d0796b7ae5e76ec7bb3bbc7"
+    },
+    {
+      "path": "server/auth/jwt.ts",
+      "sha256": "5ad14007c3a2c11970d0dc8f1d95d9332399a22679a4216b7b06b1bbc4df711f"
+    },
+    {
+      "path": "server/security/desktop-session.ts",
+      "sha256": "36e262bcd9e8c21b6beb711933f7047a30b6d596897d113477af58a621530302"
+    },
+    {
+      "path": "server/routes.ts",
+      "sha256": "a5353a30a9467b6d62eeae35906ada96458a89ac77b64a31204524a709571407"
+    },
+    {
+      "path": "server/index.ts",
+      "sha256": "bd815e6271000f1c7525e57aff7cc4e3329a4179df1b1f51afe54c65882106d2"
+    },
+    {
+      "path": "server/__tests__/account-session-panel.test.ts",
+      "sha256": "0f1aea519503b0eb04fedcfcd7ef4b4c72519b1eaaf35c764e55015887f072ae"
+    }
+  ],
+  "captured_utc": "2026-09-14T18:41:33.8394940Z",
+  "qualification": "Shared worktree; content hashes identify inspected source files, not installed or deployed artifacts. No runtime changes by this task.",
+  "head": "256554ca2637b2978a83616d9f9670069fdfd8c4"
+}

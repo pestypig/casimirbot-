@@ -182,12 +182,58 @@ delivery tasks, not new program gates or inherited capability acceptance.
 | Stage | State | Dependency and advancement evidence |
 | --- | --- | --- |
 | CFP-0 — Baseline and plan reconciliation | closed (inventory only) | Reviewed 39 recursively linked packets plus the ET6 supplement, assigned 14 release gaps, and prepared the CFP-1 handoff. Closure evidence: `docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md`; validation and packet matrix under `docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-0/2026-09-06-audit-01/`. No product or G8 acceptance is implied. |
-| CFP-1 — Product and rights boundary | active (specification) | `docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md`: owner selected subscription for the broader harness, Minecraft as visible technical proof of concept, and component-by-component distribution-rights review. Reuse applicable Stripe subscription foundations; credit purchases/bundles and managed model/API services are excluded from the initial offer. Free personal use and paid hosted collaboration now control the offer. Current source/GitHub/domain reconciliation and build direction: `docs/work-packets/eh-g8-cfp1-code-deployment-alignment-audit-v1.md`. Exact hosted benefit/payer mapping, lifecycle terms, commercial rights and acceptance freeze remain open. Child implementation remains unadmitted. |
+| CFP-1 — Product and rights boundary | active (specification) | `docs/work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md`: owner selected free supported personal tools, hosted collaboration subscription with a seven-day no-card action-inclusive trial, one host sponsoring invited guests with explicit eligible-host handoff, an action-inclusive first paid benefit, and Minecraft as the conditional first paid/trial action target with a non-game fallback. Exact connector acceptance and commercial rights remain open. Minecraft is also the visible technical proof of concept; component-by-component distribution-rights review is required. Reuse applicable Stripe subscription foundations; credit purchases/bundles and managed model/API services are excluded from the initial offer. Current source/GitHub/domain reconciliation and build direction: `docs/work-packets/eh-g8-cfp1-code-deployment-alignment-audit-v1.md`. The `docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-shared-action-stage-addendum-27.md` records the shared-action closure evidence and guest-action broker denial; later stage clarifications appear below. Exact supported action/room IDs, price mapping, handoff/trial lifecycle terms, commercial rights and acceptance freeze remain open. Child implementation remains unadmitted. |
 | CFP-2 — Useful installed capability | blocked | CFP-1 closure plus existing PNA and selected environment prerequisites; current installed external-Codex useful-task and interruption/recovery evidence. |
-| CFP-3 — Paid entitlement and distributable build | blocked | CFP-2 closure; software entitlement and sandbox commerce tests, signed artifact, and reviewed customer download/update path. |
+| CFP-3 — Paid entitlement and distributable build | blocked | CFP-2 closure; hosted-collaboration entitlement and sandbox subscription tests, selected rights-cleared cross-participant action delegation with free-personal/self-player regressions, signed artifact, and reviewed customer download/update path. |
 | CFP-4 — Integrated reliability audit | blocked | CFP-3 closure; one signed artifact passes the frozen installed matrix and retains applicable G8 prerequisite evidence. |
 | CFP-5 — Attended paid pilot | blocked | CFP-4 closure; explicit owner production activation and attended commercial/external-user acceptance with rollback evidence. |
 | CFP-6 — Release decision | blocked | CFP-5 closure; all applicable G8 requirements, claim/evidence review, and owner release decision. |
+
+The [CFP-1 stage-sequencing clarification](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-stage-sequencing-clarification-34.md)
+keeps planned-component rights disposition and frozen release tests in CFP-1,
+while exact signed output bytes, notices and customer-feed acceptance remain
+CFP-3 work. It changes no stage state or commercial rights hold.
+The [planned release inclusion checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-planned-inclusion-stage-addendum-35.md)
+adds a source-backed builder/stager selector for qualified review and CFP-3
+verification; its rows remain unselected for customer shipping.
+The [operation/context selection checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-operation-context-stage-addendum-36.md)
+adds candidate personal and sponsored-room rows with current source IDs and
+dependency/authority gaps; the complete supported offer remains unselected.
+The [used-trial return selection](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-reuse-owner-selection-39.md)
+holds the seven-day trial consumed after deletion and return with the same
+verified sign-in identity. Trial benefits, start, retention/privacy and other
+commercial terms remain open; this does not admit CFP-2/3.
+The [staged-data and trial-return checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-trial-reuse-and-staged-data-stage-addendum-41.md)
+records independent source review of those account terms and four builder-selected
+data/config files. Placeholder reference URLs and qualified shipping dispositions
+remain open; G8 and CFP-1 statuses are unchanged.
+The [action-inclusive trial selection](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-shared-action-benefit-owner-selection-42.md)
+requires at least one accepted paid-benefit guest action within the seven-day
+trial; [current Minecraft term review](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-action-minecraft-rights-term-check-43.md)
+keeps its connector classification open. Exact trial rows/limits, paid connector
+and rights dispositions remain unselected; CFP-1 stays active.
+The [reviewed CFP-1 trial checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-action-inclusive-trial-stage-addendum-44.md)
+records the owner selection, current-term check, independent wording review
+and unchanged CFP-1/CFP-2/CFP-3 stage states.
+The [conditional action-target selection](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-conditional-minecraft-paid-action-owner-selection-46.md)
+prioritizes the Minecraft paid/trial candidate while preserving a non-game
+fallback branch. The [source check](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-paid-action-fallback-source-check-45.md)
+found only a read-only non-game profile and no accepted fallback action. This
+does not lift the guest-delegation or rights hold or change the stage states.
+The [reviewed conditional action-target checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-conditional-action-target-stage-addendum-47.md)
+records the source and independent review with CFP-1 active and CFP-2/3 blocked.
+The [provisional hosted-trial limits](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-provisional-hosted-trial-limits-owner-selection-48.md)
+target one active room, one guest, one program and ten verified bounded effects
+per sponsor. Exact effect unit, cost and installed validation still precede a
+final entitlement/claim freeze; CFP-1 remains active.
+The [reviewed provisional trial-limits checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-provisional-trial-limits-stage-addendum-49.md)
+records the independent review and unchanged CFP-1/CFP-2/CFP-3 states.
+The [trial-start and rights-submission checkpoint](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-trial-start-and-rights-submission-stage-addendum-51.md)
+records the pending explicit-start proposal and current R-MC-01 review packet;
+neither selects a trigger nor clears commercial Minecraft use. CFP-1 remains active.
+The [provisional first-customer component selection](evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-customer-component-baseline-owner-selection-52.md)
+sets C01–C15 planning treatments while final versions, claims, channel, rights
+dispositions and exact signed-byte verification remain open. No stage advances.
 
 The owner's 2026-09-14 platform focus is specified in
 `docs/work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md`: this product
@@ -394,6 +440,19 @@ NAV-EQ is a parallel qualification lane within G8:
 Its current maturity is `specified`; target maturity is `live accepted` for
 the declared direct-MCP execution profile. No live evidence is promoted here.
 This supersedes the ET6-only NAV dependency recorded in earlier dated notes.
+
+The 2026-09-19 documentation alignment specifies an addressable bounded skill
+operation across the existing reasoning, Environment Time, NAV, federation,
+exact-binding, voice and developer contracts. The principal selects semantic
+objective and policy; a qualified implementation may derive finite segments
+within that exact admission; the existing arbiter/scheduler retains physical
+execution authority. Durable history does not renew a lease. The next proposed
+demonstration is one controlled actor with causal pause explanation,
+non-mutating analysis and attributed revision through the exact principal.
+This is specification only: it neither changes NAV-EQ's live acceptance exit
+nor admits simultaneous player mutation, room-driven task delivery, a generic
+third-party action loader, or a release claim. The platform handoff is in
+`docs/work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md`.
 
 NAV live executor integration depends on a real external-MCP course proving at least
 three rolling extensions, fresh evidence re-entry, changed-affordance repair,

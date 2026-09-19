@@ -20,6 +20,14 @@ pre-result design decisions while explicitly retaining unresolved prerequisites.
 Do not run the bundled `rn`, `re`, `mk`, or optimizer using this packet as
 authorization. The historical attempt-1 failure and runtime v1 remain unchanged.
 
+September 19 continuation: the
+[G1 source and input validation packet](./controlled-stellar-composition-transport-g1-source-validation-v1.md)
+retains the BiSON-13 numerical table and a typed structural source-binding
+blocker, verifies selected inlist semantics with an independent namelist
+parser, and hashes the installed image's data and SDK files. Its current audit
+supersedes the pending items below where they have been checked. G1 remains
+open; this original preparation record is not a launch authorization.
+
 ## Verified runtime inventory
 
 Image: `evbauer/mesa_lean@sha256:c9e4e66db3b34ca8b977bd32725a098eb4c6e81ac1e2f261aa4af38a7954de62`.

@@ -6,7 +6,7 @@ Reaction timescale: durable implementation planning; runtime limits must be froz
 Authority owner: Distribution implementer; updater/security reviewer; release coordinator owns publication; product owner retains commercial and release decisions
 Current maturity: specified
 Target maturity: deterministically verified within frozen scope, with separately labeled installed/sandbox acceptance where required
-Required evidence: CFP-1 closure, CFP-2 completion, rights and terms freeze, exact source/artifact manifest, targeted checks and bounded acceptance artifacts
+Required evidence: CFP-1 closure, CFP-2 completion, rights and terms freeze for the planned component scope, then exact source/built-artifact manifest, targeted checks and bounded acceptance artifacts produced in CFP-3
 Explicit non-goals: no dispatch from this draft, no production charging/publication, source privatization, automatic rights clearance, capability promotion, or replacement agent runtime
 Downstream gate unlocked: CFP-4 integrated same-signed-artifact acceptance only after parent CFP-3 evidence closure
 
@@ -46,6 +46,11 @@ the owner's decision. Do not independently select price, rights interpretation
 or expiry semantics during implementation.
 
 ## Scope and ownership
+
+For R-NOTICE-01/R-BIN-01, consume the [CFP-1 planned release inclusion selector](eh-g8-cfp1-planned-release-inclusion-and-rights-review-v1.md) and [pinned tunnel redistribution evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-tunnel-redistribution-closure-12.md). The v0.0.13 vendor archive has NOTICE, third-party report and SPDX inputs omitted by current staging/builder selections. Freeze the rights-reviewed inclusion and user-accessible notice contract, hash-pin every selected file, then verify those bytes and the product notice index in the actual signed installer and update/repair cohort. Source or staged-runtime presence alone cannot pass distribution acceptance; the vendor SPDX input is not a complete CasimirBot SBOM.
+The [local artifact coherency check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-local-distribution-artifact-coherency-33.md) found an old ASAR, an unsigned local setup EXE and a sensor JAR path whose bytes changed between observations. Consume CFP-1's rights-reviewed planned inclusion/notice contract, then reserve and snapshot one immutable source/build/artifact cohort before assigning R-BIN-01 hashes; recheck the exact staged bytes after signing and before feed publication. The final signed-byte and notice check is CFP-3 output evidence, not a CFP-1 closure prerequisite. Any actual inclusion outside the approved scope reopens its rights disposition. Do not combine whichever EXE and JARs happen to occupy mutable `release/` and `build/` paths into a supposed final manifest.
+
+For R-ASSET-01, consume the [CFP-1 desktop media byte crosswalk](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-desktop-media-byte-crosswalk-13.md). It identifies 100 candidate public-tree media/font/WASM bytes and their current local inputs, with all rights dispositions pending. Obtain item-level origin and redistribution evidence for selected client assets and exact package/notice mapping for fonts and parsers; inspect the newly built signed installer before accepting inclusion or exclusion. This crosswalk does not cover bundled JS/CSS, native closure, map services or separately provisioned companions.
 
 Owner/reviewer responsibilities: Distribution implementer; updater/security reviewer; release coordinator owns publication.
 

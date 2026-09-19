@@ -24,6 +24,14 @@ the selected technical scope is not approval of a paid Minecraft offering.
 
 The owner selected the complete supported single-person MCP experience as free on 2026-09-08. Recurring subscription applies to hosted collaboration. This supersedes earlier requirements to buy or trial the personal harness. Free personal use is not a temporary evaluation license, does not expire when a collaboration subscription ends, and does not require a credit balance or managed model service. The external reasoning application remains user supplied.
 
+The owner subsequently selected a [seven-day hosted trial with no card required](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-hosted-trial-owner-selection-20.md), [one host sponsoring invited guests](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-host-sponsorship-owner-selection-21.md), [explicit handoff to another eligible host](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-host-handoff-owner-selection-22.md), and an [action-inclusive first **paid** hosted benefit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-shared-actions-benefit-owner-selection-26.md). The paid launch must include a selected set of accepted guest-requested, owner-granted program actions whose connectors and commercial relationships are rights-cleared; every advertised action must pass, with one useful action as the minimum demonstration. Coordination/read-only alone does not fulfill O-02. The exact action IDs, room operations and advertised claims remain to freeze. The owner also [selected an action-inclusive seven-day trial with trial-specific limits](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-shared-action-benefit-owner-selection-42.md): at least one accepted paid-benefit shared action must be available to an invited guest under the program owner's grant and the connector's commercial-rights disposition. The exact trial operation IDs and limits, conversion, start, handoff protocol, outage and in-flight expiry rules still require a freeze; these selections authorize no automatic charge or room operation now and do not change the free personal term. The owner then [selected Minecraft conditionally as the first paid/trial action target, with a non-game fallback](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-conditional-minecraft-paid-action-owner-selection-46.md). This prioritizes technical and rights review; it does not approve Minecraft commercially or select a ready fallback. The [source check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-paid-action-fallback-source-check-45.md) found no registered non-game action adapter.
+
+The [trial/account identity source map](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-account-identity-source-map-37.md) makes O-05 and O-07's deletion/re-enrollment dependency explicit. The owner [selected that a used trial stays used after deletion and return with the same verified sign-in identity](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-reuse-owner-selection-39.md). A one-time trial must bind the verified sponsor identity across approved provider links and concurrent/retried starts; deletion cannot silently reset eligibility or revive stale grants. Exact retention, privacy treatment, relink/recovery and start rules remain to freeze. The current sandbox credit ledger and soft-delete path do not implement this contract. Trial start itself must not create a checkout, require a card or post a credit.
+
+The owner also [selected provisional trial limits](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-provisional-hosted-trial-limits-owner-selection-48.md): ten verified bounded native effects per sponsoring host, one active room, one invited guest and one connected program during the seven days. These are CFP-1 cost/installed-validation targets, not current enforcement or final customer copy. Exact action/effect unit, counter and handoff behavior and final numerical acceptance remain to freeze; each action still needs separate owner grant, consent and connector authority. A denial or duplicate request is not a successful effect.
+
+The [trial-clock proposal](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-hosted-trial-start-proposal-50.md) uses explicit host activation with a visible expiry and server-authoritative idempotent start. It remains **pending owner selection**; no trial can be offered before a selected rights-cleared action is actually available. Signing in or using free personal tools does not start a trial under this proposal.
+
 The intended platform resembles a party shared across games and programs: people converse, choose a shared objective, and contribute to observable changes in programs whose owners have granted bounded access. This is a product analogy, not an Xbox integration or current multiplayer acceptance claim. Shared conversation never merges ownership or permissions.
 
 Tools contribute observations, domain procedures, constraints and checks that can help reasoning and reflection. Codex remains responsible for interpreting those results, revising its approach and forming the answer. A procedure or receipt is not automatically answer authority. Do not claim that every tool call improves reasoning; evaluate usefulness, errors and recovery on representative tasks.
@@ -33,7 +41,7 @@ Tools contribute observations, domain procedures, constraints and checks that ca
 | Surface | Selected product boundary |
 | --- | --- |
 | Personal supported MCP tools | Free single-person use of the supported tool experience; identity, program ownership, consent, effect bounds and safety remain enforced. No paid software grant or expiring trial is required for personal access. |
-| Hosted collaboration | Subscription funds maintained rooms/connections, participant permissions, coordination, history and recovery. Exact payer/guest policy, limits and $5/$10 mapping remain to define. |
+| Hosted collaboration | One verified host sponsors invited guests through an active paid term or the selected seven-day no-card trial. Explicit handoff to another eligible host is selected. Both paid and trial experiences must demonstrate accepted, rights-cleared shared actions under program owners' exact grants. The trial's provisional targets are ten verified bounded effects per sponsor, one active room, one guest and one connected program; final limits, exact action/room IDs, handoff protocol and $5/$10 mapping remain to freeze. Each guest's membership, consent and program grants are separate. |
 | Reasoning and model accounts | User-supplied external reasoning; no shared subscription credentials, included model credits or funded API fallback. |
 | Security and recovery | Enforced for free and paid users. Hosted expiry cannot disable personal tools or safety controls, or expose another owner's data. |
 
@@ -41,7 +49,21 @@ CFP-2.PUBLIC and ONBOARD must prove ordinary free personal access without purcha
 
 Before dispatch, freeze the explicit personal-versus-hosted capability IDs and adapt scenario fixtures accordingly. Required regression: a never-subscribed user completes the supported personal task; an expired collaboration subscriber can do the same; neither gains hosted participant authority without the required eligibility and owner grant. COLLAB-01–06 remains the paid-service acceptance journey. The current bounded Minecraft test is a technical pilot, not a permanent limit on the complete personal tool offer.
 
-Free software does not imply open-source licensing, redistribution permission for third-party assets, or free provider/hosted services without an operational plan. Reconcile any essential personal transport/identity hosting cost or supported local route before promising sustainable delivery. No public repository/license change, commercial Minecraft clearance, stage promotion or runtime change follows from this scope decision.
+The [104-name MCP offer-context triage](eh-g8-cfp1-mcp-offer-context-triage-v1.md) is the source-backed selection worksheet. Its lanes are proposals only: one MCP name can need separate free-personal and paid-hosted context rows, and every advertised operation still requires owner selection and installed acceptance.
+The [candidate operation/context register](eh-g8-cfp1-candidate-operation-context-register-v1.md)
+makes the first personal and hosted journey's exact IDs, current scopes,
+authority gaps and acceptance owners reviewable. Its rows are not selected
+customer support; CFP-1 must still freeze the complete supported set.
+
+Free software does not imply open-source licensing, redistribution permission for third-party assets, or free provider/hosted services without an operational plan. The [free personal connection dependency checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-free-personal-connection-dependency-17.md) separates the existing loopback service, developer-only full tunnel and public OAuth route; none yet proves an ordinary-user full-tool profile or its operating cost. Select and qualify that profile before promising sustainable delivery. No public repository/license change, commercial Minecraft clearance, stage promotion or runtime change follows from this scope decision.
+
+The [Codex local MCP feasibility addendum](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-codex-local-mcp-profile-feasibility-25.md) verifies that current official Codex-host documentation supports same-host HTTP MCP configuration and maps the installed service's changing-port and external-client bearer gaps. It makes local HTTP the first technical qualification target, not an accepted ordinary-user connection or a requirement that paid hosted collaboration use that transport.
+
+### Proposed service-mode amendment for owner review
+
+The [three-person product reference](../architecture/casimirbot-environment-harness-product-goal-v1.md#three-person-reference-journey-and-proposed-service-expansion) proposes a bounded free human-only room and paid assisted rooms with one shared AI participant, restricted API workers and either an exact external or managed principal. It also proposes hosted text assistance. Those provider-funded modes conflict with the selected no-CasimirBot-funded-inference initial offer above. This entry records the proposal without changing that selection or assigning benefits to the existing $5/$10 presets.
+
+Before an assisted mode becomes a selected offer, the owner must choose its launch phase, sponsor/guest and mission-lead rules, permitted provider arrangement, cost and usage limits, processing consent, expiry/stop behavior and the precise entitlement versus per-player authority split. A human-only room separately needs an operating-cost and privacy design proving that no AI session starts invisibly. These choices require qualified service behavior and focused rights review; payment never confers another participant's player grant or model account. The platform build plan may specify and rehearse the reference without treating any proposed mode as commercially approved.
 
 ## Selected subscription and proof-of-concept scope
 
@@ -96,7 +118,7 @@ The owner endorsed authenticated hosted collaboration as the leading paid-servic
 
 A participant may receive access to another owner's explicitly shared program capabilities. Room membership, payment or a harness download does not grant access to that owner's GPT/Codex account, credentials, model subscription or unrestricted device. This offer includes no pooled reasoning subscription, model-account resale or CasimirBot-funded inference. Any future external-task steering claim still requires its supported host bridge and separate acceptance.
 
-Keep the simple personal tool connection usable without room setup. The owner subsequently selected the complete supported personal MCP experience as free, with hosted collaboration as the paid workflow. Before commercial freeze, define who pays (host, participant or organization), guest eligibility, room/member/node limits, retention, support and expiry terms. Do not infer that every invitee must subscribe, or that one payer grants every participant model access.
+Keep the simple personal tool connection usable without room setup. The owner subsequently selected the complete supported personal MCP experience as free, with hosted collaboration as the paid workflow. One authenticated host sponsors invited guests, who need no separate purchase merely to join. Explicit handoff to another eligible host is selected; before commercial freeze, define its initiator/acceptor, lost-host recovery authority, room/member/node limits, retention, support and expiry terms. One payer grants no participant model access.
 
 Payment determines eligibility for the selected hosted service; it never substitutes for identity, target isolation or action consent. Enforce those boundaries for every participant. On service expiry, reject newly ineligible collaboration and release affected authority within the selected safety bounds while retaining authenticated stop, revoke, export and account recovery. Continued maintenance supports security; a paywall is not security evidence or a guarantee of security.
 
@@ -108,12 +130,37 @@ CFP-4.INTEGRATION consumes the existing [room federation contract](eh-g8-shared-
 | --- | --- |
 | COLLAB-01 invite | An authenticated owner invites a distinct participant; membership alone exposes no unshared program or model credential. Record inviter, invitee and room identity. |
 | COLLAB-02 bounded grant | Owner selects program/node/subject, observations or actions, effect limits and duration. The participant can request only that scope; wrong-member, wrong-target and wider requests fail before effects. |
-| COLLAB-03 useful work | Through the supported reasoning connection, perform an approved useful operation; owner and participant see permitted observations, effect outcome and attribution. No inference from message delivery to action success or task steering. |
+| COLLAB-03 useful work | Through the supported reasoning connection, an invited guest requests at least one accepted, rights-cleared shared-program action under that program owner's exact grant; verify the native effect postcondition and show owner and participant permitted observations, outcome and attribution. No inference from message delivery to action success or task steering. A read-only room rehearsal does not pass the first paid benefit. |
 | COLLAB-04 revoke and reconnect | Owner revokes access during work; measure bounded release. Reconnect and restart the participant/host separately; the old grant remains rejected and no uncertain operation repeats. Regrant requires fresh explicit authority. |
-| COLLAB-05 expiry and recovery | Exercise the selected subscription/membership expiry policy. No new ineligible collaboration; safety and identity-protected export/account recovery remain available without granting access to another participant's data. |
+| COLLAB-05 expiry and recovery | Exercise the host's seven-day trial and paid-term expiry, membership loss and explicit handoff to a separately eligible successor. Include failed, competing, stale and replayed handoffs; at most one current successor may be accepted. Until handoff succeeds, no new ineligible collaboration; neither trial time nor program grants transfer. Safety and identity-protected export/account recovery remain available without granting access to another participant's data. |
 | COLLAB-06 base independence | With collaboration disabled, expired or its steering bridge unavailable, an otherwise eligible personal MCP connection still works under its own consent and permissions. |
 
 One-host/multiple-member evidence and two-physical-device federation evidence must remain separately labeled. The existing stricter G8 federation, room and voice obligations remain in force. The Minecraft commercial classification question is not settled by describing the charge as room access.
+
+The [hosted participant and entitlement lifecycle handoff](eh-g8-cfp1-hosted-participant-entitlement-lifecycle-v1.md)
+maps the current two-person room, locked public account policy and sandbox
+credit billing to the selected personal/hosted boundary. Host sponsorship,
+eligible-host handoff and paid/trial action-inclusive benefit shapes are selected,
+while exact room/action operations, final trial limits, protocol and clocks remain open; it grants
+no permission to expose paid Minecraft actions.
+The [host handoff protocol proposal](eh-g8-cfp1-host-handoff-protocol-v1.md)
+maps the fixed owner/slot, source-credential and transport seams to a
+versioned, explicit transition. It keeps lost-host recovery authorization open
+for an owner decision and requires separate re-admission of program grants.
+The [first hosted benefit selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-shared-actions-benefit-owner-selection-26.md)
+requires a guest-requested shared action as well as room coordination. It is
+conditional on exact capability acceptance and rights clearance; an uncleared
+Minecraft action cannot be substituted to satisfy that product decision.
+The [first paid shared-action candidate](eh-g8-cfp1-first-paid-shared-action-candidate-v1.md)
+maps the current room, invite, source, player-action and stop entries to a
+reviewable two-account Minecraft proposal. Its rows remain unselected and do
+not narrow the full supported personal catalog or select exact trial rows/limits.
+Current broker admission rejects a guest acting on another member's paired
+player, and authority configuration assumes the room owner also owns that
+player. Any selected shared-action path needs an explicit, bounded
+cross-participant delegation and separate program-owner authority without
+weakening the existing self-player checks. A room invitation or hosted grant
+does not implement this missing contract.
 
 ## Developer ecosystem scope
 
@@ -124,6 +171,10 @@ DEV-01–06 acceptance. Personal tools remain free; hosted collaboration is paid
 This is an intended developer experience, not an existing public SDK or
 automatic third-party adapter admission. Its publication rights and bounded
 implementation handoff must be reviewed before dispatch.
+The [public-interface and source-boundary proposal](eh-g8-cfp1-public-interface-and-source-boundary-v1.md)
+lists the current probe-only kit and its shared-source dependencies, proposes
+a standalone reviewed interoperability artifact, and leaves exact publication
+and private-source rights decisions with the owner and rights reviewer.
 
 ## Domain delivery and account authority
 
@@ -164,11 +215,16 @@ payment or release workflow. G8 and paid-product maturity remain unchanged.
 
 The prepared specifications are:
 
-- [Scope, claims, capability bindings and twelve G8 scenarios](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/scope-claims-policy-proposal.md).
+- [Historical scope, capability bindings and twelve G8 scenarios](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/scope-claims-policy-proposal.md); its paid-personal SKU and public-policy assumptions are superseded.
+- [Current personal/hosted capability boundary and handler freeze proposal](eh-g8-cfp1-personal-hosted-capability-boundary-v1.md).
+- [Current twelve-goal claim and evidence register](eh-g8-cfp1-claims-evidence-register-v1.md).
 - [Entitlement lifecycle, hosted costs and distribution migration](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/entitlements-distribution-draft-2026-09-07.md).
 - [Controlling bounded-task acceptance proposal](eh-g8-cfp1-bounded-assistance-acceptance-v1.md) and [source feasibility/owner-room route map](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md).
 - [Component rights and exact clearance questions](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/rights-draft-2026-09-06/rights-component-matrix.md).
-- [Owner decision register](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-08-free-personal-05/owner-decisions.json).
+- [Current-source rights and distribution delta](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-rights-distribution-delta-09.md), preserving the earlier matrix as a dated snapshot.
+- [Source-backed hosted participant and entitlement lifecycle handoff](eh-g8-cfp1-hosted-participant-entitlement-lifecycle-v1.md).
+- [Hosted-offer owner decision brief and cost evidence checklist](eh-g8-cfp1-hosted-offer-owner-decision-brief-v1.md).
+- [Current owner decision register](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-14-platform-account-08/owner-decisions.json), retaining historical selections and explicitly superseding obsolete personal commercial proposals.
 - [Source capture](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-specification-01/source-capture.json) and [official external-source review](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-06-specification-01/external-source-review.json).
 
 These are review inputs, not a second stage ledger or frozen runtime authority.
@@ -200,6 +256,13 @@ CFP-1 cannot freeze its paid offer or admit dependent commercial implementation
 on an assumption. Existing separately authorized environment work continues
 under its own packet. No external contact or EULA acceptance is delegated here.
 
+The [current-source rights delta](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-rights-distribution-delta-09.md)
+updates the reviewer question to the selected free-personal/paid-hosted offer.
+The September 6 rights inventory still identifies its old ASAR exactly but
+cannot certify a current source-and-companion release cohort. Its prior
+"paid Minecraft pilot" wording is historical, not the selected monetization
+map. The rights hold and notice/feed handoffs remain open.
+
 The owner reaffirmed that navigation evaluation mods will be removed before
 release. Preserve that exclusion, including the existing Baritone non-shipping
 contract, and verify the final installer plus separately provisioned game
@@ -228,7 +291,7 @@ excluded from pilot advertising. Rights clearance for a narrow offer cannot
 substitute for technical evidence, and technical evidence cannot establish
 commercial permission.
 
-## CFP-1.SCOPE — choose a useful bounded paid task
+## CFP-1.SCOPE — choose a useful bounded technical pilot
 
 Owner-selected technical pilot direction: **assisted local Minecraft work through the
 user's existing Codex app** on one Windows computer, with a selected player and
@@ -281,6 +344,10 @@ the canonical installed authorization, semantic-monitoring and steering
 requirements. A smaller paid pilot does not erase broad G8 obligations. If a
 pilot/release split is wanted, prepare an explicit canonical scope decision;
 do not silently infer it from the commercial offer.
+The [current claim and evidence register](eh-g8-cfp1-claims-evidence-register-v1.md)
+maps all twelve goals and offer-specific customer copy to the actual evidence
+boundary and the owner of the later proof. Its wording is a proposal; no
+landing-page claim or canonical maturity is promoted by creating the register.
 
 ## CFP-1.POLICY — free personal and paid hosted access without developer promotion
 
@@ -289,6 +356,20 @@ local lifecycle launch and locks shared-room/gateway features for `user`.
 Define exact free-personal and paid-hosted capability IDs and handler bindings before
 changing that policy. Keep no-session behavior `user`; preserve developer as
 the superset. A purchase never changes account type to developer.
+The [current capability-boundary packet](eh-g8-cfp1-personal-hosted-capability-boundary-v1.md)
+identifies the existing room-gated MCP handlers. The [CFP-1 personal-context
+architecture decision](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-personal-context-architecture-decision-31.md)
+selects a service-created, immutable owner-only context backed by existing
+room/source identity as the first implementation target, with a distinct
+hosted-room kind and mandatory isolation tests. It does not prove that the
+current shared-room implementation is safe for personal use or that an ordinary
+user can reach the selected MCP operations. If isolation fails, CFP-1 must
+choose a distinct binding before CFP-2 dispatch; a catalog entry or
+experimental room override alone is not a supported personal path.
+Its [source-catalog worksheet](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-mcp-source-catalog-11.csv)
+lists 104 resolved source-level MCP names at the inspected HEAD, all unselected;
+the supported-offer register must classify every advertised operation against
+actual account and installed-client evidence, including non-Minecraft families.
 
 For each capability define the independent checks for profile identity,
 hosted entitlement only for hosted capabilities, client authorization, exact target binding,
@@ -330,8 +411,8 @@ chat control or exact-task continuation is promised without its acceptance.
 
 | Decision | Concrete options to prepare for the owner |
 | --- | --- |
-| Hosted subscription | Freeze hosted benefits, interval, payer/guest rules and expiry. Personal tools remain free with no trial expiry; no credits or bundled inference. |
-| Evaluation | Personal tools are free rather than a trial. Choose any hosted trial separately; the technical pilot is not a paid-value proof. |
+| Hosted subscription | One host sponsors invited guests with explicit handoff to another eligible host. Freeze hosted benefits, interval, handoff protocol and expiry. Personal tools remain free with no trial expiry; no credits or bundled inference. |
+| Evaluation | Personal tools are free rather than a trial. A seven-day no-card hosted trial is owner-selected, with its remaining admission and expiry terms to freeze; the technical pilot is not a paid-value proof. |
 | Hosted dependency | Identify any hosted OAuth/routing service needed even for the base client journey; include its cost or define a supported local alternative. Optional rooms/remote services remain separately classified. |
 | Offline allowance | Specify connection/consent validity and any cached hosted entitlement separately. Personal tools have no payment expiry; external reasoning/transport availability remains explicit. |
 | Cancellation/refund | Distinguish scheduled cancellation, paid-period end, immediate revocation and refund; define admitted in-flight work, safe stop and remaining read/export/recovery access. |
@@ -365,6 +446,46 @@ Deliver a per-component publish/private/retain-existing-license/exclude matrix
 and unresolved questions for the rights reviewer. Selected public SDKs,
 protocol examples and research/verifier components need their own disposition;
 do not close unrelated scientific work by implication.
+
+The current reviewer handoff is the [component matrix](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/rights-draft-2026-09-06/rights-component-matrix.md)
+and the [planned release inclusion selector](eh-g8-cfp1-planned-release-inclusion-and-rights-review-v1.md)
+plus its [current-source delta](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-rights-distribution-delta-09.md)
+and [source-publication/provenance checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-source-publication-provenance-14.md),
+the [targeted path-authorship crosswalk](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-rights-path-authorship-crosswalk-28.md),
+the [owner's first-party authorship statement](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-party-authorship-owner-attestation-29.md),
+the [pinned tunnel redistribution evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-tunnel-redistribution-closure-12.md),
+the [desktop media byte crosswalk](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-desktop-media-byte-crosswalk-13.md),
+the [local artifact coherency check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-local-distribution-artifact-coherency-33.md),
+the [public-interface/source-boundary proposal](eh-g8-cfp1-public-interface-and-source-boundary-v1.md),
+the [personal/hosted capability boundary](eh-g8-cfp1-personal-hosted-capability-boundary-v1.md)
+and [current payment-to-Minecraft-effect source map](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-payment-to-minecraft-effect-source-map-15.md),
+the [selected host/trial/handoff rights-review brief](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-selected-hosted-minecraft-rights-review-23.md),
+the [later action-inclusive benefit selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-shared-actions-benefit-owner-selection-26.md),
+the [action-inclusive Minecraft candidate rights map](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-action-inclusive-minecraft-commercial-rights-map-32.md),
+the [later action-inclusive trial and current-term check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-action-minecraft-rights-term-check-43.md),
+the [hosted-offer decision brief](eh-g8-cfp1-hosted-offer-owner-decision-brief-v1.md).
+For R-MC-01, submit the **selected** payment-to-effect map after O-01–07 are
+answered: personal source/setup/action for a never-subscriber, room creation
+and guest join under an active host trial or subscription, owner grants for a shared player,
+and the exact behavior at expiry/refund/outage. The reviewer must distinguish
+the first-party Fabric connector and separately provisioned profile from
+excluded evaluation mods, and record a permission basis or required written
+permission for that exact relationship. For R-OWN-01, the owner has asserted
+that the named Git identities and product work are theirs, but must still supply
+contribution/commission/employment and prior-publication records rather than
+infer legal ownership from that statement, Git authors or package metadata.
+At CFP-1 closure, R-BIN/NOTICE/LGPL/ASSET/PUBLIC/MAP require a qualified
+disposition for the **planned** source, component, asset, connector and delivery
+profile, including exact selected versions or bounded inclusion rules,
+applicable notices/source-offer obligations, exclusions and a release-time
+inspection test. An uncertain component must be excluded from that selected
+shipping scope or keep its dependent decision open. CFP-3.SIGNING and
+CFP-3.DISTRIBUTION then inspect the actual frozen build tree, record exact
+EXE/JAR/profile hashes and notices, and reject unexpected or unreviewed bytes
+before signed-artifact and customer-feed acceptance. The final signed cohort
+cannot be a CFP-1 prerequisite when producing it is CFP-3 work. A reviewer
+outcome identifies allowed scope, conditions and evidence reference; silence
+or a product-label change is not clearance.
 
 ## CFP-1.DISTRIBUTION — design delivery independent of source access
 
@@ -419,7 +540,7 @@ license text or release workflow edits. Read all applicable contracts before
 changing a related specification.
 
 Create and review child implementation packets before dispatching these task
-IDs. The seven linked candidates below are prepared specifications; later task
+IDs. The eight linked candidates below are prepared specifications; later task
 IDs remain reserved. No implementation or completed stage is implied:
 
 Prepared candidates (all remain non-dispatchable until the parent prerequisites
@@ -430,6 +551,7 @@ and their exact contracts are frozen):
 - [CFP-2.CAPABILITY](eh-g8-cfp2-bounded-obstruction-clearing-v1.md)
 - [CFP-3.LICENSE](eh-g8-cfp3-license-enforcement-v1.md)
 - [CFP-3.COMMERCE](eh-g8-cfp3-software-commerce-v1.md)
+- [CFP-3.SHARED-ACTION](eh-g8-cfp3-shared-program-action-delegation-v1.md)
 - [CFP-3.SIGNING](eh-g8-cfp3-signing-provenance-v1.md)
 - [CFP-3.DISTRIBUTION](eh-g8-cfp3-distribution-migration-v1.md)
 
@@ -440,6 +562,7 @@ and their exact contracts are frozen):
 | CFP-2.CAPABILITY | Frozen useful task, world/inventory postconditions and interruption |
 | CFP-3.LICENSE | Trusted hosted-collaboration entitlement enforcement and offline/expiry semantics |
 | CFP-3.COMMERCE | Deployed attended sandbox lifecycle for the selected hosted subscription |
+| CFP-3.SHARED-ACTION | Exact owner-issued cross-participant action delegation, broker admission and native effect attribution for the selected rights-cleared paid connector; preserve free personal/self-player checks |
 | CFP-3.SIGNING | Signing provisioning, immutable signed build and package provenance |
 | CFP-3.DISTRIBUTION | Download/update delivery and notices independent of private-source access |
 | CFP-4.RECOVERY | Same-signed-artifact identity, crash/update/revoke/expiry, DIST-06 uninstall/retention/reinstall and no duplicate effects |
@@ -448,10 +571,107 @@ and their exact contracts are frozen):
 | CFP-5.PILOT | Owner-authorized attended commercial and external-user value/support evaluation |
 | CFP-6.RELEASE | Claim-by-claim review and canonical G8/owner release decision |
 
-CFP-1 closes only when decisions are recorded, rights/distribution obligations
-for the selected scope are reviewed, each claim has a frozen acceptance test,
-and a reviewer accepts the dependent work packets. Run
+CFP-1 closes only when decisions are recorded, qualified rights/distribution
+review accepts the planned selected scope and its release-time verification
+obligations, each claim has a frozen acceptance test, and an independent
+reviewer accepts the dependent work packets. CFP-1 freezes tests and planned
+inputs; CFP-2/3 execute those tests and CFP-3 freezes the built/signed output
+cohort. No final installer hash, signed install, customer feed or executed
+acceptance is required to close the preceding specification stage. Run
 `npm run helix:environment-harness:docs-audit` and link validation after edits.
 An unresolved owner/rights question blocks the dependent decision, not all
 independent specification work. No implementation stage opens merely because
 this handoff file exists.
+
+The [2026-09-14 completion audit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-14-platform-account-08/cfp1-completion-audit.md)
+records the source-backed account/connection handoff, operative offer
+reconciliation and remaining requirement-by-requirement closure evidence.
+Its [bounded validation and review](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-14-platform-account-08/validation-and-review.json)
+does not promote CFP-1 or G8 or accept runtime/production behavior.
+
+The [2026-09-19 stage review](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-stage-review-10.md)
+checks this contract against current source and the hosted lifecycle handoff.
+It keeps CFP-1 active while owner commercial choices and rights review remain open.
+The [later closure-readiness addendum](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-closure-readiness-addendum-16.md)
+incorporates the public-source provenance and payment-to-effect traces without
+replacing the dated stage review or admitting dependent implementation.
+The [current closure audit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-current-closure-audit-18.md)
+adds the ordinary-user connection and commerce UI cutover findings; it keeps
+CFP-1 active pending owner selections, qualified rights review and final freeze.
+The later [seven-day no-card hosted-trial selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-hosted-trial-owner-selection-20.md),
+[host-sponsorship selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-host-sponsorship-owner-selection-21.md)
+and [explicit host-handoff selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-host-handoff-owner-selection-22.md)
+partially resolve O-05 and O-01. They do not retroactively change the dated
+closure audit or admit CFP-2/3.
+The [owner-term progress stage addendum](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-owner-term-progress-stage-addendum-24.md)
+records these selections, the bounded rights-brief review and the remaining
+closure work without replacing the canonical stage authority.
+The later [shared-action closure checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-shared-action-stage-addendum-27.md)
+records the O-02 selection, current cross-participant broker denial, new
+CFP-3.SHARED-ACTION handoff and unchanged active-stage decision. It does not
+retroactively alter the earlier snapshots or admit CFP-2/3.
+The [authorship and Device Check claims checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-authorship-and-claims-stage-addendum-30.md)
+records the owner's first-party assertion, the targeted Git crosswalk, the
+corrected three-tool source claim and the unchanged active CFP-1 stage. It is
+not a qualified rights disposition or installed plugin acceptance.
+The [free personal context architecture decision](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-personal-context-architecture-decision-31.md)
+selects a service-created immutable owner-only context as the CFP-2 target,
+with a mandatory separate hosted kind and negative cross-context fixtures. It
+does not admit CFP-2 or claim that current shared rooms provide this isolation.
+The [action-inclusive Minecraft candidate rights map](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-action-inclusive-minecraft-commercial-rights-map-32.md)
+updates the qualified-review question after O-02's selection. It maps the
+free-personal, trial, paid guest-action and expiry/handoff paths while keeping
+the exact Minecraft action and connector release unselected for paid scope and R-MC-01 open. The later conditional Minecraft target selection prioritizes this review without lifting the hold.
+The [local distribution-artifact coherency check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-local-distribution-artifact-coherency-33.md)
+records why current in-place EXE/JAR outputs cannot close R-BIN-01; one reserved,
+immutable signed release cohort and its notices remain required.
+The [stage-sequencing clarification](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-stage-sequencing-clarification-34.md)
+assigns planned-component rights review to CFP-1 and exact signed-byte/notice
+verification to CFP-3; it preserves the commercial rights hold and leaves CFP-1
+active.
+The [planned release inclusion checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-planned-inclusion-stage-addendum-35.md)
+reviews the current builder/stager cohorts, their CFP-1 disposition fields and
+CFP-3 extraction tests without selecting customer shipping rights or promoting
+the stage.
+The [operation/context selection checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-operation-context-stage-addendum-36.md)
+reviews the first candidate personal and sponsored-room rows, repairs setup
+ordering and authority/version wording, and keeps the full support selection
+open.
+The [hosted-trial identity checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-trial-identity-stage-addendum-38.md)
+records the source-backed deletion/re-enrollment and one-time-trial dependency,
+without selecting remaining O-05/O-07 terms or advancing CFP-2/3.
+The later [used-trial return selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-reuse-owner-selection-39.md)
+resolves the same-verified-identity return rule after deletion. Minimum
+retention and privacy treatment, start and benefit terms remain open.
+The [staged-data and trial-return checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-trial-reuse-and-staged-data-stage-addendum-41.md)
+records independently reviewed source-byte/provenance findings and the unchanged
+CFP-1 stage decision; no planned file or placeholder citation is accepted for
+customer shipping by that checkpoint.
+The later [action-inclusive trial selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-shared-action-benefit-owner-selection-42.md)
+requires a real rights-cleared guest action during the seven-day trial under
+trial-specific limits; the later provisional numeric selection is subject to
+cost and installed validation, while exact operations remain unselected.
+The [action-inclusive trial stage checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-action-inclusive-trial-stage-addendum-44.md)
+records the current official Minecraft term question, corrected working-packet
+claims, independent review and unchanged CFP-1 stage hold.
+The [conditional paid/trial action target selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-conditional-minecraft-paid-action-owner-selection-46.md)
+prioritizes Minecraft subject to effect and rights acceptance, with a new non-game
+action as the fallback branch. The [source check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-paid-action-fallback-source-check-45.md)
+shows why the existing read-only non-game profile does not itself satisfy O-02.
+The [current R-MC-01 review submission](eh-g8-cfp1-minecraft-commercial-rights-review-submission-v1.md)
+puts the action-inclusive paid/trial relationship, provisional trial limits and
+conditional Minecraft target in one exact question for a qualified reviewer;
+it records no commercial permission.
+The [first customer component decision sheet](eh-g8-cfp1-first-customer-component-decision-sheet-v1.md)
+turns the inspected builder/stager cohorts into [owner-selected provisional release treatments](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-customer-component-baseline-owner-selection-52.md);
+the owner and qualified reviewer still must finally dispose each row before a ship list exists.
+The [reviewed trial-start and rights-submission checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-trial-start-and-rights-submission-stage-addendum-51.md)
+keeps the start trigger unselected, R-MC-01 open and CFP-1 active.
+The [reviewed stage checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-conditional-action-target-stage-addendum-47.md)
+retains CFP-1 active and CFP-2/3 blocked pending exact action, trial limits,
+guest delegation and commercial-rights disposition.
+The [provisional trial-limit selection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-provisional-hosted-trial-limits-owner-selection-48.md)
+sets a one-room, one-guest, one-program and ten-verified-effects target for
+evaluation; final counters and release limits still require a freeze.
+The [reviewed trial-limits checkpoint](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-cfp1-provisional-trial-limits-stage-addendum-49.md)
+retains CFP-1 active pending final action, rights, cost and lifecycle decisions.

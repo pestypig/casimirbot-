@@ -1,0 +1,20 @@
+# CFP-1 operation/context selection checkpoint — 2026-09-19
+
+Status: dated source-backed review of the [candidate operation/context register](../../../work-packets/eh-g8-cfp1-candidate-operation-context-register-v1.md), not owner selection, installed catalog acceptance, rights clearance or stage promotion. The [CFP-1 working contract](../../../work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md) and [G8 work program](../../../helix-environment-harness-work-program-v1.md) retain authority. Source HEAD inspected: `256554ca2637b2978a83616d9f9670069fdfd8c4`, with a shared dirty worktree. No runtime, account policy, billing, package, license, repository or production state changed.
+
+The [104-name source triage](../../../work-packets/eh-g8-cfp1-mcp-offer-context-triage-v1.md) remains entirely `unselected/not_run`. The new register takes one **candidate** personal journey and one sponsored hosted counterpart down to operation/context rows, current MCP/room IDs, catalog descriptor versions where explicit, account/OAuth and owner-grant boundaries, and CFP-2/3/4 proof owners. It does not define the whole supported free set or approve Minecraft as the paid connector. The owner-selected free-personal/paid-hosted split, seven-day no-card trial, host sponsorship and action-inclusive paid benefit remain unchanged; trial shared actions remain unselected.
+
+Two independent read-only source reviews found and then rechecked four corrections:
+
+| Review finding | Correction in the working register |
+| --- | --- |
+| Player pairing requires `action_authority_id` and local launch requires a player lease; the draft put pairing before authority. | The dependency graph now requires personal context/source, subject selection, authority configure, player pair/lease launch, observation, effect, then result/stop. CFP-2.ONBOARD must test the fresh-profile sequence and skip/replay denials. |
+| The draft's `room.source.create (v1)` could be read as an operation version. | `v1` is now identified as the room-agent API contract; per-operation/connector versions remain to freeze. Probe `@1/@2` labels are identified as catalog descriptors, not final connector manifests. |
+| Current `room.source.create/list` requires room-owner membership in addition to scope. | H03 now says a guest-owned program needs a distinct authorized contribution path if selected; a paying host cannot acquire the guest's source or action authority. |
+| Room history was named without a current MCP history operation. | H05 now labels room history future/unspecified and limits current-source claims to inspect/status/revoke/control handlers. |
+
+After those corrections, the personal reviewer found no remaining material conflict in P01–P08 for the proposed path; the hosted reviewer found no remaining issue in H01–H05/T01. The source-backed first Minecraft paid action still fails current guest-to-owner-player broker admission, and the first paid connector and commercial rights are not selected. A useful personal pilot remains a candidate because ordinary-user personal context, developer-gated launch, exact manifest versions, rights and installed tests are incomplete.
+
+Validation: `npm run helix:environment-harness:docs-audit` returned `ok: true` with G8 active, 40 capability rows and 14 claims; scoped `git diff --check` passed; 124 relative Markdown links across the new register, two working backlinks, G8 program and this addendum resolved. A name comparison found all 16 distinct `helix_` tool names mentioned in the register in the 104-row source triage. Those checks do not prove tool execution or customer support.
+
+**Stage decision:** CFP-1 remains **active (specification)**. The product owner and capability owners must select and version the **complete** advertised personal and paid operation/context rows, distinguish wizard-internal and shadow/deferred names, freeze exact tests and terms, and obtain the qualified rights dispositions. CFP-2/3 remain blocked by the [G8 ledger](../../../helix-environment-harness-work-program-v1.md); their later installed/sandbox/signed acceptance cannot be inferred from this register.

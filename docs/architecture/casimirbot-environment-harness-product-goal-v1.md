@@ -25,9 +25,10 @@ implementation where ownership and dependency obligations permit, with
 deliberately selected public contracts, examples, and components. Existing
 licensed copies and third-party obligations require a rights/distribution
 review; this specification changes no license or repository visibility.
-The complete supported single-person MCP experience is free. Paid hosted
-collaboration terms, any hosted trial, offline allowance and expiry must be frozen
-before dependent implementation; stop, revocation, export, and account recovery
+The complete supported single-person MCP experience is free. The owner selected a
+[seven-day no-card hosted trial](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-hosted-trial-owner-selection-20.md);
+its start/reuse, benefit, outage and expiry details and the paid hosted terms must
+be frozen before dependent implementation. Stop, revocation, export, and account recovery
 must remain available under the defined lifecycle.
 
 `docs/work-packets/eh-g8-codex-first-paid-product-delivery-v1.md` defines staged
@@ -65,7 +66,154 @@ capabilities, revocation/recovery, action history and connector support. It does
 not grant another person's model account or subscription. Security boundaries
 apply regardless of payment; room eligibility never replaces consent. Prove
 the personal tool loop first, then the invite/grant/use/revoke/reconnect journey
-specified in CFP-1. Payer roles, guest policy and price-tier mapping remain open.
+specified in CFP-1. One host sponsoring invited guests with explicit handoff
+to another eligible host is selected; handoff protocol, capacity and price-tier
+mapping remain open.
+
+The owner also selected an [action-inclusive first paid benefit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-shared-actions-benefit-owner-selection-26.md): at least one guest-requested program action under its owner's exact grant, after that connector and commercial relationship are rights-cleared and technically accepted. Coordination/read-only alone does not fulfill the selected first paid offer. No specific Minecraft action or connector has yet met those conditions.
+
+## Three-person reference journey and proposed service expansion
+
+This journey is the product-design reference for the platform plan, not an
+accepted release claim. Dan, Sam and Alex want to reach a cave entrance while
+talking, stay together, avoid deep water and recover if one player disconnects.
+The Minecraft setting makes control and progress visible; the platform must
+eventually support other consented programs through the same contracts. The
+owner-selected launch offer above remains free personal MCP tools plus paid
+hosted collaboration using the user's supported external reasoning client.
+
+The reference proposes a richer service split. Its human-only room and
+CasimirBot-funded AI modes require a new commercial decision, operating-cost
+and provider-rights review, and their own implementation and acceptance. They
+must not be inferred from today's room, voice, billing or agent code.
+
+| Service mode | User experience | Decision status and reasoning source |
+| --- | --- | --- |
+| Personal harness | One person installs supported tools and connects an approved program to their own AI client; no room or purchase is required. | Selected free boundary; the user's supported external client reasons. |
+| Human-only room | A bounded text/voice call with no AI participant, provider session, automatic transcription or AI processing. | Proposed free communication mode; media cost, limits and privacy behavior need review. |
+| Assisted room, external principal | One shared AI conversation, bounded helpers and program coordination; one exact external task directs the mission. | Proposed paid expansion; the external client supplies principal reasoning, while CasimirBot-funded voice/helpers would amend the initial no-funded-inference selection. |
+| Assisted room, managed principal | The same governed room with a separately qualified managed agent as the sole mission principal. | Proposed later profile; provider access, continuation, cost, tools and rights must be qualified. |
+| Hosted text assistance | Managed AI help without a voice room or an external app. | Proposed separate service, outside the selected initial offer. |
+
+For the selected hosted offer, the [room host sponsors invited guests](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-host-sponsorship-owner-selection-21.md)
+but is not automatically the mission leader. Guests keep separate identity,
+processing consent and program grants without each buying the same session.
+The richer service modes above remain proposals; [explicit eligible-host handoff](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-host-handoff-owner-selection-22.md)
+is selected while its protocol and the existing $5/$10 preset benefits remain
+to freeze. The [shared-action benefit shape](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-shared-actions-benefit-owner-selection-26.md) is selected, while its exact action/room IDs and price mapping remain open. Entitlement answers whether a hosted feature is available; usage
+admission answers whether its current capacity may be consumed; an owner's
+operation grant answers whether one specific program or player may be used.
+Payment cannot substitute for the latter two authority checks or purchase
+another person's model subscription.
+
+### From installation to a shared mission
+
+1. Dan, Sam and Alex each install the harness and compatible integration only
+   if they contribute a locally controlled player. A browser-only observer can
+   join without a local connector. The installer and catalog show the actual
+   package/version prerequisites and distinguish **available → downloaded →
+   installed → connected → authorized**. Discovery or installation never
+   becomes an executable grant.
+2. Dan starts the proposed human-only call. Its truthful initial state is
+   **Human call connected. AI absent. No players shared.** Enabling the shared
+   AI later requires explicit service admission and participant notice/consent
+   for provider processing, distinct from microphone permission. One shared
+   AI participant speaks with the group; speaker attribution and overlapping
+   voice require live qualification.
+3. Each owner selects their own player and bounded mission delegation. The
+   first example permits qualified movement and look toward the cave while
+   excluding mining, attack, item dropping and administrative world changes.
+   Each owner can stop, revoke or take over independently. A payer or mission
+   lead cannot widen another owner's grant. Grants, leases and current source
+   identity are checked at execution, not only at connection time.
+4. The room selects exactly one mission principal: an authenticated external
+   task or a separately qualified managed session. Shared AI voice receives
+   permitted mission facts and submits attributed proposals. Restricted
+   workers may inspect or calculate within enforced read-only permissions.
+   The principal selects strategic changes; local controllers execute only
+   admitted finite operations and protective responses. A worker, room
+   participant or voice model does not become a competing mission writer.
+5. The principal proposes a coordinated route; each node observes fresh local
+   geometry, executes bounded segments and returns measured progress. The
+   current room contract holds two participants, and the federation contract
+   serializes mutations. The three-person reference requires new room capacity;
+   simultaneous multi-player motion is a separate projected contract for
+   per-player ownership,
+   nonconflicting effects, shared-resource arbitration and partial failure;
+   one group request is not assumed atomic.
+
+```text
+Dan, Sam, Alex -- human room/media -- one shared AI participant (proposed)
+                                      |
+                        scoped context, tasks and budgets
+                         |                         |
+                 restricted workers          one mission principal
+                                       external bound task OR managed session
+                                                   |
+                                  governed environment operations
+                                      /         |         \
+                                Dan's node  Sam's node  Alex's node
+                                      |         |         |
+                                Dan's player Sam's player Alex's player
+```
+
+The domain service coordinates accounts, room membership, routing and service
+admission; it does not run the three game clients. Each node retains its
+owner's native connection and timely controller. Retiring a self-hosted
+open-source Codex runtime is a candidate migration only after a caller
+inventory and a managed replacement qualify for every required role. Helix
+may display permitted public messages, plans, observations and outcomes, not
+an external task's hidden reasoning or private conversation.
+
+### Change the plan without losing control
+
+Suppose Sam refuses a flooded passage and Alex asks for a dry approach. Sam's
+stop or refusal fences his player immediately. Shared AI can explain the
+observed stop reason and ask a restricted worker for a route candidate, but
+neither action approves movement. An attributed, evidence-backed request goes
+to the principal with the current goal and plan revision. The UI distinguishes
+**change queued**, **principal received it**, **decision made**, and **new
+per-player work admitted**. Pickup/polling, provider push and unavailable
+delivery remain distinct; a queued event cannot be presented as continuous
+principal supervision. Each owner can reject the revised route for their own
+player. A late worker result from an old plan revision cannot steer the new one.
+
+The mission record separates what a participant reported, what a connector
+observed, what a worker proposed, what the principal selected and what each
+controller actually started or completed. Shared views exclude private
+material before they are built. Past evidence can explain a past stop; new
+execution needs fresh applicable evidence. A voice request, backend speech
+receipt and actual client playback are separate observations. Consequential
+spoken claims such as "all players stopped" need evidence for each player.
+
+### Failure behavior and visible state
+
+| Transition | Required behavior in the proposed journey |
+| --- | --- |
+| Shared AI fails | Keep the human call where media remains healthy; show AI unavailable and follow independently valid local control policy. |
+| Helper fails or returns late | Report the limitation or discard stale work; never promote it to the principal. |
+| External principal cannot receive input | Show awaiting pickup; allow only valid bounded local work until its declared hold/release boundary. |
+| One player disconnects or takes over | Fence that player's old authority and apply the declared group dependency policy; never route their work through another player. |
+| Sponsored usage is exhausted | Decline new paid work and close paid provider sessions while preserving eligible human communication, personal tools and stop/revoke paths. |
+| Package or connection changes | Reconcile version, source epoch, uncertain effects and grants before resuming; no active-controller hot swap or duplicate action. |
+
+The room UI must show call health, AI presence, principal responsiveness,
+mission status and sponsored usage separately. Each player needs a distinct
+control state, reason, current grant and stop/take-over path. **End mission**,
+**remove AI**, **leave room** and **disconnect player** have different effects.
+The proposed assisted service should be evaluated by whether people can converse and
+correct each other while the principal makes useful progress, whether every
+owner retains control through disagreement and failure, and whether usage is
+charged only for an explicitly active eligible service. The selected release
+path first proves the free personal MCP loop and then subscribed hosted
+collaboration without funded inference. The proposed expansion starts with an
+owner-approved service-mode and routing contract, then a read-only/replayed
+group conversation, one controlled player, existing multi-node prerequisites
+and finally separately qualified simultaneous players. NAV-EQ and other
+admitted game qualification may advance on their own work-program path without
+waiting for the commercial expansion. The [CFP-1 platform build plan](../work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md)
+owns these handoffs; the [environment work program](../helix-environment-harness-work-program-v1.md)
+alone owns gate order and maturity.
 
 ## Product thesis
 
@@ -98,6 +246,21 @@ leases, approval, interruption, Emergency Stop and terminal eligibility.
 The compact product principle is:
 
 > Maximum reasoning freedom inside an explicit, enforceable authority envelope.
+
+For longer environment work, the intended user-facing unit is a governed,
+addressable skill operation. The principal selects what should happen and
+within which limits; an admitted implementation may keep finite work moving
+inside those limits, report actual progress and causal pause reasons, and wait
+for a new principal decision when the objective or policy must change. In the
+proposed assisted-room mode, shared GPT Live can explain permitted operation
+evidence and carry attributed
+proposals without becoming another controller. Each program owner retains a
+direct stop and revoke path. The operation record can survive a reconnect;
+execution permission must be current. This is a specified product direction,
+not a claim that one generic skill endpoint or three-player experience is
+already accepted. The [platform build plan](../work-packets/eh-g8-cfp1-harness-platform-build-plan-v1.md#governed-skill-operations--2026-09-19-alignment)
+owns its delivery handoff, and the [work program](../helix-environment-harness-work-program-v1.md)
+owns maturity and admission.
 
 ## What the harness is
 
@@ -166,7 +329,7 @@ The labels below are deliberately strict:
 | Web workstation | Existing research workstation, panels, Helix Ask surfaces and governed workstation gateway | Implemented; individual live-provider paths have their own acceptance state |
 | Windows desktop | `0.1.0-alpha.8` native host, private ephemeral loopback service, per-launch session secret, desktop-local profile state and packaged renderer | Implemented and packaged; it does not inherit repository provider or connector secrets |
 | Secure MCP tunnel | Pinned, checksum-verified OpenAI tunnel client supervised by the desktop host; Windows-account-protected tunnel credentials | Implemented; process launch, local health and remote control-plane readiness remain distinct states |
-| Device Check MCP | One OAuth-protected, owner-scoped, read-only tool for connector identity, health, freshness, bindings, capability IDs, credential status and actionable blockers | Implemented; it cannot execute an environment action or expose credentials |
+| Device Check MCP | OAuth-protected read-only endpoint with an owner-scoped connector check, a public UI catalog projection, and owner-scoped evidence retrieval | Implemented server contract with three registered tools; it cannot execute an environment action or expose credentials, and the public plugin remains staged |
 | Public Codex plugin | Bundled Device Check plugin and marketplace payload | Staged behind Auth0/Codex production OAuth and release acceptance |
 | Helix Agent API | Provider-neutral durable run lifecycle over REST and MCP, with idempotency, owner isolation, evidence and events | Implemented server contract; not evidence of a public deployment |
 | Shared Live Rooms | Room/run/source bindings, browser-selected chat handoff, observer projections and owner-scoped revocation | Implemented contract; deterministic Auth0 web-session convergence now reuses the already-linked MCP profile without exposing a bearer, while live exact-callback/profile/room, multi-user and text/voice acceptance remain deployment gates |
@@ -217,9 +380,12 @@ references, cancellation state, supported terminal product, and presentation
 certainty. Hidden model reasoning is not mirrored between surfaces. Public
 lifecycle evidence and products are.
 
-Only one serialized execution lease may mutate an environment. A second
-surface may observe, request cancellation, or submit a new governed turn when
-authorized; it cannot create a competing writer or silently replay an effect.
+Under the current federation contract, only one serialized execution lease may
+mutate an environment. A second surface may observe, request cancellation,
+or submit a new governed turn when authorized; it cannot create a competing
+writer or silently replay an effect.
+The proposed simultaneous-player mode requires a separate conflict and
+per-actor authority contract before changing that execution rule.
 
 ### Credential classes and user onboarding
 
@@ -232,22 +398,25 @@ The product must keep these credentials distinct:
 | Environment/provider authorization | Connects Minecraft, brokerage, a device, or another adapter to its environment | Owned only by the corresponding connector boundary; results are normalized and credential-free before model re-entry |
 
 Payment entitlement is a fourth, non-credential class. The initial subscription
-grants selected Casimir features; managed-provider credit is a deferred separate
-proposal. Payment never substitutes for
-profile identity, MCP client authorization, provider authorization, device
+grants selected hosted CasimirBot features; managed-provider usage remains a
+proposed later service, not an initial credit bundle. Payment never substitutes
+for profile identity, MCP client authorization, provider authorization, device
 trust, a capability grant, or a billable-session lease. Likewise, a ChatGPT or
 Codex login is not an OpenAI API credential or API billing balance. The staged
-EXE-first subscription, bring-your-own-provider, MFA, metering, and public-pilot
-plan is governed by
-`docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md`.
+EXE-first provider-broker proposal in
+`docs/work-packets/eh-g8-exe-first-subscription-provider-broker-v1.md`
+applies only to a separately selected native-runtime profile; CFP-1 controls
+the free personal external-client offer and paid hosted boundary.
 
-An ordinary user installs the signed application, creates or links a profile,
-enrolls a provider through the application, connects an MCP client through an
-authorization flow, and approves individual environment scopes. The user must
-not edit a key-bearing command file, paste a provider key into Codex MCP
-configuration, or place secrets in repository files. Headless and enterprise
-installations may use an approved OS or deployment secret-store reference, but
-not a raw secret in process arguments.
+For the selected external-client profile, an ordinary user installs the signed
+application, creates or links a profile, connects the supported MCP client and
+approves individual environment scopes. This path does not require enrolling a
+separate model provider with CasimirBot. A separately offered native-runtime
+profile may require provider enrollment through the application. Neither path
+asks the user to edit a key-bearing command file, paste a provider key into
+Codex MCP configuration, or place secrets in repository files. Headless and
+enterprise installations may use an approved OS or deployment secret-store
+reference, but not a raw secret in process arguments.
 
 The existing opaque `start-myapp-for-codex` command remains a developer
 acceptance mechanism for the keyed repository runtime. The product equivalent
@@ -257,17 +426,19 @@ processes, supervises MCP transport, and reports sanitized health. It is not a
 distributed user-editable launcher.
 
 The current desktop Device Check tunnel is the first narrow vertical slice of
-this experience. Full provider enrollment, governed MCP catalog parity,
-managed client reconnect/catalog refresh, shared durable-run projection, and
-cross-surface cancellation/steering require their own acceptance packet; they
-must not be inferred from Device Check readiness alone.
+this experience. Optional native-runtime provider enrollment, governed MCP
+catalog parity, managed client reconnect/catalog refresh, shared durable-run
+projection, and cross-surface cancellation/steering require their own acceptance
+packet; they must not be inferred from Device Check readiness alone.
 
 ### Local single-user use
 
 The user installs CasimirBot and an approved environment companion. The account
-surface shows personal provider connections and device health. The user chooses
-an environment, grants narrow observation or action scopes, states a natural
-objective and can revoke, pause, override or Emergency Stop the connection.
+surface shows reasoning-client connection and device health, plus provider
+connection only for a separately offered native-runtime profile. The user
+chooses an environment, grants narrow observation or action scopes, states a
+natural objective and can revoke, pause, override or Emergency Stop the
+connection.
 
 Codex reasons from the model-visible capability catalog and fresh observations.
 It may construct a bounded program, receive the exact measured result and revise
@@ -284,13 +455,14 @@ or their credentials.
 Room members may benefit from shared observations and reasoning according to
 their membership, consent and subject bindings. Mutation authority remains
 separate and explicit. Two proposals cannot race for the program: all mutations
-converge through one serialized execution lease.
+converge through the current serialized execution lease. Proposed concurrent
+per-player execution has a separate qualification boundary above.
 
 The projected multi-host form extends the same rule without turning a room into
 ambient device access. One installed node may serve several authenticated room
 members, so observers and authorized steering participants do not need their own
-harness merely to benefit from the host's normalized evidence and Runtime Codex
-reasoning. When a second member wants the room to observe or act through a
+harness merely to benefit from the host's normalized evidence and permitted
+mission products. When a second member wants the room to observe or act through a
 program or player client physically owned by that member's computer, that
 computer contributes its own installed node or approved companion and an
 independently revocable capability grant.
@@ -301,9 +473,12 @@ owner profile, node, environment, source/world, subject, connector epoch,
 credential, consent, and lease. Room membership never grants host shell,
 filesystem, process, credential-store, private-network, native-account, or
 arbitrary-program access, and it never unions member permissions into a room
-super-user. Cross-host reasoning still uses one principal Runtime Codex path,
-one execution arbiter, and one terminal writer. The exact projected acceptance
-contract is `docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md`.
+super-user. The current federation contract specifies one principal Runtime
+Codex path, one execution arbiter, and one terminal writer. An external bound
+task or managed principal must separately qualify the same single-principal,
+arbiter and terminal-authority semantics before replacing that path. The exact
+projected acceptance contract is
+`docs/work-packets/eh-g8-shared-room-multi-host-capability-federation-v1.md`.
 
 Development on one computer may rehearse that topology with two installed EXE
 instances only when each uses a separate native data root, profile session,

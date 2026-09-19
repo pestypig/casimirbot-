@@ -34,7 +34,24 @@ The [adapter registry](helix-environment-adapter-registry-v1.md) currently descr
 
 The existing sdk/package.json describes a verification SDK, but connectors/environment already contains a separate probe-only integration kit: canonical contract re-exports, TypeScript/Java helpers, a read-only template, system-clock and synthetic examples, and conformance fixtures. Extend that kit; do not create a second SDK. The enabled system.clock.connector.v1 registry profile is a non-game read implementation. Neither these sources nor mock conformance establish generic mutation support or independent developer/live collaboration acceptance. Before implementation, inventory reusable schemas/modules and assign exact file ownership; propose only the missing developer surface through a bounded packet in the admitted stage. Publishing a manifest or installing a connector must not register a trusted profile, choose someone else's task or expand permissions.
 
+The [CFP-1 public-interface proposal](../work-packets/eh-g8-cfp1-public-interface-and-source-boundary-v1.md) inventories the eleven tracked kit files and six shared-source dependencies behind its contract entrypoint. It sets a candidate standalone public package and clean-room acceptance, subject to owner file selection and rights review. The current in-repository kit is not itself a verified distributable SDK.
+
 Free personal access must not depend on a paid collaboration grant, expiring commercial trial or model-credit balance. Hosting needed for personal connectivity still needs a sustainable operating model or an accepted local route. Hosted subscription expiry must leave eligible personal use and safety/recovery intact. Developer access to tools/documentation is not permission to redistribute a third-party program or access another user's model account.
+
+## Bounded skill-operation integration
+
+An ongoing skill operation is a future integration pattern over admitted
+capabilities, not a new generic action loader in the current probe-only kit.
+Where a program qualifies that pattern, its developer must declare the
+versioned objective/subject schema, permitted local derivations and repairs,
+hard prohibitions versus preferences, finite resource/effect/deadline bounds,
+checkpoint and control-state evidence, interruption and resume preconditions.
+The platform binds those declarations to identity, consent, current authority
+and operation history; it does not let a manifest install itself as trusted
+execution. A read-only preview cannot move or mutate the program to obtain
+evidence. Cross-program operation claims still require DEV-01–06 and the
+separately admitted bounded-action contract; Minecraft NAV does not certify a
+universal skill SDK.
 
 ## Evidence before developer-platform claims
 

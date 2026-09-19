@@ -150,6 +150,55 @@ not goal satisfaction. A final answer is eligible only after its selected
 current-turn evidence has re-entered the runtime and supports the claimed
 result.
 
+## Governed skill-operation lifecycle
+
+The principal reasoning runtime or authorized operator selects the semantic
+objective, exact subject, policy, effects, deadline and completion conditions.
+Helix admits the request against current identity, consent and evidence. A
+qualified skill implementation may then derive finite domain segments inside
+that envelope; NAV's route and trajectory planning is the movement example.
+Those segments are implementation output with their own provenance, not new
+principal decisions or model-authored plans. The scheduler executes admitted
+segments and never becomes a general strategy writer. Changing the destination,
+capability composition, forbidden traversal, effect ceiling or group policy
+requires a new principal decision and admission.
+
+A stable operation reference may retain the parent request, actor, profile
+version, child derivations, checkpoints, performed effects and unresolved
+outcomes across disconnects. It does not retain a lease or permission to
+resume. After restart, rebind the current subject, authority, observations,
+expected native state and predecessor checkpoint before generating or
+dispatching another segment. Success requires measured postconditions, not a
+queued segment, completed input sequence or plausible prediction.
+
+The same implementation offers different admitted views. The principal can
+select, revise, cancel and verify. A restricted worker can inspect permitted
+evidence and propose non-mutating analysis. Shared GPT Live can explain a
+current causal reason and carry attributed questions or revision requests.
+Each owner can stop, revoke or take over their own contribution through the
+direct control path. Conversation and supporting workers do not gain an
+independent environment writer. A purported read-only probe that moves a
+camera, player or simulation is an effect and requires the corresponding
+authority.
+
+Progress, native control, evidence freshness and reasoning delivery are
+different states. A useful reason record binds the actor, operation and plan
+revision to the observation, governing rule, actual effects, current control
+state, and next decision owner. GPT Live may explain that record at no greater
+certainty than its evidence. It must not invent private principal reasoning or
+claim that an awaiting message stopped physical movement. Prompt delivery,
+pickup, acknowledgement and principal decision retain the exact-binding
+contract; an operation status receipt is not an assistant answer.
+
+This is a specified relationship over the existing temporal compiler, broker,
+arbiter, scheduler, connector, room and terminal boundaries. A durable handle,
+client task extension or learned local proposal cannot expand the operation's
+authority or bypass its current postcondition checks. Implementation and
+acceptance remain with the [work program](../helix-environment-harness-work-program-v1.md),
+[Environment Time](helix-environment-time-action-planning-v1.md),
+[NAV](../work-packets/eh-g8-environment-spatial-navigation-v1.md) and the
+applicable environment profile.
+
 ## Simultaneous reasoning roles
 
 Environment use benefits from concurrent reasoning, but concurrent lanes must

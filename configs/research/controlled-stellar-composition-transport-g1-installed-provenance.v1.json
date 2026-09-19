@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "g1-installed-provenance/1",
+  "status": "INSTALLED_INVENTORY_AND_SELECTED_SOURCE_MATCH_RECORDED",
+  "launchAllowed": false,
+  "date": "2026-09-19",
+  "image": "evbauer/mesa_lean@sha256:c9e4e66db3b34ca8b977bd32725a098eb4c6e81ac1e2f261aa4af38a7954de62",
+  "upstreamCommit": "7ecf3dfa61d514c7b6f47645e02d968d3e3c28b7",
+  "installedInventory": {
+    "localReceipt": "artifacts/research/g1-source-validation-v1/installed-inventory-20260919/inventory-final.txt",
+    "sha256": "5f2ab8a085e69240323c6bc92c8ce99f5b3d7ed8eabb1912d8b0c939311bd6a3",
+    "mesaFileCount": 3552,
+    "sdkFileCount": 885,
+    "containerExitCode": 0,
+    "scope": "MESA data, selected default and source trees, SDK bin and lib; broad installed inventory rather than active file-load trace"
+  },
+  "inlist": {
+    "path": "ops/mesa/g1-preparation-v1/inlist_project",
+    "sha256": "20e2a14d328721618d790101409a879f79917b14e60b46cfb08adb399a8d9a77",
+    "independentParser": "f90nml 1.5.0",
+    "assignmentCountCheckedAgainstOwnDefaultGroups": 73,
+    "nativeMesaParserExecuted": false
+  },
+  "selectedInstalledAndUpstreamMatches": [
+    {"path":"star/private/pre_ms_model.f90","sha256":"c6dac994cbaf13a30610be8cb9a8f616d7b5ab6be62151b3c5156e5c18e9452b"},
+    {"path":"star/job/run_star_support.f90","sha256":"a612fb4e2350c5d9cecd2a90b987c9533fc5f1874d9c2faf23bff8c0cae7a41f"},
+    {"path":"star/public/star_lib.f90","sha256":"757e0ebcbd7964eb1e7e6239f31c24364ef7ea97cd111aec90ae389e8445264f"},
+    {"path":"star/private/init.f90","sha256":"7b8b9c6cded9bda328d62c078311fb052be4e5cf592bf65b99cdb991476fd615"},
+    {"path":"star/defaults/controls.defaults","sha256":"1e159d0e3e8e07b5071bbec26c44fd4841e40d4b96d4cc404c2afe890e68c4ef"},
+    {"path":"star/defaults/star_job.defaults","sha256":"96afcb0c3e30a6407acfa42d015cd68bbe6940375a75b91bde6e84a744ac8c59"},
+    {"path":"eos/defaults/eos.defaults","sha256":"b1974d782a9d8bb927507697f7de38910cda3e4fbe20778ef7fb244e52d1ce48"},
+    {"path":"kap/defaults/kap.defaults","sha256":"fdc2134f218081ddde22579e4f0e4c9d67396422015d222a54330a9fe0ad42c5"},
+    {"path":"data/net_data/nets/pp_and_cno_extras.net","sha256":"8828c416d71f3cad7815cf7bca830e8f09edcf5a38c42c599664a686d1f598b2"},
+    {"path":"data/net_data/nets/basic.net","sha256":"387dae6730a0499d086cdb5ea77ca2b472d0aaaff10a4d9e63eb9587a5da395d"},
+    {"path":"data/net_data/nets/add_pp_extras","sha256":"c86b9ac54cde5c86a324ddee1d9fb18551c45ff79bc1bebc8ed927d6c522d880"},
+    {"path":"data/net_data/nets/add_cno_extras","sha256":"7d80b28275a7976f98057a8e522e9f1907eef52124f31ea034500496f68b9bb8"},
+    {"path":"data/net_data/nets/add_hot_cno","sha256":"8f7da2beeb885d2dcee8a5e31bc2550c4e7adaaaa24ca5f98635d7f123ef0f95"}
+  ],
+  "unresolvedBeforeScienceLaunch": [
+    "structural observation resolution and systematic-error binding",
+    "MESA native parser and effective-default receipt",
+    "exact microphysics files loaded in an evolution attempt",
+    "bounded launcher and capacity gate"
+  ]
+}

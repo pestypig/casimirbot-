@@ -6,7 +6,7 @@ Reaction timescale: durable planning for development; runtime timing remains gov
 Authority owner: The product owner selects the offer, licensing terms, public-source boundary, and release; Development Codex implements bounded packets; reviewers verify evidence; the external agent owns reasoning; CasimirBot and its connectors retain existing identity, consent, effect, and evidence boundaries
 Current maturity: specified
 Target maturity: release-ready for the exact signed Windows capability set accepted through G8
-Required evidence: repository and roadmap disposition audit; rights and distribution inventory; frozen offer and acceptance matrix; useful external-Codex environment journey; enforced software entitlement independent of action consent and model billing; signed clean-machine installation, update, recovery, and cancellation evidence; audited release claims
+Required evidence: repository and roadmap disposition audit; rights and distribution inventory; frozen offer and acceptance matrix; useful external-Codex environment journey; enforced hosted-service eligibility independent of personal tools, action consent, and model billing; signed clean-machine installation, update, recovery, and cancellation evidence; audited release claims
 Explicit non-goals: no repository visibility or license change from this document alone; no production charging or publication from a planning assignment; no resale or bundling of the Codex desktop app; no required bundled model runtime; no private replacement agent loop; no promotion of existing capability maturity; no expansion of physics, brokerage, device, or environment authority; no commitment to an indefinitely free full harness
 Downstream gate unlocked: evidence-based G8 release decision for a paid Codex-first CasimirBot product
 
@@ -22,10 +22,11 @@ expiry or purchase may become a requirement for the personal customer path.
 
 ## Purpose and document ownership
 
-Deliver a product people can install, connect to their existing Codex app, and
-pay for because its environment capabilities accomplish useful work reliably.
-The purchase funds CasimirBot software, maintained integrations, updates, and
-support. The owner selected subscription only for the initial offer: no credit
+Deliver a free personal harness people can install and connect to their
+existing supported reasoning client, with a subscription for hosted
+collaboration. The purchase funds maintained rooms and shared connections,
+participant coordination, history, recovery and hosted-service support.
+Personal supported tools remain free. The initial offer includes no credit
 purchases, bundled model allowance or CasimirBot-funded model/API service.
 Required hosted coordination must be costed into that offer; managed inference
 is deferred outside its implementation and acceptance scope.
@@ -46,7 +47,7 @@ their work. A narrow commercial pilot is not automatically G8 closure.
 
 ## Product decisions and decisions still to freeze
 
-The selected direction is a paid CasimirBot companion product, Codex-first in
+The selected direction is a free personal harness with paid hosted collaboration, Codex-first in
 onboarding and acceptance and provider-neutral at its supported interface.
 The ordinary path uses an external reasoning client; it does not require an
 additional CasimirBot-managed Codex runtime, model key, or inference purchase.
@@ -65,11 +66,11 @@ CFP-1 must freeze the following before dependent implementation:
 | Decision | Required explicit answer |
 | --- | --- |
 | First customer and useful task | Exact supported Codex client/version, Windows baseline, environment/version, and natural task with measurable postconditions |
-| Paid capability set | Capability IDs and public-user policy bindings; trial/demo limits; what is deliberately excluded |
-| Commercial term | Recurring subscription selected; freeze its benefits, interval, device allowance, updates/support commitments, cancellation effective boundary, refunds, and activation/recovery behavior |
-| Local continuity | Network dependencies, activation validation and offline allowance, expiry behavior, and continued access to stop, revoke, history/export, and account management |
+| Personal and hosted capability sets | Explicit capability IDs and public-user policy bindings for the selected release; free personal admission and separate hosted grants. The first paid hosted benefit includes selected, accepted, rights-cleared guest-requested program actions under each owner's exact grant. The [seven-day no-card trial also demonstrates an accepted paid-benefit guest action under trial-specific limits](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-trial-shared-action-benefit-owner-selection-42.md); the owner [provisionally selected one room, one guest, one program and ten verified bounded effects per sponsor](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-provisional-hosted-trial-limits-owner-selection-48.md). Exact operations, effect unit and final limits remain open. Personal use has no paid trial expiry. |
+| Commercial term | Hosted subscription selected with one host sponsoring invited guests and explicit handoff to another eligible host; freeze exact benefit operations, price and interval, capacity and limits, support commitments, cancellation effective boundary, refunds, trial lifecycle and hosted activation/recovery behavior |
+| Local continuity | Personal network dependencies and any supported local route; separate connection/session and program-consent lifetimes; hosted outages/expiry preserve eligible personal tools and stop/revoke/history/export/account management |
 | Model payer | User's supported external client account; no credit purchases, bundled inference or managed API service in the initial offer; no automatic API fallback |
-| Hosted services | Which routing, room, or recovery services the base offer actually needs and who funds them; which are optional paid additions |
+| Hosted services | Which maintained room, shared-action, history and recovery operations the hosted subscription includes; each advertised action needs connector-specific technical and commercial-rights acceptance. Separately account for any hosting essential to free personal connectivity. |
 | Source and distribution boundary | Existing licensed material, owned proprietary code, required notices/source offers, public SDK/docs, download and updater endpoints |
 | Release scope | Mapping to every existing G8 acceptance requirement, with retained prerequisites and separately identified broader pilot exclusions |
 
@@ -118,7 +119,7 @@ bounded implementation/audit handoff; failures return to the owning stage.
 | CFP-0 — Baseline and plan reconciliation | Read-only roadmap auditor plus read-only implementation/distribution auditor; coordinator integrates findings | Complete disposition matrix, source/evidence inventory, conflict register, dependency graph, dirty-worktree qualification, exact next work packets, and an audit that distinguishes verified facts from untested claims. No material first-release dependency may remain unassigned. |
 | CFP-1 — Product and rights boundary | Product/architecture author with licensing/distribution review | Owner-selected offer, bounded capability list, rights-review outcome for the intended distribution, software/hosted/model entitlement matrix, lifecycle and cancellation rules, frozen acceptance thresholds, and reconciled canonical backlinks. Unresolved rights or offer decisions block only dependent work. |
 | CFP-2 — Useful installed capability | External-client/onboarding implementer plus environment capability implementer using existing PNA and adapter packets | One ordinary-user installed journey through external Codex performs the frozen useful task, shows measured outcome and public lifecycle, survives a repairable interruption, and stops safely. No developer launcher or packaged model runtime is needed. Record deterministic and live evidence separately. |
-| CFP-3 — Paid entitlement and distributable build | Entitlement implementer plus packaging/distribution implementer | Software entitlement enforced at the trusted service/action boundary, developer-superset preservation, sandbox purchase/cancel/refund and webhook replay/reorder tests, activation/offline policy, signed build, notices, and customer-accessible download/update path independent of source-repository visibility. No production charging is required for this stage. |
+| CFP-3 — Paid entitlement and distributable build | Entitlement, room/action and packaging/distribution implementers with nonoverlapping file ownership | Hosted-collaboration entitlement enforced at its trusted service/action boundary; exact owner-issued cross-participant action delegation for the selected rights-cleared first paid benefit, with native effect attribution and personal/self-player regressions; developer-superset preservation; sandbox subscription/cancel/refund and webhook replay/reorder tests; hosted expiry/recovery policy; signed build, notices, and customer-accessible download/update path independent of source-repository visibility. Never-subscribed and expired-hosted users retain eligible personal tools. No production charging is required for this stage. |
 | CFP-4 — Integrated reliability audit | Integration auditor with bounded repairs delegated to the owner of each failure | The same signed artifact passes the full acceptance matrix across identity, entitlement, effects, client lifecycle, recovery, update, and cancellation. Applicable G8 prerequisite artifacts are linked; code changes invalidate affected results and require a focused rerun. |
 | CFP-5 — Attended paid pilot | Pilot/release operator and product reviewer | Owner-authorized production payment configuration and attended charge/cancel/refund evidence for the actual offered terms; clean external-user signed installs; predeclared useful-task and support measurements; concrete rollback and incident procedures. Source visibility changes, if selected, use the reviewed distribution migration. |
 | CFP-6 — Release decision | Release reviewer, distinct from the implementation assignment | Claim-by-claim evidence review, reproducible version/hash manifest, all advertised capabilities at the required maturity, complete applicable G8 evidence, and explicit owner release decision. Any failed prerequisite prevents a release-ready or G8-closure claim. |
@@ -140,10 +141,11 @@ until that prerequisite is met. CFP-3 supplies the signed commercial build;
 CFP-4 repeats the useful-task journey and full matrix on that same signed
 artifact before pilot admission.
 
-If CFP-1 excludes hosted collaboration or built-in model consumption from the
-initial offer, CFP-3/5 still prove the software purchase. Unadvertised optional
-services need not be built merely to justify a subscription. The canonical G8
-room, voice, parity, and other required evidence remains separately applicable.
+CFP-1 selects hosted collaboration as the paid offer and excludes managed
+model consumption. CFP-3/5 prove that selected hosted subscription; they do not
+introduce a personal software purchase. Any later offer change requires an
+explicit CFP-1 decision. The canonical G8 room, voice, parity and other
+required evidence remains separately applicable.
 
 ## Required installed-product acceptance matrix
 
@@ -155,7 +157,7 @@ separately; record all failures and operator interventions, not only the best ru
 | --- | --- |
 | Existing Codex user | Connects without enabling built-in reasoning, enrolling a model key, or purchasing Casimir inference; completes the selected useful environment task. |
 | No compatible client | Truthful setup state with supported installation guidance; no false ready state or hidden model execution. |
-| Trial/unlicensed/licensed user | Exact offered capability policy holds in UI, MCP/API, and direct service requests; payment does not grant action consent. |
+| Never-subscribed, eligible hosted and expired-hosted user | Exact personal/hosted policy holds in UI, MCP/API and direct service requests; eligible personal tools remain free in all three cases, and payment does not grant action consent. |
 | Developer account | Existing developer panels and capabilities remain a superset; experiments are not accidentally public through a license purchase. |
 | Fresh profile and account switch | No repository session/secret inheritance; wrong-owner access fails; switched profiles do not inherit prior device/environment grants. |
 | Scope increase and catalog refresh | Explicit user consent, bounded refresh, exact current-task continuation or actionable unavailable state; no generic Full Access workaround. |
@@ -163,7 +165,7 @@ separately; record all failures and operator interventions, not only the best ru
 | Competing tasks and room participants | One effect authority, scoped observation/steering, and exact attribution; multi-device claims require physical-device evidence. |
 | App/service/client restart and update | Identity and durable state recover according to contract, without duplicate effects or guessed session ownership. |
 | Network loss and provider limit | Declared offline behavior, safe control release/retained bounded behavior, actionable recovery, and no silent API billing fallback. |
-| Cancel, expiry, refund, revocation | Distinct effective boundaries; no new disallowed work, bounded termination of existing authority, retained stop/revoke/export/account access, and no conversion of remote authority into local authority. |
+| Cancel, expiry, refund, revocation | Distinct hosted, session and program-consent boundaries; no new disallowed work, bounded termination of affected authority, retained eligible personal tools and stop/revoke/export/account access, and no conversion of remote authority into local authority. |
 | Download, signed install, repair, update, uninstall | Ordinary supported machine uses reviewed artifacts without source-repository access; profile/data handling follows declared policy; rollback is tested. |
 | Value demonstration | Same declared task and comparable starting state/client/model configuration, with and without CasimirBot; report completion, intervention, elapsed time and recovery without claiming universal reasoning superiority. |
 

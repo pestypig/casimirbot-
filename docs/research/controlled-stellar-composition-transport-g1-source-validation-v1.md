@@ -11,8 +11,8 @@ Downstream gate unlocked: none
 
 # G1 source and input validation v1
 
-Status: PARTIAL_VALIDATION_RUNTIME_AND_SOURCE_BLOCKERS; not launch ready.
-Date: September 13, 2026.
+Status: SOURCE_AND_INPUT_PREPARATION_CHECKS_RECORDED; structural source binding blocks launch.
+Date: September 19, 2026 (initial source intake September 13).
 
 This work continues the completed preparation deliverable without closing G1.
 
@@ -30,6 +30,8 @@ for a resolved inversion comparison.
 
 The 37-row table and primary HTML are retained under
 `artifacts/research/g1-source-validation-v1/bison13-intake-20260913/`.
+The identical 37-row CSV is tracked at
+`configs/research/controlled-stellar-composition-transport-g1-bison13-table3.v1.csv`.
 `ops/mesa/g1-preparation-v1/intake-bison13.ps1` reproduces extraction into a
 new directory only, checks six numeric columns, positive entries and separate
 strictly increasing radial grids, and records unit conversions and hashes.
@@ -128,13 +130,49 @@ Image inspection returned the expected immutable RepoDigest
 The startup blocker is recovered; parser and installed dependency validation
 remain outstanding. No stellar evolution ran.
 
+## September 19 continuation
+
+The fresh readiness check found no engine. A normal start reproduced the
+inference-socket failure at 16:24:55 UTC. The approved recoverable procedure
+was repeated: verified Docker executables stopped, only `docker-desktop` WSL
+terminated, exact runtime directory checked to contain the same two zero-byte
+sockets, and directory preserved as
+`C:\Users\dan\AppData\Local\Docker\run.pre-recovery-20260919`.
+No backup was overwritten or data deleted. A normal hidden restart followed.
+
+The read-only inventory at
+`artifacts/research/g1-source-validation-v1/installed-inventory-20260919/inventory-final.txt`
+completed with container exit 0. It records SHA-256 for 3,552 MESA data and
+source files and 885 SDK files, plus symlink targets. Its SHA-256 is
+`5f2ab8a085e69240323c6bc92c8ce99f5b3d7ed8eabb1912d8b0c939311bd6a3`.
+The retained `inventory-validation.json` verifies the section structure and
+all 13 selected installed/upstream hash matches. This covers the network
+definition include tree, selected implementation/defaults, the installed data
+tree including opacity and rate tables, and the SDK bin/lib tree. It is a
+broad installed inventory, not a trace of which tables a future trial loads.
+The container had a read-only root, no network, one CPU, 512 MiB memory and no
+extra swap, 64 PIDs and no additional capabilities. No MESA executable ran.
+The compact [installed provenance manifest](../../configs/research/controlled-stellar-composition-transport-g1-installed-provenance.v1.json)
+is tracked with the image reference, receipt hash, inlist hash and 13 selected
+matching file hashes. Detailed receipts remain in the local ignored artifact
+tree and can be regenerated with the versioned inspection scripts.
+The first mount attempt exited 125 because Docker interpreted a comma in the
+workspace path as a mount-field separator; a read-only volume syntax resolved
+it. The failed receipt is retained. No file was removed.
+
 ## Current validation audit
 
 All 73 initial-inlist assignments were checked against their own namelist's
-pinned defaults, not merely against a union of control names. All passed.
-All 13 retained call-path/default/network source hashes were recomputed and
-matched the manifest. These are static checks, not Fortran parsing, type/range
-validation, installed dependency closure or a stellar calculation.
+pinned defaults, and all 13 retained call-path/default/network source hashes
+matched both upstream and the installed image. `f90nml` 1.5.0 independently
+parsed the inlist's five groups. The versioned
+`ops/mesa/g1-preparation-v1/validate-preparation-inlist.py` also checked the
+age, composition, mixture, network, diffusion, opacity and zero-transport
+settings. Its receipt is `installed-inventory-20260919/inlist-validation.json`;
+the inlist SHA-256 remains
+`20e2a14d328721618d790101409a879f79917b14e60b46cfb08adb399a8d9a77`.
+These checks establish syntax and selected input semantics. MESA's native
+namelist reader, effective-default resolution and a loader trace have not run.
 
 The structural source manifest now records `BLOCK_SOURCE_BINDING`. Primary
 HTML, PDF and author-data endpoint checks supplied the numerical profiles and
@@ -145,19 +183,24 @@ require an author-provided dataset or an explicitly reviewed alternative
 inversion product. No external message has been sent and no alternative
 acceptance policy has been substituted.
 
-The full goal remains incomplete: installed parser/type checks and EOS/rate/
-opacity/library dependency validation require a working pinned runtime.
-Docker recovery permission is pending. Source-blocker documentation satisfies
-the objective's allowed source outcome, but does not excuse missing input
-validation. No calibrated-baseline or completed-goal claim is made.
+The source manifest's typed blocker is the intended terminal source outcome
+for this preparation step. The input packet now has installed-file provenance,
+an independent syntax parse and source-backed initialization semantics. The
+native MESA reader, actual loaded microphysics subset and resulting model
+remain requirements of a separately authorized execution attempt. Available
+host space at the latest check was 14,395,346,944 bytes, below the frozen 25 GB
+science-start threshold. No calibrated-baseline claim is made.
 
 ## Remaining work
 
-1. Preserve numerical source data and review resolution/systematics binding.
-2. Trace initial composition/network/age semantics in the pinned source.
-3. Retain complete relevant microphysics/include dependency identities.
-4. Validate namelist parsing without launching stellar evolution when runtime
-   access is available; distinguish upstream checks from installed checks.
-5. Run local manifest/consistency checks and update the preparation roadmap.
+1. Obtain numerical averaging kernels or an independently reviewed quantitative
+   resolution map, then freeze the observational comparison and systematic-error
+   policy in a new manifest version. `BLOCK_SOURCE_BINDING` remains until then.
+2. In the future executable attempt, capture MESA's native input parse,
+   resolved defaults and loaded microphysics identities. The installed file
+   inventory provides a pre-run provenance baseline.
+3. Implement/test the bounded launcher and calibration driver, recover at
+   least 25 GB of free space, and perform a fresh resource preflight before
+   any separately authorized evolution run.
 
 Launch remains disabled throughout this goal.

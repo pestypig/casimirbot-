@@ -657,6 +657,7 @@ type HelixMinecraftPlayerActionToolArguments = {
 
 type HelixMinecraftActorStatusToolArguments = {
   room_id: string;
+  include_navigation_collision?: boolean;
 };
 
 const HELIX_MINECRAFT_MCP_SITUATION_PROBE_KINDS = [
@@ -8321,10 +8322,11 @@ export const createHelixMcpServer = (input: {
     {
       title: "Read the selected Minecraft actor status",
       description:
-        "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The result also carries a separately labeled same-revision perception snapshot compatibility observation for clients whose MCP catalog has not yet refreshed; callers should still refresh their catalog to use the dedicated situation-probe tool. Both observations are evidence for Codex re-entry, never assistant answers or terminal authority.",
+        "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The result also carries a separately labeled same-revision perception snapshot compatibility observation for clients whose MCP catalog has not yet refreshed. An explicit include_navigation_collision opt-in applies only to that perception snapshot; default reads do not capture collision data. Callers should still refresh their catalog to use the dedicated situation-probe tool. Both observations are evidence for Codex re-entry, never assistant answers or terminal authority.",
       inputSchema: z
         .object({
           room_id: helixSharedLiveRoomIdSchema,
+          include_navigation_collision: z.boolean().optional(),
         })
         .strict(),
       outputSchema: minecraftActorStatusOutputSchema,
@@ -8336,7 +8338,7 @@ export const createHelixMcpServer = (input: {
       },
       _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
     },
-    async ({ room_id }: HelixMinecraftActorStatusToolArguments) =>
+    async ({ room_id, include_navigation_collision }: HelixMinecraftActorStatusToolArguments) =>
       callRoomObservationTool(HELIX_MINECRAFT_STATUS_MCP_SCOPES, async () => {
         requireAllAgentScopes(HELIX_MINECRAFT_STATUS_MCP_SCOPES);
         requireCurrentRoomFeature();
@@ -8369,6 +8371,9 @@ export const createHelixMcpServer = (input: {
               horizontal_radius: 7,
               vertical_radius: 8,
               freshness_requirement_ms: 30_000,
+              ...(include_navigation_collision === true
+                ? { include_navigation_collision: true }
+                : {}),
             },
             accountContext: input.principal.accountContext,
             conversationThreadId: `helix-ask:room:${room_id}`,

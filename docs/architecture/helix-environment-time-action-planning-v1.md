@@ -82,13 +82,30 @@ compiles them to native mechanics. Changing semantic action, identity,
 condition, authority, effect ceiling or postcondition changes the plan hash.
 Delivery-only identifiers do not. Bounded repetition is allowed only through a
 typed operation with a maximum count or deadline. Branches select pre-admitted
-nodes; only Runtime Codex may author a semantically new plan.
+nodes; only Runtime Codex may author a semantically new plan. A qualified
+domain implementation may derive finite route or behavior segments inside a
+separately admitted semantic objective and policy. This is a child derivation,
+not authority to change the objective, strategy, capability family or effects.
+
+An addressable skill operation retains its parent request, actor, admitted
+policy, implementation version, child plan hashes, checkpoints and measured
+effects. Retention is not execution permission. Each child segment must bind
+the parent operation/revision, subject and connector epoch, authority lease,
+current observation and frontier revisions, expected starting state, predecessor
+checkpoint, effect bounds and deadline. The qualified implementation may
+prepare the next segment while valid work runs, but Helix rechecks these facts
+after computation and immediately before dispatch. A stale computation cannot
+be appended merely because it finished. The existing arbiter and scheduler
+remain the only mutation path.
 
 ## Receding-horizon execution
 
-Long goals are not one long open-loop macro. Codex supplies a short rolling
+Long goals are not one long open-loop macro. Codex supplies the semantic
+objective and policy or an exact finite plan. Where an admitted skill profile
+permits child derivation, its implementation supplies the next short execution
 window: long enough to cover ordinary model latency, short enough to remain
-observable and interruptible.
+observable and interruptible. A profile without that permission still requires
+Codex-authored extensions.
 
 - **Committed window:** admitted nodes that may execute.
 - **Decision watermark:** latest safe extension point without a stall.
@@ -98,8 +115,20 @@ observable and interruptible.
 An extension binds the prior plan, latest settled checkpoint and unchanged
 identity/authority. It appends only after the committed boundary. Replacement
 cancels incompatible unexecuted nodes and cannot reinterpret performed effects.
+The quantity to replenish is **valid execution runway**: work that still has
+current evidence, authority, expected state and time to execute. Queue depth
+alone is not runway. If a new observation, manual input, lease or mission
+revision invalidates a prepared successor, discard it and publish the reason.
 At runway exhaustion, the controller performs only an admitted stabilization,
 then stops. It never improvises.
+
+Operation progress, physical control, evidence freshness and reasoning delivery
+are tracked separately. `waiting_for_decision` does not imply `held` or
+`released`; a cancellation request does not prove release. An operation-level
+reason must connect the changed condition and applicable rule to the performed
+effects, checkpoint, control state and next decision owner. These are required
+associations to reconcile with existing feedback schemas, not a second status
+service or a claim that those fields already exist.
 
 ## Lanes and resources
 
