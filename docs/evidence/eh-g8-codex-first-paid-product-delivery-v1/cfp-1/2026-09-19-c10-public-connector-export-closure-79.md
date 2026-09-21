@@ -1,0 +1,15 @@
+# C10 public connector export and package closure — 2026-09-19
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains **active (specification)**; CFP-2/3 remain **blocked**. Read-only source inspection at HEAD `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93`, with no uncommitted changes in the inspected connector/shared-source paths. This is a publication-scope input, not a package build, rights disposition or customer acceptance.
+
+The tracked `connectors/environment/` tree still has eleven files and no local `package.json`, `tsconfig.json`, Maven or Gradle package descriptor. The root package script exposes `helix:environment-connectors:live-acceptance`, but no standalone export/build/publish command for this kit. Its `contract/v1/index.ts` has four `export *` statements, targeting `shared/helix-environment-connector.ts`, `helix-environment-connector-conformance.ts`, `helix-environment-adapter-profile.ts` and `helix-environment-source-manifest.ts`. Those four modules currently declare 71 top-level exported names (46, 3, 12 and 10 respectively). The exports include Minecraft-specific capability constants and adapter IDs, not just the generic probe envelope. The source manifest also names forbidden mutation probes; naming a forbidden action is not an implemented action SDK.
+
+The four directly re-exported modules depend on two more shared type/runtime modules, `helix-environment-state-snapshot.ts` and `helix-environment-sensor-scope.ts`; the connector, adapter-profile and source-manifest schemas import `zod`. The TypeScript transport helper additionally imports Node `crypto` and the in-repository contract entrypoint. The template and both examples import that helper and/or contract; the mock fixture imports their types. The Java helper uses JDK APIs and its own README calls it a JDK 21 reference, not an independently published package.
+
+| CFP-1 publication decision | CFP-3/developer-kit rejection check |
+| --- | --- |
+| Select exact public wire symbols and versioned output files. Do not use the current wildcard exports as the public allowlist by default. | Fail if generated declarations/JSON expose unreviewed Minecraft-specific or internal symbols, or diverge from the selected runtime schemas. |
+| Select source/license/notice treatment for the six-module shared dependency closure and `zod`, plus Node/JDK requirements. | From a clean external checkout, resolve every import from the published artifact and declared dependencies, without CasimirBot private source or ambient workspace aliases. |
+| Select the probe-only developer claim, supported endpoint, package manifest and installation command. | Run the documented pairing/probe/conformance path as an independent user; reject a generic action or hosted-collaboration claim from these fixtures alone. |
+
+The [C10 public-interface packet](../../../work-packets/eh-g8-cfp1-public-interface-and-source-boundary-v1.md) and [component rights submission](../../../work-packets/eh-g8-cfp1-component-rights-review-submission-v1.md) consume this source boundary. It does not select a public license, package channel, source visibility change or implementation stage.

@@ -1,0 +1,57 @@
+{
+  "schema": "helix.nav_eq_direct_mcp_arena_course_scout.v1",
+  "scope": "Separately authorized Player Embodiment course scouting, not NAV-EQ rolling acceptance",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+  "world_id": "minecraft:local:combat-c0",
+  "subject_binding_id": "environment_subject_binding:17f434f8-2267-43cd-a766-651d9cd49ed1",
+  "setup_authority": {
+    "id": "environment_action_authority:14a6a58d-83c2-4739-93ea-a2ef213bf310",
+    "capabilities": ["com.casimirbot.minecraft.player.look", "com.casimirbot.minecraft.player.walk"],
+    "autonomy_mode": "approved_capabilities",
+    "manual_override_policy": "cancel",
+    "issued_at": "2026-09-20T15:30:46.627Z",
+    "expires_at": "2026-09-20T15:45:39.000Z",
+    "pairing_handoff": "player_pairing_inbox_staged",
+    "pairing_material_included": false,
+    "release_requested_at": "2026-09-20T15:38:05.813Z",
+    "release_control_request": "environment_action_control:48d3a8e3-d943-45dd-8bec-6aac4ec88b64",
+    "post_release_visible_authorities": 0,
+    "post_release_visible_connector_readiness": 0,
+    "terminal_revoked_status_observed": false
+  },
+  "starting_actor": {"position": [-2.49, 65, 5.58], "yaw_degrees": 169.8, "health": 20},
+  "actions": [
+    {"kind": "walk", "direction": "forward", "duration_ms": 500, "evidence_ref": "environment_action_evidence:99206f069db8a84d30b34045a33b9477697be6785"},
+    {"kind": "walk", "direction": "forward", "duration_ms": 500, "evidence_ref": "environment_action_evidence:71fc45ef9ca5601e7e7b7bf22e8a37e17ebf4aeef"},
+    {"kind": "walk", "direction": "forward", "duration_ms": 500, "evidence_ref": "environment_action_evidence:ced0de2acdaf5f65d35f9a5d10aa786d9f2841f9e"},
+    {"kind": "walk", "direction": "forward", "duration_ms": 500, "evidence_ref": "environment_action_evidence:324d892d47b4b47766822f9f1cda81fe413b9ff6a"},
+    {"kind": "walk", "direction": "right", "duration_ms": 750, "evidence_ref": "environment_action_evidence:e46a3d736b0bfbe7154a05e5ddbbc2255147fd380"},
+    {"kind": "look_at", "yaw_delta_degrees": 10.2, "evidence_ref": "environment_action_evidence:a738912f32fa45bc735010d97c60b99c4314bf9b8"},
+    {"kind": "walk", "direction": "left", "duration_ms": 1000, "evidence_ref": "environment_action_evidence:1dd6aeaa14d5a10c95779655a0a7f6b77bc8334c2"},
+    {"kind": "walk", "direction": "forward", "duration_ms": 500, "evidence_ref": "environment_action_evidence:16739e51115e948ca660000298e3abb49353e23e5"}
+  ],
+  "ending_actor": {
+    "position": [-5.14, 65, -5.63],
+    "yaw_degrees": -180,
+    "health": 20,
+    "perception_evidence_ref": "environment_probe_evidence:dc1a7b1188394795b6d6f167f7e095163efcd64e"
+  },
+  "map_screen": {
+    "north_observation_ref": "environment_probe_evidence:5e1aabfea3444196648eee32964c0e856b30dc80",
+    "east_observation_ref": "environment_probe_evidence:403e5fe701502d126eb4e9ef68eaaf90e2ff5d94",
+    "north_boundary": "A solid row at z=-8 and unsupported cells beyond it; do not treat the area as a straight 100-block runway.",
+    "internal_obstacle": "The east side of row z=-4 has a solid span within the observed bounded region.",
+    "course_candidate": "Finite, non-repeating arena coverage sweep with distinct row checkpoints; exact cells and timing remain to be frozen after fresh whole-course sensing.",
+    "claim_limit": "Separate bounded snapshots do not prove every candidate row simultaneously safe or that rolling successor admission will work."
+  },
+  "effects": {
+    "setup_player_motion": true,
+    "inventory_mutation_reported": false,
+    "world_mutation_reported": false,
+    "all_recorded_actions_settled_succeeded": true,
+    "all_recorded_actions_released_controls": true,
+    "temporal_plan_submitted": false
+  },
+  "maturity": "NAV-EQ remains specified."
+}

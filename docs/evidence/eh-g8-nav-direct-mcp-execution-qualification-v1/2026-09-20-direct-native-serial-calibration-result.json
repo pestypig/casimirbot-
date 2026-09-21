@@ -1,0 +1,119 @@
+{
+  "schema": "helix.nav_eq_direct_native_serial_calibration_result.v1",
+  "date": "2026-09-20",
+  "scope": "Installed EXE, authenticated external Codex MCP, native-Fabric one-action serial calibration; not NAV-EQ rolling acceptance",
+  "runtime_package": "apps/desktop/release-nav-eq-20260920/win-unpacked/CasimirBot.exe",
+  "runtime_package_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3A44999919AD06BA9F",
+  "service_instance_ref": "service_instance:50f1c88ffb72f58e659c6e4c84a20605",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "run_id": "run_a3cfbf3f-af2a-4579-a73c-be404f440f31",
+  "goal_id": "environment_durable_goal:61dbe6ee45afcea8e53a02e0219b3eddb4699a4b40b2fa2bd5a4773b14ddf292",
+  "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+  "world_id": "minecraft:local:combat-c0",
+  "subject_label": "DatDamPig",
+  "action_authority_id": "environment_action_authority:13344148-a2cb-4ed1-b058-35f2a52648fd",
+  "authority": {
+    "allowed_capability_ids": ["com.casimirbot.minecraft.player.walk", "com.casimirbot.minecraft.player.sequence.execute"],
+    "autonomy_mode": "approved_capabilities",
+    "manual_override_policy": "cancel",
+    "expires_at": "2026-09-20T15:06:09.957Z",
+    "credential_delivery": "opaque local inbox; no code or credential in model output"
+  },
+  "setup": {
+    "direct_submit_visible": true,
+    "connector_ready": true,
+    "native_fabric_available": true,
+    "room_run_binding_ref": "agent_room_binding:48f0f65b-260b-485d-bc44-93388c5aeda3",
+    "provider_task_binding_claimed": false
+  },
+  "attempts": [
+    {
+      "plan_id": "nav_eq:calibration:20260920:1",
+      "plan_hash": "sha256:e0107fda45b563c9fdbad9c89fe90aca0f97bf0f421f2976498871991846cb5e",
+      "outcome": "action_policy_denied before admission or motion",
+      "first_divergence": "caller effect_class player_motion disagreed with live sequence manifest continuous_control"
+    },
+    {
+      "plan_id": "nav_eq:calibration:20260920:2",
+      "plan_hash": "sha256:7e2c78f9ca44bcf7ff5b79e6aa3f39f8d58dde12d87b5145a24022a4ed7f370f",
+      "admission": "succeeded",
+      "resident_outcome": "capability_unavailable before controller start; zero side effects",
+      "result_evidence_ref": "environment_action_evidence:d561fb7fbaf8db00dd1f3a7b6e4409224bf8de7aa",
+      "clock_diagnostic": {
+        "source_client_tick": 12680,
+        "delivery_client_tick": 12776,
+        "offset_ticks": 96,
+        "plan_stop_unit": 60,
+        "interpretation": "Offset violated the resident clock window. This proves one failing predicate, not that all other checks passed."
+      }
+    },
+    {
+      "plan_id": "nav_eq:calibration:20260920:3",
+      "plan_hash": "sha256:a09ca98a9a4a53fd797794ce62d10500912d3528e916a04cfad37c6886b3db74",
+      "source_probe_evidence_ref": "environment_probe_evidence:8fe2ca139e717f58a3142f6d18c2d49770b939ec",
+      "source_observed_at": "2026-09-20T14:59:26.892Z",
+      "source_position": [-2.1, 65, 7.7],
+      "action_request_id": "nav_eq:calibration:20260920:action:3",
+      "workflow_id": "nav_eq:calibration:20260920:workflow:3",
+      "frontier_id": "environment_frontier:e8b20e30-bf9e-469e-bff6-8e428c0c7f3b",
+      "control_engine": "native_fabric",
+      "action": "walk forward 500 ms; no sprint",
+      "bounds": { "max_distance_blocks": 3, "max_duration_ms": 10000, "block_mutations": 0, "inventory_transfers": 0, "combat_allowed": false },
+      "admission": "succeeded; receipt not treated as execution proof",
+      "retained_outcome": "succeeded",
+      "result_evidence_ref": "environment_action_evidence:06e4ef92669b7a12a9352cdebf64b8829870aa174",
+      "source_client_tick": 15541,
+      "first_execution_client_tick": 15635,
+      "completed_client_tick": 15645,
+      "duration_ticks": 10,
+      "checkpoint_satisfied": "checkpoint:walk",
+      "resident_measurements": {
+        "dispatch_to_client_accept_ms": 83,
+        "dispatch_to_first_tick_ms": 124,
+        "resident_computation_ms": 64,
+        "wall_clock_elapsed_ms": 470,
+        "queue_depth_at_lease": 1,
+        "oldest_pending_age_ms": 3126,
+        "missed_ticks": 1,
+        "stalled_ticks": 0,
+        "retry_count": 0
+      },
+      "post_action_position": [-2.49, 65, 5.58],
+      "straight_line_displacement_blocks": 2.156,
+      "post_action_health": 20,
+      "post_action_inventory": ["iron_sword:1@0", "golden_apple:1@1", "rotten_flesh:4@2"],
+      "post_action_evidence_ref": "environment_probe_evidence:0add1268804a9eeeac79ae3961e575c0cadb1771",
+      "post_action_observed_at": "2026-09-20T14:59:54.738Z",
+      "late_motion_check": {
+        "observed_at": "2026-09-20T15:00:26.962Z",
+        "position": [-2.49, 65, 5.58],
+        "evidence_ref": "environment_probe_evidence:804b97616cac27578a20821abae07ff534a8fad5"
+      },
+      "effects": { "player_motion_performed": true, "inventory_mutation_performed": false, "world_mutation_performed": false, "controls_released": true, "automatic_replay_performed": false }
+    }
+  ],
+  "status_projection_lag": "First workflow-status read showed not_running without a retained result; later read returned succeeded. The early status-tool failure is not gameplay failure evidence.",
+  "post_calibration_authority_check": {
+    "revoke_requested_at": "2026-09-20T15:04:04Z",
+    "immediate_authority_status": "suspended",
+    "emergency_stop_control_request_ref": "environment_action_control:1e503c6c-93fb-4bd7-a621-714198f2b170",
+    "later_owner_inspect": "zero visible authorities and zero connector action-readiness entries; exact terminal revoke status not observed",
+    "stale_walk_probe": {
+      "observed_at": "2026-09-20T15:04:23Z",
+      "outcome": "blocked",
+      "reason": "authority_stale",
+      "failure_ref": "environment_action_failure:fad6176def9e0ac3d08455c71ecf0143c69b4e8f",
+      "execution_ref_created": false,
+      "observation_provenance_valid": false
+    },
+    "post_denial_actor_read": {
+      "observed_at": "2026-09-20T15:05:57.219Z",
+      "position": [-2.49, 65, 5.58],
+      "health": 20,
+      "evidence_ref": "environment_probe_evidence:c2c637a98638e9c220116a5a3aa6f17d37553c19"
+    },
+    "claim_ceiling": "One post-calibration stale-authority rejection and unchanged actor position; not the full NAV-EQ revocation/reconnect/rolling-course acceptance. The blocked action observation was not provenance-valid for solver re-entry."
+  },
+  "measurement_limits": "One successful calibration sample only; p50/p95/p99, rolling overlap, useful-motion ratio for a longer course, changed-affordance repair, both interruption paths, reconnect, and full-course revocation remain unmeasured.",
+  "maturity": "NAV-EQ remains specified; installed-runtime live calibration only."
+}

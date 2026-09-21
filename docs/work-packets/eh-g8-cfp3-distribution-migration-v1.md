@@ -27,7 +27,8 @@ Current stage authority: `docs/helix-environment-harness-work-program-v1.md`.
 ## Admission prerequisites
 
 Require recorded CFP-1 closure and CFP-2 completion in canonical authority,
-reviewed rights for the selected monetized components, selected commercial
+reviewed rights for every planned distributed component and the selected
+paid/trial connector relationship, selected commercial
 term/trial/device/offline/expiry/refund/service terms, frozen capability IDs,
 versions and all numerical acceptance limits. Signing and feed provisioning
 are independently owned external dependencies. Mere presence of this packet,
@@ -48,15 +49,28 @@ or expiry semantics during implementation.
 ## Scope and ownership
 
 For R-NOTICE-01/R-BIN-01, consume the [CFP-1 planned release inclusion selector](eh-g8-cfp1-planned-release-inclusion-and-rights-review-v1.md) and [pinned tunnel redistribution evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-tunnel-redistribution-closure-12.md). The v0.0.13 vendor archive has NOTICE, third-party report and SPDX inputs omitted by current staging/builder selections. Freeze the rights-reviewed inclusion and user-accessible notice contract, hash-pin every selected file, then verify those bytes and the product notice index in the actual signed installer and update/repair cohort. Source or staged-runtime presence alone cannot pass distribution acceptance; the vendor SPDX input is not a complete CasimirBot SBOM.
+The [owner-selected provisional C01–C15 treatments](eh-g8-cfp1-first-customer-component-decision-sheet-v1.md) are the planning baseline, not final rights clearance or an approved ship list. The [C15 route packet](eh-g8-cfp1-customer-distribution-route-decision-v1.md) now has the [owner-selected provisional public binary-only GitHub Releases direction](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-recommended-direction-owner-selection-106.md), with `pestypig/casimirbot-desktop-releases` as the unprovisioned proposed target name. The [public-channel observation](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-public-distribution-channel-observation-64.md) found no public GitHub Release and an unconfigured domain release API; the [local installed inventory](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-local-installed-old-feed-inventory-138.md) then found one unsigned developer alpha whose updater metadata points to the old draft feed. At dispatch consume the selected route and broader reviewed prior-install inventory: prove the bridge for any affected supported old installation that can query the old feed and provide signed manual repair for the known alpha and dormant/offline installs, or record independently reviewed zero-affected-supported-install evidence before omitting only the old-feed bridge. Do not implement an unverified channel or assume the known alpha is a supported customer build.
+The later [authenticated GitHub inventory](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-authenticated-github-channel-inventory-148.md) confirms the current source repository is public/admin-controlled by the connected owner, while the proposed binary-channel name returned 404 and was absent from that connection's accessible owner list. At dispatch, provision or independently verify the actual release repository, publisher permission and anonymous asset/notice access before any feed cutover. The access result does not reserve the name or authorize a source-visibility change.
+Consume the [D07 distribution cash and repair freeze](eh-g8-cfp1-d07-distribution-cash-and-repair-owner-freeze-v1.md): direct public GitHub asset delivery, no Replit/domain binary proxy, 300 MiB per bundle, ten retained bundles, a `$10` rolling-30-day distribution cash ceiling, a 50-install attended-support cohort, two bounded publication attempts, 30 routine minutes and two 30-minute ordinary repair cases inside existing support/incident reserves. Reread the actual account and domain terms and fail closed if any required path exceeds a selected guard. Mandatory security, privacy, rights, refund or deletion remedies remain outside the routine-repair cap and pause new admission rather than being waived.
+
+Coordinate every release, update and repair with the [identity/signing cash guard](eh-g8-cfp1-d07-identity-and-signing-cash-guard-owner-freeze-v1.md). Distribution may consume only a signature reserved before dispatch within the 800 routine/candidate allocation, or the protected 200-signature allocation for a same-or-newer security/rights repair. A failed publication does not make a signature free, and a distribution retry may not consume the protected reserve for ordinary cadence. Pause new release admission when the reconciled provider-month or rolling-30-day total would exceed 1,000 or the `$15` signing ceiling.
 The [local artifact coherency check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-local-distribution-artifact-coherency-33.md) found an old ASAR, an unsigned local setup EXE and a sensor JAR path whose bytes changed between observations. Consume CFP-1's rights-reviewed planned inclusion/notice contract, then reserve and snapshot one immutable source/build/artifact cohort before assigning R-BIN-01 hashes; recheck the exact staged bytes after signing and before feed publication. The final signed-byte and notice check is CFP-3 output evidence, not a CFP-1 closure prerequisite. Any actual inclusion outside the approved scope reopens its rights disposition. Do not combine whichever EXE and JARs happen to occupy mutable `release/` and `build/` paths into a supposed final manifest.
 
+For the separately provisioned C07 profile, consume the [Fabric package/runtime identity contract](eh-g8-cfp1-fabric-package-runtime-identity-contract-v1.md) and [customer delivery/profile contract](eh-g8-cfp1-c07-customer-connector-delivery-and-profile-contract-v1.md): bind the actual first-party JAR and nested-core hashes to the signed EXE's reviewed allowlist or equivalent authenticated manifest, verify selected delivery, profile placement and loaded manifest, reject a substituted same-name JAR, and keep prerequisite, persisted-catalog drift and rights/notice dispositions visible. These JARs are separate assets; their hashes are not a claim that each JAR already carries its own digital signature. The server's pairing-package content hash is descriptor metadata, not a hash of delivered mod bytes.
+
 For R-ASSET-01, consume the [CFP-1 desktop media byte crosswalk](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-desktop-media-byte-crosswalk-13.md). It identifies 100 candidate public-tree media/font/WASM bytes and their current local inputs, with all rights dispositions pending. Obtain item-level origin and redistribution evidence for selected client assets and exact package/notice mapping for fonts and parsers; inspect the newly built signed installer before accepting inclusion or exclusion. This crosswalk does not cover bundled JS/CSS, native closure, map services or separately provisioned companions.
+The [desktop dependency/notice gap inspection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-desktop-dependency-rights-evidence-gap-61.md)
+adds C02–C04 acceptance: generate package-origin graphs for bundled host,
+service and client outputs, then compare reviewed package/license/notice rows
+with the reserved signed EXE, ASAR, unpacked native files and runtime resources.
+The desktop lockfile's optional multi-platform entries and stale local x64
+output are review inputs, not the shipped SBOM or final rights disposition.
 
 Owner/reviewer responsibilities: Distribution implementer; updater/security reviewer; release coordinator owns publication.
 
 Allowed files: apps/desktop/electron-builder.config.cjs publish configuration by coordinated file ownership; apps/desktop/src/updater.ts; apps/desktop/scripts/site-release-metadata-lib.mjs; apps/desktop/scripts/create-site-release-metadata.mjs; shared/desktop-release.ts; server/routes/desktop-release.ts; tests/desktop-site-release-metadata.spec.ts and new updater/migration tests at paths frozen at dispatch. No blanket URL replacement, production feed switch, tags, repository visibility change or asset overwrite.
 
-Implement the selected public binary-only repository or reviewed HTTPS feed. Maintain exact origin/redirect/artifact allowlists, Authenticode publisher and checksum validation, explicit install, disabled web installer and allowDowngrade=false. Design an old-public-channel forward-version bridge before source visibility changes. Prove customer download without source membership or privileged GitHub credentials. Define entitled feature versus repair/security updates, immutable manifests/notices and same-or-newer signed repair with preserved data. A local test feed rehearsal is not customer-accessible production acceptance.
+Implement the selected public binary-only repository after verifying its control and anonymous access. Maintain exact origin/redirect/artifact allowlists, Authenticode publisher and checksum validation, explicit install, disabled web installer and allowDowngrade=false. Enforce direct immutable asset delivery, workflow concurrency one, a 120-minute Windows build timeout, a 30-minute Ubuntu publication/verification timeout, one-day transient-artifact retention and standard runners; never proxy installer bytes through Replit. Inventory prior installs before source visibility changes: design and prove a signed old-channel forward bridge if any affected supported install can query the old feed, and provide a signed manual repair path for the known local alpha and dormant/offline installs; record independently reviewed zero-affected-supported-install evidence before omitting only the old-feed bridge. Prove customer download without source membership or privileged GitHub credentials. Define entitled feature versus repair/security updates, immutable manifests/notices and same-or-newer signed repair with preserved data. A local test feed rehearsal is not customer-accessible production acceptance.
 
 The coordinator freezes exact file ownership before dispatch. Shared builder,
 schema or handler files have one writer; changes required by another packet
@@ -127,6 +141,26 @@ first-party bridge; its existence does not authorize shipping an evaluation
 engine. Do not delete unrelated mods from an existing user profile to make
 the acceptance scan pass; use the reviewed isolated product profile. Exclusion
 evidence and first-party Minecraft commercial permission remain separate.
+
+The [C08 runtime-discovery gap](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-c08-runtime-discovery-and-catalog-source-gap-239.md)
+and [server admission recheck](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-c08-server-admission-source-gap-241.md)
+require an absent/present-Baritone pair on isolated customer profiles. A
+compatible user-supplied API must not cause the **customer release channel** to
+advertise `baritone` in its action manifest, heartbeat or catalog or accept it
+through ordinary or direct-diagnostic engine selection. Prove the selected
+customer build and trusted server admission deny that path, including a forged
+schema-valid engine request and top-level manifest claim, while native accepted
+actions continue;
+inspect signed bytes separately for bundled upstream code. This is a future
+acceptance case, not a current source-level claim of exclusion.
+
+The [nested sequence-engine recheck](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-c08-nested-sequence-engine-source-gap-243.md)
+adds a distinct C08 denial case: an outer native `execute_sequence` may carry a
+schema-valid nested navigation `engine_preference=baritone`. For the selected
+customer profile, either deny that composite operation before child start or
+prove a reviewed native-only nested-engine rule. Exercise the negative case
+with a compatible external mod present and retain a positive native sequence
+when that operation is part of the supported customer set.
 
 Write new sanitized results under
 `docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-3/<task-id>/<run-id>/`

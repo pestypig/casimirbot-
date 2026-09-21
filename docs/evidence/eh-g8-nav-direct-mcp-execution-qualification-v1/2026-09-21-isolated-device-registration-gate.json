@@ -1,0 +1,30 @@
+{
+  "schema": "helix.nav_eq_isolated_device_registration_gate.v1",
+  "observed_at_utc": "2026-09-21T00:41:28Z",
+  "claim_ceiling": "Native account linking is complete, but Full Harness trust was not granted because the isolated profile's Windows device is unregistered. The private MCP tunnel and Minecraft qualification remain unavailable. NAV-EQ remains specified.",
+  "installed_node": {
+    "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "profile": "C:/Users/dan/AppData/Local/CasimirBotNavEqIsolated20260920",
+    "service_origin": "http://127.0.0.1:59664",
+    "service_listening": true,
+    "agent_access_stage": "step_5_waiting_for_ai_task",
+    "account_link_state": "linked_per_agent_access_ui"
+  },
+  "trust_attempt": {
+    "initiated_by": "user",
+    "native_result": "This device is not registered or is no longer active. Open Connections, Billing & Security, choose Device & Security, and complete registration or recovery with MFA. Then return here to approve Full Harness trust.",
+    "device_security_status": "This Windows device: unregistered",
+    "native_next_control": "Register this device with MFA",
+    "full_harness_trust_granted": false
+  },
+  "transport_and_game_state": {
+    "tunnel_client_process_count": 0,
+    "isolated_profile_tunnel_run_file_count": 0,
+    "fabric_server_started": false,
+    "fabric_client_started": false,
+    "player_authority_granted": false,
+    "minecraft_observation_or_action": false
+  },
+  "next_boundary": "The user must perform the native device-registration ceremony and fresh Auth0 MFA in the open Device & Security panel. Then recheck device status, approve Full Harness trust, establish the private MCP tunnel and exact client session, and only then re-pair Minecraft and run matched-runtime observation and NAV-EQ trials. Do not reuse primary-profile credentials or infer device identity from the account link.",
+  "nav_eq_maturity": "specified"
+}

@@ -19,10 +19,12 @@ import {
   type HelixLocalSupervisorStatus,
 } from "@shared/helix-local-supervisor";
 import {
+  DESKTOP_AUTH0_STEP_UP_CANCEL_PATH,
   DESKTOP_AUTH0_STEP_UP_START_PATH,
   DESKTOP_AUTH0_STEP_UP_STATUS_PATH,
   helixInstalledSecurityStatusSchema,
   helixStepUpCompletionProjectionSchema,
+  helixStepUpCancelReceiptSchema,
   helixStepUpStartReceiptSchema,
   type HelixInstalledSecurityStatus,
   type HelixStepUpPurpose,
@@ -39,6 +41,23 @@ import {
 const ENDPOINT = "/api/account/installed-services";
 const BILLING_ENDPOINT = "/api/account/billing-entitlement";
 const SUPERVISOR_ENDPOINT = "/api/local-supervisor/status";
+
+const cancelPendingStepUp = async (): Promise<number> => {
+  const response = await fetch(DESKTOP_AUTH0_STEP_UP_CANCEL_PATH, {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const parsed = helixStepUpCancelReceiptSchema.safeParse(
+    await response.json().catch(() => null),
+  );
+  if (!response.ok || !parsed.success) {
+    throw new Error("The pending MFA request could not be cancelled.");
+  }
+  return parsed.data.cancelled_intent_count;
+};
 
 type PanelTab = "overview" | "connections" | "billing" | "security";
 
@@ -148,6 +167,8 @@ export default function InstalledServicesPanel() {
   const [securityStatus, setSecurityStatus] =
     useState<HelixInstalledSecurityStatus | null>(null);
   const [securityBusy, setSecurityBusy] = useState(false);
+  const [securityWaiting, setSecurityWaiting] = useState(false);
+  const [securityCancelBusy, setSecurityCancelBusy] = useState(false);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [supervisorStatus, setSupervisorStatus] =
     useState<HelixLocalSupervisorStatus | null>(null);
@@ -281,13 +302,15 @@ export default function InstalledServicesPanel() {
       if (!parsed.success) {
         setSecurityMessage("The native MFA completion was invalid.");
         setSecurityBusy(false);
+        setSecurityWaiting(false);
         return;
       }
       setSecurityMessage(parsed.data.ok
         ? "Fresh MFA was verified and the exact security operation completed."
         : `Security step-up failed: ${parsed.data.error ?? "unknown error"}.`);
       setSecurityBusy(false);
-      if (parsed.data.ok) void loadSecurity();
+      setSecurityWaiting(false);
+      void loadSecurity();
     });
   }, [loadSecurity]);
 
@@ -301,7 +324,9 @@ export default function InstalledServicesPanel() {
       return;
     }
     setSecurityBusy(true);
+    setSecurityWaiting(false);
     setSecurityMessage(null);
+    let intentStarted = false;
     try {
       const response = await fetch(DESKTOP_AUTH0_STEP_UP_START_PATH, {
         method: "POST",
@@ -319,21 +344,65 @@ export default function InstalledServicesPanel() {
           : "Fresh MFA could not be started.";
         throw new Error(message);
       }
+      intentStarted = true;
       const opened = await bridge.openAuth0StepUp(parsed.data.authorization_url);
       if (
         opened && typeof opened === "object" &&
         "cancelled" in opened && opened.cancelled === true
       ) {
-        setSecurityBusy(false);
-        setSecurityMessage("Security step-up was cancelled before opening Auth0.");
-      } else {
+        try {
+          await cancelPendingStepUp();
+          setSecurityBusy(false);
+          setSecurityMessage("Security step-up was cancelled before opening Auth0.");
+        } catch {
+          setSecurityWaiting(true);
+          setSecurityMessage("Native confirmation was cancelled, but its pending request could not be invalidated. Use Stop waiting for MFA before retrying.");
+        }
+      } else if (opened && typeof opened === "object" &&
+          "opened" in opened && opened.opened === true) {
+        setSecurityWaiting(true);
         setSecurityMessage("Complete the Auth0 MFA challenge in your browser.");
+      } else {
+        throw new Error("The native MFA bridge did not open Auth0.");
       }
     } catch (caught) {
+      if (intentStarted) {
+        try {
+          await cancelPendingStepUp();
+        } catch {
+          setSecurityWaiting(true);
+          setSecurityMessage("The native MFA attempt could not be opened or invalidated. Use Stop waiting for MFA before retrying.");
+          return;
+        }
+      }
       setSecurityBusy(false);
-      setSecurityMessage(caught instanceof Error ? caught.message : String(caught));
+      setSecurityWaiting(false);
+      setSecurityMessage(
+        caught instanceof Error && caught.message.includes("desktop_auth0_callback_port_unavailable")
+          ? "CasimirBot cannot reserve its private Auth0 return port on this device. Close any other active CasimirBot authentication attempt, then retry."
+          : caught instanceof Error && caught.message.includes("desktop_auth0_callback_route_unavailable")
+          ? "This CasimirBot instance cannot receive its Auth0 callback because the desktop protocol is not routed to this exact profile. Use the registered installation or repair the protocol association before retrying."
+          : caught instanceof Error ? caught.message : String(caught),
+      );
     }
   }, []);
+
+  const stopWaitingForStepUp = useCallback(async () => {
+    setSecurityCancelBusy(true);
+    try {
+      const cancelled = await cancelPendingStepUp();
+      setSecurityBusy(false);
+      setSecurityWaiting(false);
+      setSecurityMessage(cancelled > 0
+        ? "The pending MFA request was invalidated. Close its old browser tab, then start a fresh attempt."
+        : "No pending MFA request remains. Close the old browser tab, then start a fresh attempt.");
+      void loadSecurity();
+    } catch (caught) {
+      setSecurityMessage(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setSecurityCancelBusy(false);
+    }
+  }, [loadSecurity]);
 
   const connectionByProvider = useMemo(() => new Map(
     projection?.connections.map((connection) => [
@@ -627,6 +696,19 @@ export default function InstalledServicesPanel() {
             <p role="status" aria-live="polite" className="rounded border border-white/10 bg-white/5 p-3 text-xs text-slate-200">
               {securityMessage}
             </p>
+          ) : null}
+          {securityWaiting ? (
+            <button
+              type="button"
+              disabled={securityCancelBusy}
+              onClick={() => void stopWaitingForStepUp()}
+              data-helix-control-id="workstation.panel.connections-billing-security.security.step-up-stop-waiting"
+              data-helix-interaction-kind="mutate"
+              data-helix-authority-state="owner_auth_required"
+              className="rounded border border-amber-300/30 px-3 py-2 text-xs text-amber-100 disabled:opacity-50"
+            >
+              Stop waiting for MFA
+            </button>
           ) : null}
           <div className="flex flex-wrap gap-2">
             {securityStatus?.current_device.status === "unregistered" ? (

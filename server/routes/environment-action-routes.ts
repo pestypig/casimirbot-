@@ -103,7 +103,7 @@ environmentActionRouter.use(
 );
 
 /** Dependencies come from server construction, never the connector request. */
-export function createEnvironmentTemporalDeliveryRouter(bindingStore: Pick<HelixReasoningTaskBindingStore, "inspect">) {
+export function createEnvironmentTemporalDeliveryRouter(bindingStore?: Pick<HelixReasoningTaskBindingStore, "inspect">) {
   const router = Router();
   const identity = z.object({
     resident_action_request_id: z.string().min(1).max(512),
@@ -151,7 +151,7 @@ export function createEnvironmentActionRouter(bindingStore?: Pick<HelixReasoning
   const router = Router();
   // Mount before the general 1MB parser/rate limiter so temporal requests keep
   // their own 8KB limit and are not charged twice by shared middleware.
-  if (bindingStore) router.use(createEnvironmentTemporalDeliveryRouter(bindingStore));
+  router.use(createEnvironmentTemporalDeliveryRouter(bindingStore));
   router.use(environmentActionRouter);
   return router;
 }

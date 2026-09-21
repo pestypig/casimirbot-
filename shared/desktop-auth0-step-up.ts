@@ -8,10 +8,12 @@ export const AUTH0_STEP_UP_MINIMUM_MAX_AGE_SECONDS = 60;
 export const AUTH0_STEP_UP_MAXIMUM_MAX_AGE_SECONDS = 15 * 60;
 
 export const DESKTOP_AUTH0_STEP_UP_REDIRECT_URI =
-  "casimirbot://oauth/callback" as const;
+  "http://127.0.0.1:8767/callback" as const;
 
 export const DESKTOP_AUTH0_STEP_UP_START_PATH =
   "/api/account/security/step-up/start" as const;
+export const DESKTOP_AUTH0_STEP_UP_CANCEL_PATH =
+  "/api/account/security/step-up/cancel" as const;
 export const DESKTOP_AUTH0_STEP_UP_CALLBACK_PATH =
   "/api/account/security/step-up/callback" as const;
 export const DESKTOP_AUTH0_STEP_UP_INSPECT_PATH =
@@ -57,6 +59,16 @@ export const helixStepUpStartReceiptSchema = z.object({
   pkce: z.literal("S256"),
   nonce_bound: z.literal(true),
   mfa_acr_requested: z.literal(AUTH0_MFA_ACR),
+  usable_receipt_included: z.literal(false),
+  identity_token_included: z.literal(false),
+  access_token_included: z.literal(false),
+  factor_detail_included: z.literal(false),
+}).strict();
+
+export const helixStepUpCancelReceiptSchema = z.object({
+  schema: z.literal("helix.auth0_step_up_cancel.v1"),
+  ok: z.literal(true),
+  cancelled_intent_count: z.number().int().nonnegative(),
   usable_receipt_included: z.literal(false),
   identity_token_included: z.literal(false),
   access_token_included: z.literal(false),

@@ -1,0 +1,23 @@
+{
+  "schema": "helix.nav_eq_south_floor_scout.v1",
+  "date": "2026-09-20",
+  "world_id": "minecraft:local:combat-c0",
+  "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+  "authority_id": "environment_action_authority:75d47bf3-aa4c-42a3-baba-8381497284c9",
+  "allowed_capabilities": ["com.casimirbot.minecraft.player.walk"],
+  "start_pose": {"position": [-3, 65, -3.7], "yaw": -180},
+  "source_map_evidence_refs": ["environment_probe_evidence:ed0982f42bc1837bd1ebf8c1ed1e5d15149d4acd", "environment_probe_evidence:11550584fda7c1ce0e3e68e227632f724bc67d3c", "environment_probe_evidence:192dd0f86ae5a6928cbc954c48c88e567637e56b", "environment_probe_evidence:37e19ab5df274d4e0d0335e1213e91aa9577d090"],
+  "admitted_setup_walks": [
+    {"direction": "back", "duration_ms": 500, "evidence_ref": "environment_action_evidence:d28217fead643e0064154186d28578c2f036a4dee", "retained_outcome": "succeeded", "post_position": [-3, 65, -1.55]},
+    {"direction": "back", "duration_ms": 1000, "evidence_ref": "environment_action_evidence:6c5031c2e6cefff3221054f9dbf60a4912383db46", "retained_outcome": "succeeded", "post_position": [-3, 65, 2.77]},
+    {"direction": "right", "duration_ms": 1000, "evidence_ref": "environment_action_evidence:462bf76c34b5992723550004abb58965873eba66f", "retained_outcome": "succeeded", "post_position": [1.32, 65, 2.77]}
+  ],
+  "post_pose_evidence_ref": "environment_probe_evidence:9b83ae0e584aee86d090243fcb47cc7e76c77d60",
+  "post_health": 20,
+  "nearby_entities": 0,
+  "nearby_hazards": 0,
+  "measured_floor": "Complete radius-seven reads centered near (-3, 65, 3) and (1, 65, 2) each retained 225 columns. Their union shows supported, head-clear floor across x=-6..7 and z=-3..3; the first read additionally covers x=-7..-6 in the same corridor. The east wall is measured at x=8, and walls at z=-4 and z=4 interrupt the wider area. This is not evidence beyond those measured bounds or proof of a longer route.",
+  "world_build_command_route": "MCP helix_room_command_request advertises command_execution_not_enabled; no World Authority command or direct server-console setup was used.",
+  "gameplay_mutation": "Three bounded player walks only; no world or inventory action",
+  "claim_ceiling": "Read-only course reconnaissance plus three ordinary Player Embodiment setup walks. No rolling successor or NAV-EQ acceptance."
+}

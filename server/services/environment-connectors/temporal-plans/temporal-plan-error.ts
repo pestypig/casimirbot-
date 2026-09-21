@@ -1,5 +1,7 @@
 /** Closed diagnostic vocabulary: never project arbitrary exception messages. */
 export type TemporalPlanErrorCode =
+  | "temporal_direct_context_identity_mismatch"
+  | "temporal_direct_context_unavailable"
   | "temporal_checkpoint_action_event_hash_mismatch"
   | "temporal_checkpoint_action_event_mismatch"
   | "temporal_checkpoint_action_mismatch"

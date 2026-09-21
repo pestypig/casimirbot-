@@ -14,7 +14,9 @@ import * as checkpointEvidence from "../temporal-checkpoint-evidence";
 import { TemporalPlanError } from "../temporal-plan-error";
 afterEach(() => { vi.restoreAllMocks(); });
 
-it.each(["valid", "wrong_task_run", "missing_frontier", "wrong_identity", "no_executor", "blocked", "wrong_clock", "expired", "revoked_during_read"])("joins temporal preflight without dispatch (%s)", async scenario => {
+it.each(["valid", "wrong_task_run", "missing_frontier", "wrong_identity", "no_executor",
+  "executor_unlisted", "executor_without_native_fabric", "executor_without_start_deadline",
+  "blocked", "wrong_clock", "expired", "revoked_during_read"])("joins temporal preflight without dispatch (%s)", async scenario => {
   const identity = { environment_id: "env:test", source_id: "source:test", subject_id: "subject:test",
     producer_epoch: "epoch:action", authority_id: "authority:test", authority_revision: 1,
     goal_id: "goal:test", goal_revision: 1, observation_revision: 1, affordance_revision: 1 };
@@ -44,8 +46,10 @@ it.each(["valid", "wrong_task_run", "missing_frontier", "wrong_identity", "no_ex
       source_id: identity.source_id, subject_binding_id: identity.subject_id, action_authority_id: identity.authority_id, authority_policy_version: 1 } },
     action_producer_epoch_ref: identity.producer_epoch, observation_producer_epoch_ref: "epoch:observation",
     evidence: { observation: { evidence_ref: "evidence:test", result: { observation_revision: 1 } } },
-    catalog: { capabilities: scenario === "no_executor" ? [] : [{ action_kind: "execute_sequence", policy_listed: true,
-      native_fabric_available: true, start_deadline_supported: true }],
+    catalog: { capabilities: scenario === "no_executor" ? [] : [{ action_kind: "execute_sequence",
+      policy_listed: scenario !== "executor_unlisted",
+      native_fabric_available: scenario !== "executor_without_native_fabric",
+      start_deadline_supported: scenario !== "executor_without_start_deadline" }],
       resident_clock_observation: { producer_epoch_ref: identity.producer_epoch, clock: { clock_kind: "minecraft_game_tick", tick_index: 10,
         world_tick_index: scenario === "expired" ? 120 : 100,
         monotonic: { origin_id: scenario === "wrong_clock" ? "origin:other" : "origin:test", elapsed_ms: 100 } } } },
@@ -223,5 +227,9 @@ it.each(["valid", "wrong_task_run", "missing_frontier", "wrong_identity", "no_ex
     await expect(result).rejects.toThrow();
     if (scenario !== "revoked_during_read") await expect(result).rejects.toBeInstanceOf(TemporalPlanError);
     if (scenario === "expired") await expect(result).rejects.toMatchObject({ code: "temporal_plan_frontier_expired_or_unmapped" });
+    if (["no_executor", "executor_unlisted", "executor_without_native_fabric",
+      "executor_without_start_deadline"].includes(scenario)) {
+      await expect(result).rejects.toMatchObject({ code: "temporal_plan_executor_unavailable" });
+    }
   }
 });

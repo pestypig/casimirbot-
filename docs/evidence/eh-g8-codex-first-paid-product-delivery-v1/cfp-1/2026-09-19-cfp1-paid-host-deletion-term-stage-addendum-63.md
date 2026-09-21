@@ -1,0 +1,7 @@
+# CFP-1 paid-host deletion-term checkpoint — 2026-09-19
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains **active (specification)**; CFP-2/3 remain **blocked**. No Stripe, account, room, connector, refund, runtime or production action occurred.
+
+The [paid-host deletion term proposal](../../../work-packets/eh-g8-cfp1-paid-host-account-deletion-term-decision-v1.md) now makes O-07's customer choice explicit: end subscription and hosted access now with a reviewed unused-time refund, or schedule account deletion at paid-period end while service remains independently valid. Stripe's official cancellation guide and API reference distinguish immediate versus period-end cancellation, pending invoice/usage handling and proration credits from payment refunds. The current account deletion path does not perform either option. The owner choice has been requested but is **not yet recorded**; refund calculation, processor configuration, retention and local effect-release bounds remain separate review inputs.
+
+Independent read-only review reported **PASS** for source and official-provider fidelity, unselected-option wording, local links and stage boundaries. `npm run helix:environment-harness:docs-audit` passed with `ok: true`; scoped `git diff --check` passed. The proposal adds a concrete CFP-3 account/commerce/room acceptance handoff but does not close a CFP-1 term or authorize customer billing/deletion.

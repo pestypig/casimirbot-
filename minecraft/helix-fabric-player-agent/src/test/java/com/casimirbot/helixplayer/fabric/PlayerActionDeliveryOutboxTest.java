@@ -1,11 +1,13 @@
 package com.casimirbot.helixplayer.fabric;
 
+import com.casimirbot.helixsensor.snapshot.SectionHasher;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +16,63 @@ final class PlayerActionDeliveryOutboxTest {
         return new PlayerActionDeliveryOutbox.Delivery(PlayerActionDeliveryOutbox.Stage.WORKFLOW_EVENT,
             Map.of("event_id", "event:" + sequence, "workflow_id", "workflow:test",
                 "action_request_id", "request:test", "sequence", sequence));
+    }
+
+    private static PlayerActionDeliveryOutbox.Delivery projection(int sequence, String epoch) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("schema", "helix.environment_event_batch.v1");
+        payload.put("batch_id", "batch:" + sequence);
+        payload.put("room_id", "room:test");
+        payload.put("source_id", "source:test");
+        payload.put("world_id", "world:test");
+        payload.put("producer_epoch_ref", epoch);
+        payload.put("producer_plane", "player_embodiment");
+        payload.put("first_sequence", sequence);
+        payload.put("last_sequence", sequence);
+        payload.put("events", List.of(Map.of("event_id", "environment_event:" + sequence)));
+        payload.put("created_at", "2026-09-20T22:00:00Z");
+        payload.put("batch_hash", SectionHasher.hashIncludingNulls(payload));
+        return new PlayerActionDeliveryOutbox.Delivery(
+            PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH, payload);
+    }
+
+    @Test
+    void freezesAndAcknowledgesOneOrderedProjectionBatchWithoutDroppingTheFence() {
+        var box = new PlayerActionDeliveryOutbox(12);
+        var first = projection(0, "epoch:one");
+        var second = projection(1, "epoch:one");
+        var later = projection(2, "epoch:one");
+        assertTrue(box.enqueueSequence(List.of(event(0), first, event(1), second), 0));
+        long fence = box.watermark();
+        assertTrue(box.acknowledge(box.peekCritical()));
+        assertTrue(box.acknowledge(box.peekCritical()));
+        var frozen = box.peekProjectionBatch();
+        assertEquals(List.of(first, second), frozen);
+        assertTrue(box.enqueueSequence(List.of(later), 0));
+        assertSame(frozen, box.peekProjectionBatch());
+        assertFalse(box.acknowledge(first));
+        Map<String, Object> merged = PlayerActionRuntime.projectionBatchPayload(frozen);
+        assertEquals("batch:0", merged.get("batch_id"));
+        assertEquals(0, merged.get("first_sequence"));
+        assertEquals(1, merged.get("last_sequence"));
+        assertEquals(2, ((List<?>) merged.get("events")).size());
+        var unhashed = new LinkedHashMap<>(merged);
+        unhashed.remove("batch_hash");
+        assertEquals(SectionHasher.hashIncludingNulls(unhashed), merged.get("batch_hash"));
+        assertTrue(box.hasPendingThrough(fence));
+        assertTrue(box.acknowledgeProjectionBatch(frozen));
+        assertFalse(box.hasPendingThrough(fence));
+        assertEquals(List.of(later), box.peekProjectionBatch());
+    }
+
+    @Test
+    void projectionBatchStopsAtSequenceOrProducerEpochBoundary() {
+        var gap = new PlayerActionDeliveryOutbox(10);
+        gap.enqueueSequence(List.of(projection(0, "epoch:one"), projection(2, "epoch:one")), 0);
+        assertEquals(1, gap.peekProjectionBatch().size());
+        var epoch = new PlayerActionDeliveryOutbox(10);
+        epoch.enqueueSequence(List.of(projection(0, "epoch:one"), projection(1, "epoch:two")), 0);
+        assertEquals(1, epoch.peekProjectionBatch().size());
     }
 
     @Test

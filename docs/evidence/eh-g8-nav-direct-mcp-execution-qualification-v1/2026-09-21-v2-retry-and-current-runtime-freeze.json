@@ -1,0 +1,107 @@
+{
+  "schema": "helix.environment_harness.nav_eq.connector_and_runtime_freeze.v1",
+  "recorded_at": "2026-09-21T06:01:11.3936967Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "Connected-client temporal-tool admission and matched installed Minecraft runtime",
+  "lifecycle_stage": "tool admission and execution preflight",
+  "reaction_timescale": "new Codex goal turn plus read-only connector and filesystem checks",
+  "authority_owner": "operator for finite player authority; Runtime Codex for plan selection; Helix for identity, admission, provenance, and serialized effects",
+  "current_maturity": "diagnostic execution-preflight checkpoint",
+  "target_maturity": "live accepted NAV-EQ execution profile",
+  "plugin_list_observation": {
+    "surface": "ChatGPT in-app browser Plugins settings",
+    "casimirbot_device_check_listed": true,
+    "casimirbot_device_check_v2_listed": true,
+    "plugin_v2_detail_heading_visible": true,
+    "plugin_v2_connected_account_row_visible": false,
+    "plugin_v2_available_control": "Connect another account"
+  },
+  "new_turn_tool_catalog": {
+    "connected_v1_namespace_present": true,
+    "connected_v1_temporal_frontier_publish_callable": false,
+    "connected_v1_temporal_plan_submit_direct_callable": false,
+    "v2_namespace_present": true,
+    "v2_temporal_frontier_publish_callable": true,
+    "v2_temporal_plan_submit_callable": true,
+    "v2_temporal_plan_submit_direct_callable": true,
+    "local_named_mcp_namespace_present": true,
+    "local_named_mcp_temporal_plan_submit_direct_callable": false,
+    "catalog_mismatch_reproduced_on_fresh_goal_turn": true
+  },
+  "authorization_observation": {
+    "capability_profile": "g2-action",
+    "v1": {
+      "display_name": "CasimirBot Device Check",
+      "app_id": "asdk_app_6a91c15c1e1c81918078ea5ae6028ec4",
+      "ready": true,
+      "required_scopes": [
+        "helix.rooms.read",
+        "helix.environment_actions.read",
+        "helix.environment_actions.write"
+      ],
+      "granted_required_scopes": [
+        "helix.rooms.read",
+        "helix.environment_actions.read",
+        "helix.environment_actions.write"
+      ],
+      "missing_scopes": [],
+      "recovery_action": "none",
+      "authorization_expires_at": "2026-09-21T07:00:29.178Z"
+    },
+    "v2": {
+      "display_name": "CasimirBot Device Check v2",
+      "app_id": "asdk_app_6a91d26fb68481918606bfc290b2ab0d",
+      "ready": false,
+      "error_code": "USER_NOT_LOGGED_IN",
+      "connected": false
+    },
+    "credentials_or_raw_claims_included": false
+  },
+  "matched_runtime_freeze": {
+    "desktop_package": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/CasimirBot.exe",
+    "desktop_executable_sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+    "desktop_app_asar_sha256": "569FF6A1DDD01507C4B2C969BA6824B890556A44457BAB99B87D532BD1778CD5",
+    "exact_desktop_process_id_observed_running": 29236,
+    "tunnel_client_process_id_observed_running": 26772,
+    "fabric_jar": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/HelixFabricPlayerAgent-0.4.12.jar",
+    "fabric_jar_sha256": "9DE77E3309F7F9DD1533D4BDCF1794475D259A63D87C01CADF57A3B02BB56F47",
+    "hashes_recomputed_in_this_checkpoint": true,
+    "runtime_manifest_hash_claimed": false
+  },
+  "safety_and_scope": {
+    "minecraft_action_attempted": false,
+    "player_motion_observed": false,
+    "world_or_inventory_mutation_attempted": false,
+    "environment_authority_changed": false,
+    "durable_run_or_goal_created": false,
+    "temporal_plan_submitted": false,
+    "desktop_or_tunnel_restarted": false,
+    "plugin_account_disconnected": false,
+    "credentials_included": false,
+    "oauth_callback_values_included": false,
+    "process_command_lines_included": false
+  },
+  "finding": {
+    "connected_v1_authorization_healthy": true,
+    "plugin_v2_installation_or_catalog_missing": false,
+    "plugin_v2_connection_persisted": false,
+    "fresh_turn_refreshed_connected_v1_temporal_schema": false,
+    "matched_runtime_files_available": true,
+    "first_execution_boundary": "make the direct temporal-plan tool callable through an authenticated client without substituting the ordinary player-action route",
+    "nav_eq_maturity": "specified"
+  },
+  "stop_fail_criteria": [
+    "Do not invoke a direct temporal tool through the unauthenticated v2 client.",
+    "Do not substitute helix_minecraft_player_action for NAV-EQ temporal compiler and broker acceptance.",
+    "Do not create movement authority or move the player until a fresh exact protocol freezes the current run, goal, authority, geometry, clocks, limits, cancellation path, and evidence-drain runway.",
+    "Do not promote NAV-EQ from this execution-preflight checkpoint."
+  ],
+  "explicit_non_goals": [
+    "No NAV-EQ movement acceptance.",
+    "No plugin-v2 OAuth persistence claim.",
+    "No ET6 or collaboration-room acceptance.",
+    "No pathfinding or benchmark superiority claim."
+  ],
+  "downstream_gate_unlocked": "The exact installed EXE, app.asar, and Fabric hashes are frozen for the next admissible live protocol. Execution remains gated on an authenticated callable direct temporal tool and a new finite movement-only authority."
+}

@@ -43,7 +43,7 @@ export type Auth0StepUpConfig = Readonly<{
   receiptTtlSeconds: number;
 }>;
 
-type PendingStepUp = Readonly<{
+type PendingStepUp = {
   session: Auth0StepUpSession;
   deviceId: string;
   purpose: HelixStepUpPurpose;
@@ -51,7 +51,8 @@ type PendingStepUp = Readonly<{
   codeVerifier: string;
   nonce: string;
   expiresAtMs: number;
-}>;
+  cancelled: boolean;
+};
 
 export class Auth0StepUpError extends Error {
   constructor(
@@ -211,8 +212,9 @@ const callbackValues = (
     throw new Auth0StepUpError(400, "invalid_callback", "The Auth0 MFA callback is invalid.");
   }
   if (
-    parsed.protocol !== "casimirbot:" ||
-    parsed.hostname !== "oauth" ||
+    parsed.protocol !== "http:" ||
+    parsed.hostname !== "127.0.0.1" ||
+    parsed.port !== "8767" ||
     parsed.pathname !== "/callback" ||
     parsed.username ||
     parsed.password ||
@@ -301,6 +303,7 @@ const defaultIdTokenVerifier = async (input: {
 
 export class Auth0StepUpController {
   private readonly pending = new Map<string, PendingStepUp>();
+  private readonly completing = new Set<PendingStepUp>();
 
   constructor(
     private readonly dependencies: Readonly<{
@@ -329,6 +332,30 @@ export class Auth0StepUpController {
     }
   }
 
+  cancelForSession(input: {
+    session: Auth0StepUpSession;
+    deviceId: string;
+  }): number {
+    this.prune(this.now().getTime());
+    const matches = (pending: PendingStepUp): boolean =>
+      pending.session.sessionId === input.session.sessionId &&
+      pending.session.profileId === input.session.profileId &&
+      pending.deviceId === normalized(input.deviceId);
+    let cancelled = 0;
+    for (const [key, pending] of this.pending) {
+      if (!matches(pending)) continue;
+      pending.cancelled = true;
+      this.pending.delete(key);
+      cancelled += 1;
+    }
+    for (const pending of this.completing) {
+      if (!matches(pending) || pending.cancelled) continue;
+      pending.cancelled = true;
+      cancelled += 1;
+    }
+    return cancelled;
+  }
+
   start(input: {
     session: Auth0StepUpSession;
     deviceId: string;
@@ -337,13 +364,15 @@ export class Auth0StepUpController {
   }): HelixStepUpStartReceipt {
     const config = this.config();
     const now = this.now();
-    this.prune(now.getTime());
+    // A fresh owner-attended attempt supersedes every older attempt for this
+    // exact installed session and device, including a callback in flight.
+    this.cancelForSession({ session: input.session, deviceId: input.deviceId });
     const randomBytes = this.dependencies.randomBytes ?? crypto.randomBytes;
     const state = randomBytes(32).toString("base64url");
     const codeVerifier = randomBytes(64).toString("base64url");
     const nonce = randomBytes(32).toString("base64url");
     const expiresAtMs = now.getTime() + 10 * 60_000;
-    this.pending.set(stateKey(state), Object.freeze({
+    this.pending.set(stateKey(state), {
       session: input.session,
       deviceId: normalized(input.deviceId),
       purpose: input.purpose,
@@ -351,7 +380,8 @@ export class Auth0StepUpController {
       codeVerifier,
       nonce,
       expiresAtMs,
-    }));
+      cancelled: false,
+    });
     const authorize = auth0Endpoint(config.issuer, "/authorize");
     authorize.searchParams.set("response_type", "code");
     authorize.searchParams.set("client_id", config.clientId);
@@ -425,9 +455,11 @@ export class Auth0StepUpController {
     const key = stateKey(state);
     const pending = this.pending.get(key);
     this.pending.delete(key);
-    if (!pending) {
+    if (!pending || pending.cancelled) {
       throw new Auth0StepUpError(404, "step_up_intent_not_found", "The MFA request was not found.");
     }
+    this.completing.add(pending);
+    try {
     const now = this.now();
     if (pending.expiresAtMs <= now.getTime()) {
       throw new Auth0StepUpError(410, "step_up_intent_expired", "The MFA request expired.");
@@ -522,6 +554,12 @@ export class Auth0StepUpController {
     if (!linked) {
       throw new Auth0StepUpError(403, "identity_mismatch", "The Auth0 MFA identity is not linked to this profile.");
     }
+    if (pending.cancelled) {
+      throw new Auth0StepUpError(404, "step_up_intent_not_found", "The MFA request was not found.");
+    }
+    if (pending.expiresAtMs <= this.now().getTime()) {
+      throw new Auth0StepUpError(410, "step_up_intent_expired", "The MFA request expired.");
+    }
     const issued = (
       this.dependencies.receiptStore ?? helixStepUpReceiptStore
     ).issue({
@@ -546,6 +584,9 @@ export class Auth0StepUpController {
       target_ref: issued.projection.target_ref,
       expires_at: issued.projection.expires_at,
     };
+    } finally {
+      this.completing.delete(pending);
+    }
   }
 }
 

@@ -192,6 +192,16 @@ describe("InstalledServicesPanel", () => {
       const url = String(input);
       const body = url.endsWith("/api/account/security/status")
         ? securityStatus
+        : url.endsWith("/api/account/security/step-up/cancel") && init?.method === "POST"
+          ? {
+            schema: "helix.auth0_step_up_cancel.v1",
+            ok: true,
+            cancelled_intent_count: 1,
+            usable_receipt_included: false,
+            identity_token_included: false,
+            access_token_included: false,
+            factor_detail_included: false,
+          }
         : url.endsWith("/api/account/billing-entitlement")
           ? billingStatus
         : url.endsWith("/api/local-supervisor/status")
@@ -317,6 +327,60 @@ describe("InstalledServicesPanel", () => {
       }),
     );
     expect(screen.queryByLabelText(/receipt|identity token|access token/i)).toBeNull();
+    const stopWaiting = await screen.findByRole("button", {
+      name: /Stop waiting for MFA/i,
+    });
+    expect(register).toBeDisabled();
+    fireEvent.click(stopWaiting);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      "/api/account/security/step-up/cancel",
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    ));
+    await waitFor(() => expect(register).toBeEnabled());
+    expect(screen.queryByRole("button", { name: /Stop waiting for MFA/i }))
+      .toBeNull();
+    fireEvent.click(register);
+    await waitFor(() => expect(window.casimirDesktop?.openAuth0StepUp)
+      .toHaveBeenCalledTimes(2));
+  });
+
+  it("invalidates the intent when the owner cancels native MFA confirmation", async () => {
+    vi.mocked(window.casimirDesktop!.openAuth0StepUp).mockResolvedValue({
+      opened: false,
+      cancelled: true,
+    });
+    render(<InstalledServicesPanel />);
+    await screen.findByText(/Native status verified/i);
+    fireEvent.click(screen.getByRole("tab", { name: "Device & Security" }));
+    const register = screen.getByRole("button", {
+      name: /Register this device with MFA/i,
+    });
+    fireEvent.click(register);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      "/api/account/security/step-up/cancel",
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    ));
+    await waitFor(() => expect(register).toBeEnabled());
+    expect(screen.queryByRole("button", { name: /Stop waiting for MFA/i }))
+      .toBeNull();
+  });
+
+  it("invalidates the intent and explains a missing native callback route", async () => {
+    vi.mocked(window.casimirDesktop!.openAuth0StepUp).mockRejectedValue(
+      new Error("Error invoking remote method 'step-up': Error: desktop_auth0_callback_route_unavailable"),
+    );
+    render(<InstalledServicesPanel />);
+    await screen.findByText(/Native status verified/i);
+    fireEvent.click(screen.getByRole("tab", { name: "Device & Security" }));
+    const register = screen.getByRole("button", { name: /Register this device with MFA/i });
+    fireEvent.click(register);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      "/api/account/security/step-up/cancel",
+      expect.objectContaining({ method: "POST", body: "{}" }),
+    ));
+    expect(await screen.findByRole("status")).toHaveTextContent("cannot receive its Auth0 callback");
+    expect(register).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Stop waiting for MFA/i })).toBeNull();
   });
 
   it("starts configured sandbox Checkout only through owner-auth-required MFA", async () => {

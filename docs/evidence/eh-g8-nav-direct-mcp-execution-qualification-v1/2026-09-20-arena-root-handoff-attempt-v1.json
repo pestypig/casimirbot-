@@ -1,0 +1,65 @@
+{
+  "schema": "helix.nav_eq_arena_root_handoff_attempt.v1",
+  "date": "2026-09-20",
+  "protocol": "2026-09-20-arena-rolling-handoff-protocol-v1.json",
+  "runtime_package_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3A44999919AD06BA9F",
+  "run_id": "run_41c41e3f-ad32-472e-8267-84ebb0f367f1",
+  "goal_id": "environment_durable_goal:ec93aecf341454c0ced6ace7bfe67681bbb4a9cecd6be778a9b563df78be5e96",
+  "authority_id": "environment_action_authority:826e7fd6-8a70-4c48-a426-719119dda505",
+  "paired_privately": true,
+  "pre_admission_rejections": [
+    {
+      "plan_id": "nav_eq:arena:root:20260920:1",
+      "reason": "temporal_plan_resident_clock_mismatch",
+      "cause": "Caller used frontier world tick rather than the resident client tick and monotonic clock",
+      "admitted": false,
+      "player_motion": false
+    },
+    {
+      "plan_id": "nav_eq:arena:root:20260920:2",
+      "reason": "connector schema rejected fractional monotonic elapsed_ms and deadline",
+      "cause": "Resident monotonic sample is fractional; temporal plan requires integer milliseconds",
+      "admitted": false,
+      "player_motion": false
+    }
+  ],
+  "admitted_root": {
+    "plan_id": "nav_eq:arena:root:20260920:3",
+    "plan_hash": "sha256:4aafc2c5260a8494b50ca8d02ba704cec79793239e8dd6d1bfa2692199c2cec3",
+    "frontier_id": "environment_frontier:6192bfa9-b2d7-47d0-9275-5d2509ea41fd",
+    "source_probe_evidence_ref": "environment_probe_evidence:40d92ee0fcc84ebc2077fa6d6a4f56e984e112f2",
+    "action_request_id": "nav_eq:arena:action:root:3",
+    "workflow_id": "nav_eq:arena:workflow:root:3",
+    "retained_result_evidence_ref": "environment_action_evidence:179c1c2246ad885788fc568e198f3782775953c7c",
+    "retained_outcome": "succeeded",
+    "native_engine": "native_fabric",
+    "start_position": [-5.14, 65, -5.63],
+    "post_position": [-1.91, 65, -5.63],
+    "post_health": 20,
+    "duration_ticks": 105,
+    "dispatch_to_client_accept_ms": 63,
+    "dispatch_to_first_tick_ms": 65,
+    "resident_computation_ms": 34,
+    "missed_ticks": 2,
+    "queue_depth_at_lease": 1,
+    "mid_route_checkpoint_id": "checkpoint:arena-root-progress",
+    "mid_route_checkpoint_tick_index_relative": 70,
+    "required_postcondition_satisfied": true,
+    "world_mutation_reported": false,
+    "inventory_mutation_reported": false,
+    "controls_released_reported": true
+  },
+  "handoff": {
+    "successor_submitted": false,
+    "reason": "The next external tool/model round trip arrived after the 105-tick root settled; the five-second current-checkpoint context was no longer available.",
+    "frontier_successor_context": "no_current_verified_checkpoint",
+    "overlap_measured": false
+  },
+  "lease_end": {
+    "expiry": "2026-09-20T15:59:00Z",
+    "owner_inspection_after_expiry": "expired and authority_inactive",
+    "extension_after_expiry": "rejected; a new grant is required",
+    "explicit_revocation_proven": false
+  },
+  "claim_ceiling": "One live multi-node native sequence and mid-route checkpoint; no rolling successor or NAV-EQ acceptance."
+}

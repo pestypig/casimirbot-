@@ -39,6 +39,14 @@ contracts and delegation; it does not maintain a second execution ledger.
 owns product scope and claims. Dated files under `docs/audits/` are immutable
 observations; raw results belong under `docs/evidence/`.
 
+The current D07 owner policy includes the [identity/signing cash guard](eh-g8-cfp1-d07-identity-and-signing-cash-guard-owner-freeze-v1.md):
+conditional rolling-30-day ceilings of `$45` for the full billed Auth0 scope and
+`$15` for Artifact Signing, with at most 450 provider-counted MAU and a
+1,000-signature split that protects 200 for same-or-newer repair. This is a
+specification input only. It does not purchase or configure a provider, accept
+the NYC sole proprietor's seller/publisher identity, validate the `$60` offer
+or alter the CFP-1 `specified` / CFP-2/3 blocked stage decision.
+
 This is a G8 delivery lane. Its initial audit and commercial specification do
 not change runtime code, activate permissions, or assume an open environment
 prerequisite passed. Existing technical lanes retain their own prerequisites.
@@ -118,7 +126,7 @@ bounded implementation/audit handoff; failures return to the owning stage.
 | --- | --- | --- |
 | CFP-0 — Baseline and plan reconciliation | Read-only roadmap auditor plus read-only implementation/distribution auditor; coordinator integrates findings | Complete disposition matrix, source/evidence inventory, conflict register, dependency graph, dirty-worktree qualification, exact next work packets, and an audit that distinguishes verified facts from untested claims. No material first-release dependency may remain unassigned. |
 | CFP-1 — Product and rights boundary | Product/architecture author with licensing/distribution review | Owner-selected offer, bounded capability list, rights-review outcome for the intended distribution, software/hosted/model entitlement matrix, lifecycle and cancellation rules, frozen acceptance thresholds, and reconciled canonical backlinks. Unresolved rights or offer decisions block only dependent work. |
-| CFP-2 — Useful installed capability | External-client/onboarding implementer plus environment capability implementer using existing PNA and adapter packets | One ordinary-user installed journey through external Codex performs the frozen useful task, shows measured outcome and public lifecycle, survives a repairable interruption, and stops safely. No developer launcher or packaged model runtime is needed. Record deterministic and live evidence separately. |
+| CFP-2 — Useful installed capability | External-client/onboarding implementer, a bounded signing-qualification operator and environment capability implementer using existing PNA and adapter packets | One ordinary-user **privately signed evaluation** journey through external Codex performs the frozen useful task, shows measured outcome and public lifecycle, survives a repairable interruption, and stops safely. No developer launcher or packaged model runtime is needed. Record deterministic and live evidence separately; this is not a customer release. |
 | CFP-3 — Paid entitlement and distributable build | Entitlement, room/action and packaging/distribution implementers with nonoverlapping file ownership | Hosted-collaboration entitlement enforced at its trusted service/action boundary; exact owner-issued cross-participant action delegation for the selected rights-cleared first paid benefit, with native effect attribution and personal/self-player regressions; developer-superset preservation; sandbox subscription/cancel/refund and webhook replay/reorder tests; hosted expiry/recovery policy; signed build, notices, and customer-accessible download/update path independent of source-repository visibility. Never-subscribed and expired-hosted users retain eligible personal tools. No production charging is required for this stage. |
 | CFP-4 — Integrated reliability audit | Integration auditor with bounded repairs delegated to the owner of each failure | The same signed artifact passes the full acceptance matrix across identity, entitlement, effects, client lifecycle, recovery, update, and cancellation. Applicable G8 prerequisite artifacts are linked; code changes invalidate affected results and require a focused rerun. |
 | CFP-5 — Attended paid pilot | Pilot/release operator and product reviewer | Owner-authorized production payment configuration and attended charge/cancel/refund evidence for the actual offered terms; clean external-user signed installs; predeclared useful-task and support measurements; concrete rollback and incident procedures. Source visibility changes, if selected, use the reviewed distribution migration. |
@@ -137,9 +145,14 @@ permits current-source diagnostic work, its child packet may select a packaged
 or unpacked diagnostic build and must label that exact installation class.
 Such evidence cannot satisfy a signed-install prerequisite. Any task whose
 existing prerequisite specifically requires a signed artifact stays blocked
-until that prerequisite is met. CFP-3 supplies the signed commercial build;
-CFP-4 repeats the useful-task journey and full matrix on that same signed
-artifact before pilot admission.
+until [CFP-2.SIGNED-QUALIFICATION](eh-g8-cfp2-signed-qualification-v1.md)
+produces and independently reviews one private, rights-scoped signed evaluation
+tuple after CFP-1 closure. Its signature admits only the CFP-2 P1/PNA2 installed
+tests; it does not publish or certify the product. CFP-3 supplies a separate
+final signed commercial build with its full release checks; CFP-4 repeats the
+useful-task journey and full matrix on that same final signed artifact before
+pilot admission. The [stage-cycle audit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-signed-p1-stage-cycle-audit-262.md)
+records the former circular prerequisite and the source workflow constraint.
 
 CFP-1 selects hosted collaboration as the paid offer and excludes managed
 model consumption. CFP-3/5 prove that selected hosted subscription; they do not

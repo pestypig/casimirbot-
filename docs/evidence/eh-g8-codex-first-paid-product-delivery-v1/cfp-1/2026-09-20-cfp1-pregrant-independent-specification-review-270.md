@@ -1,0 +1,12 @@
+# CFP-1 pre-grant independent specification review — 2026-09-20
+
+**Verdict: PASS for internal specification consistency only.** A separate read-only agent reviewed the [reconciliation 269](2026-09-20-cfp1-pregrant-route-and-cost-reconciliation-269.md) and the linked living CFP-1/CFP-3 packets. The first pass found four gaps; the final pass rechecked the corrections and found no remaining concrete contradiction or stage overclaim. This is not qualified D11 legal/financial review, implemented API evidence, provider measurement, installed acceptance, a selected D07 limit or a CFP-1 exit decision.
+
+| Initial finding | Corrected contract and final recheck |
+| --- | --- |
+| The [first-party API](../../../work-packets/eh-g8-cfp1-first-party-guest-action-api-contract-v1.md) consumed a one-use grant at request admission but appeared to require an unused grant at native release. | Native release now validates the **consumed grant record** and its bound identities, target, expiry and revocation revision plus current authority; [CFP-3](../../../work-packets/eh-g8-cfp3-shared-program-action-delegation-v1.md) says the same. |
+| Idempotency scope included body hash while also promising changed-body conflict. | Lookup is `(actor, room, method, Idempotency-Key)` with a stored canonical body hash to compare on reuse. |
+| The positive [guest-ingress fixture](../../../work-packets/eh-g8-cfp1-hosted-guest-request-ingress-v1.md) put owner grant before the guest joined, though the API binds a current verified room member. | Guest joins first, owner pre-grants that exact member, guest requests later. The [D07 fixture](../../../work-packets/eh-g8-cfp1-d07-hosted-budget-workload-fixture-v1.md) uses the same order. |
+| [PBT](../../../work-packets/eh-g8-cfp1-hosted-resource-budget-token-contract-v1.md), [pilot assay](../../../work-packets/eh-g8-cfp1-hosted-pilot-price-and-capacity-assay-v1.md) and [privacy/financial submission](../../../work-packets/eh-g8-cfp1-privacy-and-financial-review-submission-v1.md) still implied post-request owner approval. | Each now describes owner pre-grant followed by guest request. The reviewer confirmed the D07 scripted successful-path arithmetic: `3 × effects + visits` = 40 at T10/P10, 175 at P50 and 325 at P100. |
+
+The final review expressly leaves D07 matched provider economics/limits, D11 qualified returns, D12 integrated freeze and CFP-3/4 installed proof open. CFP-1 remains active at `specified`, CFP-2/3 blocked and G8 active under the [canonical work program](../../../helix-environment-harness-work-program-v1.md).

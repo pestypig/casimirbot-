@@ -151,6 +151,27 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "client_local"
   },
   {
+    "control_id": "Composer destination",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Set up connection",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Open Agent Access",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
     "control_id": "helix.ask.helix-ask-debug-drawer.close",
     "surface_id": "helix.ask",
     "account_scope": "user",
@@ -452,6 +473,34 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "client_local"
   },
   {
+    "control_id": "() => void refresh()",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "155",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => setDetailLevel(level)",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void loadStream(selectedStream, nextCursor)",
+    "surface_id": "helix.ask",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
     "control_id": "helix.ask.shared_live_room.open_dialog",
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
@@ -571,20 +620,6 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "blocked_pending_contract"
   },
   {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-dialog.shared-live-room-overlay",
-    "surface_id": "helix.ask.shared_live_room",
-    "account_scope": "user_feature_gated",
-    "interaction_kind": "navigate",
-    "authority_state": "blocked_pending_contract"
-  },
-  {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-dialog.close-shared-gpt-live-room-dialog",
-    "surface_id": "helix.ask.shared_live_room",
-    "account_scope": "user_feature_gated",
-    "interaction_kind": "navigate",
-    "authority_state": "blocked_pending_contract"
-  },
-  {
     "control_id": "helix.ask.shared_live_room.shared-live-room-dialog.close-shared-gpt-live-room",
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
@@ -593,6 +628,20 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
   },
   {
     "control_id": "helix.ask.shared_live_room.shared-live-room-dialog.dismiss",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "navigate",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.shared-live-room-dialog.shared-live-room-overlay",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "navigate",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.shared-live-room-dialog.close-shared-gpt-live-room-dialog",
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
     "interaction_kind": "navigate",
@@ -844,34 +893,6 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "blocked_pending_contract"
   },
   {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.refresh-player-embodiment-authority",
-    "surface_id": "helix.ask.shared_live_room",
-    "account_scope": "user_feature_gated",
-    "interaction_kind": "observe",
-    "authority_state": "blocked_pending_contract"
-  },
-  {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select",
-    "surface_id": "helix.ask.shared_live_room",
-    "account_scope": "user_feature_gated",
-    "interaction_kind": "configure",
-    "authority_state": "blocked_pending_contract"
-  },
-  {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select.2",
-    "surface_id": "helix.ask.shared_live_room",
-    "account_scope": "user_feature_gated",
-    "interaction_kind": "configure",
-    "authority_state": "blocked_pending_contract"
-  },
-  {
-    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select.3",
-    "surface_id": "helix.ask.shared_live_room",
-    "account_scope": "user_feature_gated",
-    "interaction_kind": "configure",
-    "authority_state": "blocked_pending_contract"
-  },
-  {
     "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.input",
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
@@ -911,7 +932,8 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
     "interaction_kind": "act",
-    "authority_state": "blocked_pending_contract"
+    "authority_state": "route_owned",
+    "route_contract_id": "environment.action_authority.revoke"
   },
   {
     "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.void-copy-pairing-command",
@@ -925,6 +947,55 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "surface_id": "helix.ask.shared_live_room",
     "account_scope": "user_feature_gated",
     "interaction_kind": "navigate",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.refresh-player-embodiment-authority",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "observe",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.player-embodiment.full-gameplay-access",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "configure",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "Minecraft play objective",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "configure",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.player-embodiment.play-minecraft-with-helix",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "act",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "configure",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select.2",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "configure",
+    "authority_state": "blocked_pending_contract"
+  },
+  {
+    "control_id": "helix.ask.shared_live_room.shared-live-room-player-embodiment-panel.select.3",
+    "surface_id": "helix.ask.shared_live_room",
+    "account_scope": "user_feature_gated",
+    "interaction_kind": "configure",
     "authority_state": "blocked_pending_contract"
   },
   {
@@ -1511,14 +1582,91 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "client_local"
   },
   {
-    "control_id": "workstation.panel.agent-access.agent-connection-setup.reasoning-claim-handle",
+    "control_id": "Stop waiting",
     "surface_id": "workstation.panel.agent-access",
     "account_scope": "user",
-    "interaction_kind": "observe",
+    "interaction_kind": "human_only",
     "authority_state": "client_local"
   },
   {
-    "control_id": "workstation.panel.agent-access.agent-connection-setup.bind-current-helix-chat",
+    "control_id": "() => void updateFullHarnessTrust(fullHarnessTrust?.trusted !== true)",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void readFullHarnessTrust()",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => requestWorkstationGuidance({ kind: \"user_attention\", panelId: trustRecoveryPanel, label: trustRecoveryPanel === \"account-session\" ? \"Check the profile ses",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void startHarness()",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void startHarness()",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => dispatch({ type: \"choose\", profile: profile.profile_id })",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Open account sign-in",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "agent-mcp-url",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.bind-environment-run",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "1590",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.clear-environment-run",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void bindCurrentChat()",
     "surface_id": "workstation.panel.agent-access",
     "account_scope": "user",
     "interaction_kind": "human_only",
@@ -1533,6 +1681,272 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
   },
   {
     "control_id": "workstation.panel.agent-access.agent-connection-setup.revoke-reasoning-binding",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Restore the native Full Harness transport and recheck setup. Does not renew an idle AI task's presence, approve binding, or grant game actions.",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Back",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void refresh()",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "I added it",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Explain",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Copy diagnostics",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Sanitized onboarding diagnostics",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Open optional Device Check",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Skip Device Check",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Disconnect",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Confirm disconnect",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Cancel",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Dismiss expiry notice",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "348",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Refresh registered tasks",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Review a new invitation",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Return to previous pairing",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "373",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "378",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "382",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Review current environment run",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "391",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.durable-task-pairing.approve-exact-task",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.durable-task-pairing.issue-invitation",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Cancel request and review again",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Reconcile delivery",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Review replacement pairing",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Check acceptance",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Revoke pairing",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Review a new invitation",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void submit()",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Request preparation again",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Preparation room",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Requested session duration",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void prepare()",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Review environment settings",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "workstation.panel.agent-access.agent-connection-setup.reasoning-claim-handle",
+    "surface_id": "workstation.panel.agent-access",
+    "account_scope": "user",
+    "interaction_kind": "observe",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void copy()",
     "surface_id": "workstation.panel.agent-access",
     "account_scope": "user",
     "interaction_kind": "human_only",
@@ -1749,6 +2163,41 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "authority_state": "client_local"
   },
   {
+    "control_id": "Realtime Texture Pack image provider",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Acknowledge external frame egress",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Acknowledge billable provider calls",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "() => void handleArmFal()",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Stop provider",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
     "control_id": "workstation.panel.image-lens.realtime-texture-pack-controls.texture-style-preset",
     "surface_id": "workstation.panel.image-lens",
     "account_scope": "user",
@@ -1802,6 +2251,62 @@ export const HELIX_PUBLIC_UI_CONTROL_CATALOG =
     "surface_id": "workstation.panel.image-lens",
     "account_scope": "user",
     "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Enable agent visual direction control",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Visual direction source",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Visual direction environment",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Visual direction mode",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "836",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "845",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "configure",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Pin direction",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
+    "authority_state": "client_local"
+  },
+  {
+    "control_id": "Resume dynamic",
+    "surface_id": "workstation.panel.image-lens",
+    "account_scope": "user",
+    "interaction_kind": "human_only",
     "authority_state": "client_local"
   },
   {

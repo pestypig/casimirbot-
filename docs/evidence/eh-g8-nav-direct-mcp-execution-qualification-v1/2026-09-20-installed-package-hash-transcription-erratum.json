@@ -1,0 +1,27 @@
+{
+  "schema": "helix.nav_eq_installed_package_hash_transcription_erratum.v1",
+  "date": "2026-09-20",
+  "scope": "Correct a shortened EXE hash in frozen same-day NAV-EQ evidence; do not reinterpret or alter the live action outcomes",
+  "package_path": "apps/desktop/release-nav-eq-20260920/win-unpacked/CasimirBot.exe",
+  "reported_exe_hash": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3A44999919AD06BA9F",
+  "reported_hash_hex_characters": 62,
+  "measured_exe_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3E3A44999919AD06BA9F",
+  "measured_hash_hex_characters": 64,
+  "measured_app_asar_sha256": "0B5A27E7F4A0576F141B770AAFEB3EFFE95F717DD45EC33D4C259D2E5F62C88D",
+  "measured_runtime_manifest_sha256": "FE0F082563BDF67030A9EE96F4A165F19F96D875964EE70D0E0A40487D841182",
+  "exe_modified_at_utc": "2026-09-20T07:52:40.1395011Z",
+  "observed_running_parent_process_id": 21236,
+  "process_started_at_utc": "2026-09-20T07:57:27.8066210Z",
+  "affected_records": [
+    "2026-09-20-direct-client-staged-package-preflight.json",
+    "2026-09-20-direct-native-serial-calibration-protocol.json",
+    "2026-09-20-direct-native-serial-calibration-protocol-v2.json",
+    "2026-09-20-direct-native-serial-calibration-result.json",
+    "2026-09-20-arena-rolling-handoff-protocol-v1.json",
+    "2026-09-20-arena-root-handoff-attempt-v1.json",
+    "2026-09-20-arena-rolling-handoff-protocol-v2.json",
+    "2026-09-20-arena-rolling-handoff-protocol-v3.json"
+  ],
+  "interpretation": "The app.asar and runtime-manifest hashes match the staged-package record, and the executable predates the running process. The 62-character reported EXE value is a transcription error, not a valid SHA-256. Frozen trial files remain unchanged; use the measured 64-character hash for package identity.",
+  "claim_ceiling": "Package identity correction only. It does not prove that the current source patch is in the installed runtime or promote any NAV-EQ trial."
+}

@@ -1,0 +1,7 @@
+# CFP-1 post-directory stage independent review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. Independent read-only review of [stage audit 181](2026-09-20-cfp1-post-directory-scope-stage-audit-181.md) against the [CFP-1 exit contract](../../../work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md#delegation-and-handoff), [owner queue](../../../work-packets/eh-g8-cfp1-owner-decision-and-review-queue-v1.md) and canonical stage ledger in the shared dirty Desktop checkout at source HEAD `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93`.
+
+**Verdict: PASS after two corrections.** The first review found that the stage table omitted an explicit planned D08/C15 and D09/C10 distribution/channel rights row; the audit now separates CFP-1's channel, component-rights and old-install treatment from CFP-3 signed feed, bridge and kit execution. The second review required the D12 row to name independent integrated acceptance of the **full final dependent CFP-2/3 work-packet set** before dispatch; that clause is now explicit. The reviewer confirmed D01/D02, D07, D11 and D12 evidence limits, the held external inquiry, non-dispatchable directory handoff and local links.
+
+This verdict accepts stage accounting, not a costed D07 term, qualified D11 return, final D12 claim/component freeze, installed task, connector permission or production release. CFP-1 remains active (`specified`); CFP-2/3 remain blocked and G8 active. No runtime or production setting changed.

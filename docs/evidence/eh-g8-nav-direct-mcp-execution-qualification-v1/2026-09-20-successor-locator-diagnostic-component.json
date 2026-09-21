@@ -1,0 +1,36 @@
+{
+  "schema": "helix.nav_eq_successor_locator_diagnostic_component.v1",
+  "date": "2026-09-20",
+  "classification": "evidence normalization and evidence re-entry; read-only failure diagnostics",
+  "first_live_divergence": "Fresh in-motion Minecraft perception and a published temporal frontier did not consistently expose a verified checkpoint locator; V8 succeeded once and V9/V10 frontiers returned the undifferentiated no_current_verified_checkpoint reason.",
+  "component_change": {
+    "file": "server/services/environment-connectors/temporal-plans/temporal-successor-context.ts",
+    "behavior": "Preserve the existing fail-closed reason_code and add a bounded diagnostic_code for the first missing or rejected locator prerequisite. Known verifier errors use the existing closed TemporalPlanError vocabulary; unknown exception text is never projected.",
+    "authority_change": false,
+    "freshness_change": false,
+    "checkpoint_verification_change": false,
+    "execution_or_strategy_change": false
+  },
+  "focused_tests": {
+    "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-successor-context.test.ts server/services/environment-connectors/temporal-plans/__tests__/temporal-frontier-publisher.test.ts --pool=forks",
+    "result": "passed",
+    "tests": 24,
+    "test_files": 2,
+    "adversarial_case": "An unexpected verifier exception containing private diagnostic text returns only checkpoint_verification_unclassified."
+  },
+  "discipline_check": {
+    "command": "npm run helix:ask:discipline:quick",
+    "result": "passed; no Helix Ask-sensitive files inferred"
+  },
+  "server_build": {
+    "command": "npm run build:server",
+    "result": "passed with four duplicate-key/case warnings in files outside this component"
+  },
+  "full_typecheck": {
+    "command": "npm run check",
+    "result": "canceled without verdict after the exact tsc worker reached about 4.07 GB private memory and available physical RAM fell to about 0.51 GB; no type verdict is claimed"
+  },
+  "build_live_status": "Not yet packaged or live accepted; installed EXE still runs the prior code. The initial Win32_OperatingSystem free-virtual-memory field reported zero, but the dedicated performance counter showed 20.53 GB committed against a 29.78 GB commit limit, with about 3.39 GB available physical memory. Packaging was deferred pending this cross-check, not because commit exhaustion was proved.",
+  "next_evidence": "Build a matching installed EXE when host commit permits, re-probe the exact selected player under a new finite authority, and record the diagnostic_code at each in-motion frontier before changing checkpoint currentness behavior.",
+  "claim_ceiling": "Component-only diagnostic improvement; NAV-EQ remains specified and no successor was admitted."
+}

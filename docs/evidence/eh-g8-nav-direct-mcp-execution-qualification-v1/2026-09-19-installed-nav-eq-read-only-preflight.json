@@ -1,0 +1,40 @@
+{
+  "schema": "eh.g8.nav_eq.installed_read_only_preflight.v1",
+  "observed_at": "2026-09-19T21:45:30Z",
+  "qualification_status": "not_started",
+  "runtime_profile": "installed unsigned development EXE and combat-c0 Fabric source",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+  "world_id": "minecraft:local:combat-c0",
+  "read_only_checks": {
+    "source_online_fresh_probe_ready": true,
+    "source_blocking_reasons": [],
+    "room_self_role": "owner",
+    "room_other_participants": 0,
+    "source_execution_policy_may_execute_live_actions": false,
+    "source_execution_policy_may_perform_read_only_probes": true,
+    "selected_subject_label": "DatDamPig",
+    "selected_subject_binding_status": "active",
+    "selected_subject_presence": "online",
+    "visible_player_action_authority_count": 0,
+    "visible_action_connector_readiness_count": 0,
+    "same_task_preparation_intent_count": 0,
+    "room_run_candidate_count": 0,
+    "task_binding_verified": false,
+    "temporal_plan_submit_action_advertised": true,
+    "temporal_plan_submit_executed": false
+  },
+  "first_missing_execution_boundaries": [
+    "A finite selected-player action authority and action-only connector pairing are absent; the current source is read-only.",
+    "No prepared run, exact-task reasoning binding, or selected goal is present for temporal admission.",
+    "The controlled course, numeric capacity/interruption limits, and measurement protocol have not been frozen before dispatch."
+  ],
+  "effects": {
+    "minecraft_player_motion": false,
+    "world_mutation": false,
+    "action_authority_created": false,
+    "pairing_created": false,
+    "run_created": false
+  },
+  "interpretation": "The successful NAV1-O sensing read does not satisfy NAV-EQ. Direct MCP qualification remains specified until the separately authorized setup and full measured rolling-execution sequence pass."
+}

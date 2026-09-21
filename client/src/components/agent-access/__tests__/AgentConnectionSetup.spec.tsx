@@ -620,6 +620,7 @@ describe("AgentConnectionSetup", () => {
       await screen.findByText("Bind the current Helix chat to this exact AI task"),
     ).toBeInTheDocument();
     expect(screen.getByText(/Repeating the same presence refresh cannot enable steering/i)).toBeInTheDocument();
+    expect(screen.getByText(/This task declared tool activity only, so Helix cannot send steering to it/i)).toBeInTheDocument();
     expect(screen.queryByText(/Ask that same AI task to refresh its CasimirBot presence/i)).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Bind current Helix chat" }),
@@ -768,20 +769,19 @@ describe("AgentConnectionSetup", () => {
     expect(startMcpTunnel).toHaveBeenCalledTimes(1);
   });
 
-  it("uses the same Start Harness entry point for browser diagnosis without native mutation", async () => {
+  it("distinguishes browser service checks from starting the installed private harness", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(response(connectionStatus(false)));
     vi.stubGlobal("fetch", fetchMock);
 
     render(<AgentConnectionSetup />);
-    fireEvent.click(screen.getByRole("button", { name: "Start Harness" }));
+    expect(screen.getByText(/Browser view: this page can check only the service at its current address/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Check current service" }));
 
-    expect(
-      await screen.findByText("Waiting for your AI task"),
-    ).toBeInTheDocument();
+    await screen.findByText(/cannot start the installed private MCP tunnel/i);
+    expect(screen.getByRole("heading", { name: "Choose your AI app" })).toBeInTheDocument();
     expect(fetchMock.mock.calls.filter(([url]) => url.startsWith(AGENT_CONNECTION_READINESS_ENDPOINT))).toHaveLength(1);
-    expect(screen.getByText(/Neither action wakes the AI task or approves binding/)).toBeInTheDocument();
   });
 
   it.each(["Start Harness", "Refresh harness connection"])("keeps %s available after persisted setup and performs one native refresh", async buttonName => {

@@ -1,0 +1,53 @@
+{
+  "schema": "helix.nav_eq_direct_client_staged_package_preflight.v1",
+  "date": "2026-09-20",
+  "scope": "installed-package staging and read-only Minecraft preflight; no NAV-EQ movement acceptance",
+  "source_commit": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+  "working_tree": "dirty shared checkout; package is a development-test artifact, not a trusted signed-release claim",
+  "running_package": "apps/desktop/release-nav1o-catalog-20260919/win-unpacked/CasimirBot.exe",
+  "staged_package": "apps/desktop/release-nav-eq-20260920/win-unpacked/CasimirBot.exe",
+  "staged_package_sha256": {
+    "CasimirBot.exe": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3E3A44999919AD06BA9F",
+    "resources/app.asar": "0B5A27E7F4A0576F141B770AAFEB3EFFE95F717DD45EC33D4C259D2E5F62C88D",
+    "resources/runtime/runtime-manifest.json": "FE0F082563BDF67030A9EE96F4A165F19F96D875964EE70D0E0A40487D841182"
+  },
+  "package_verification": {
+    "client_build": "passed",
+    "server_build": "passed with four unrelated source warnings",
+    "desktop_host_and_service_build": "passed",
+    "runtime_tree": "passed; renderer files 636; tunnel-client 0.0.13",
+    "packed_direct_temporal_tool_string_present": true
+  },
+  "retention_housekeeping": {
+    "running_and_rollback_packages_preserved": [
+      "release-nav1o-catalog-20260919",
+      "release-nav1o-20260919"
+    ],
+    "older_packages_moved_recoverably_to": "apps/desktop/archived-development-packages/2026-09-20/",
+    "moved_package_names": [
+      "release-ready-up-retry-20260914",
+      "release-retained-outcome-20260914",
+      "release-snapshot-confirmation-20260914"
+    ]
+  },
+  "live_read_only_preflight": {
+    "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+    "world_id": "minecraft:local:combat-c0",
+    "selected_player": "DatDamPig",
+    "player_position": [-2.1, 65, 7.7],
+    "health": 20,
+    "actor_evidence_ref": "environment_probe_evidence:0430a299407e9fab290adfe72483be53a049fdf4",
+    "collision_evidence_ref": "environment_probe_evidence:e311e16681bc593bc2967d41d1618e1275c327ba",
+    "collision_observed_at": "2026-09-20T07:46:04.368Z",
+    "collision_snapshot_tick": 17234673,
+    "collision_cells": 125,
+    "collision_unknown_cells": 0,
+    "snapshot_semantic_fingerprint": "sha256:3a77f7c479f7305ac82be5715f97a03eb4f0786e6ae1cf965a0ddd309d447fbf",
+    "visible_player_action_authorities": 0,
+    "movement_dispatched": false
+  },
+  "staged_package_launched": false,
+  "direct_tool_live_observed": false,
+  "nav_eq_live_accepted": false
+}

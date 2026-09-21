@@ -1,0 +1,39 @@
+{
+  "schema": "helix.nav_eq_full_mcp_transition_recovery.v1",
+  "observed_at": "2026-09-20T08:04:32.356Z",
+  "scope": "native tunnel transport recovery and read-only Minecraft probe; no NAV-EQ action",
+  "task_ref": "01a03464-1f5e-7f93-bd17-e4ca8a0bec9e",
+  "service_instance_ref": "service_instance:50f1c88ffb72f58e659c6e4c84a20605",
+  "initial_shadow_failure": {
+    "tool": "helix_room_list",
+    "reason": "full_mcp_transition_required",
+    "mutation_executed": false
+  },
+  "transition": {
+    "presence_registered": true,
+    "transition_request_ref": "desktop_tunnel_request:0ab59727-b8b5-4044-a39d-09b311bf5d72",
+    "requested_scope": "full_helix_agent",
+    "trusted_device_delegation_applied": true,
+    "execution_receipt_ref": "desktop_tunnel_receipt:46be4c9f-ca3d-4e66-b756-7c4cba9aedad",
+    "execution_receipt_event": "transition_accepted",
+    "execution_receipt_reason": "native_transition_pending",
+    "tool_list_changed_requested": true,
+    "reconnect_required_reported": false,
+    "environment_authority_granted": false,
+    "last_inspected_status": "transition_accepted"
+  },
+  "post_transition_behavior": {
+    "room_list_succeeded": true,
+    "exact_room_visible": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "session_read_preparation_succeeded": true,
+    "session_preparation_intent_count": 0,
+    "run_discovery_candidate_count": 0,
+    "minecraft_actor_status_succeeded": true,
+    "actor_status_evidence_ref": "environment_probe_evidence:67bd71a42cded3897e69b2c349e49ab7f0617e32",
+    "actor_label": "DatDamPig",
+    "actor_position": { "x": -2.1, "y": 65, "z": 7.7 },
+    "actor_health": 20,
+    "task_catalog_has_direct_submit_tool": false
+  },
+  "claim_ceiling": "Functional room and read-only environment calls now pass through the full native tunnel after the trusted-device transition. The transition ledger was only observed at transition_accepted, and this task's frozen catalog still lacks the new direct-submit schema. No run, Player Embodiment lease, temporal plan or movement was created or observed."
+}

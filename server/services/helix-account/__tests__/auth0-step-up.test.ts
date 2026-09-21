@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { JWTPayload } from "jose";
 import { AUTH0_MFA_ACR } from "@shared/desktop-auth0-step-up";
 import type {
@@ -18,7 +18,7 @@ const CONFIG: Auth0StepUpConfig = Object.freeze({
   clientId: "nativeClient_123456",
   jwksUrl: "https://tenant.example.auth0.com/.well-known/jwks.json",
   algorithms: Object.freeze(["RS256"]),
-  redirectUri: "casimirbot://oauth/callback",
+  redirectUri: "http://127.0.0.1:8767/callback",
   scope: "openid profile",
   maximumAgeSeconds: 300,
   receiptTtlSeconds: 120,
@@ -96,7 +96,7 @@ const fixture = (
   });
   authorizationUrl = started.authorization_url;
   const state = new URL(authorizationUrl).searchParams.get("state")!;
-  const callback = `casimirbot://oauth/callback?code=valid-code-123&state=${state}`;
+  const callback = `http://127.0.0.1:8767/callback?code=valid-code-123&state=${state}`;
   return { controller, started, callback, receiptStore };
 };
 
@@ -140,6 +140,100 @@ describe("Auth0StepUpController", () => {
     await expect(controller.complete(callback)).rejects.toMatchObject({
       code: "step_up_intent_not_found",
     });
+  });
+
+  it("invalidates a failed browser attempt without an MFA callback", async () => {
+    const { controller, started, callback } = fixture();
+    const binding = {
+      session: { sessionId: "session_owner", profileId: "profile_owner" },
+      deviceId: "desktop_device_AAAAAAAAAAAAAAAAAAAAAA",
+    };
+    expect(controller.cancelForSession({
+      session: { sessionId: "another_session", profileId: "profile_owner" },
+      deviceId: binding.deviceId,
+    })).toBe(0);
+    expect(controller.inspectStart(started.authorization_url).purpose).toBe("device_register");
+    expect(controller.cancelForSession(binding)).toBe(1);
+    expect(controller.cancelForSession(binding)).toBe(0);
+    expect(() => controller.inspectStart(started.authorization_url)).toThrow();
+    await expect(controller.complete(callback)).rejects.toMatchObject({
+      code: "step_up_intent_not_found",
+    });
+  });
+
+  it("supersedes an older exact-session attempt on a fresh retry", async () => {
+    let seed = 1;
+    const controller = new Auth0StepUpController({
+      config: () => CONFIG,
+      now: () => NOW,
+      randomBytes: (size) => Buffer.alloc(size, seed++),
+    });
+    const binding = {
+      session: { sessionId: "session_owner", profileId: "profile_owner" },
+      deviceId: "desktop_device_AAAAAAAAAAAAAAAAAAAAAA",
+      purpose: "device_register" as const,
+      targetRef: "desktop_device_AAAAAAAAAAAAAAAAAAAAAA",
+    };
+    const first = controller.start(binding);
+    const second = controller.start(binding);
+    expect(new URL(first.authorization_url).searchParams.get("state"))
+      .not.toBe(new URL(second.authorization_url).searchParams.get("state"));
+    expect(() => controller.inspectStart(first.authorization_url)).toThrow();
+    expect(controller.inspectStart(second.authorization_url).purpose).toBe("device_register");
+  });
+
+  it("cancels a callback in flight before it can mint a receipt", async () => {
+    let releaseFetch!: () => void;
+    const fetchGate = new Promise<void>((resolve) => { releaseFetch = resolve; });
+    let authorizationUrl = "";
+    const receiptStore = new HelixStepUpReceiptStore({
+      now: () => NOW,
+      randomBytes: (size) => Buffer.alloc(size, 7),
+      randomId: () => "receipt-id",
+    });
+    const issued = vi.spyOn(receiptStore, "issue");
+    const binding = {
+      session: { sessionId: "session_owner", profileId: "profile_owner" },
+      deviceId: "desktop_device_AAAAAAAAAAAAAAAAAAAAAA",
+      purpose: "device_register" as const,
+      targetRef: "desktop_device_AAAAAAAAAAAAAAAAAAAAAA",
+    };
+    const controller = new Auth0StepUpController({
+      config: () => CONFIG,
+      now: () => NOW,
+      randomBytes: (size) => Buffer.alloc(size, size),
+      receiptStore,
+      accessTokenVerifier: new AccessVerifier(),
+      fetch: async () => {
+        await fetchGate;
+        return new Response(JSON.stringify({
+          access_token: "access-token-value-1234",
+          id_token: "identity-token-value-1234",
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      },
+      verifyIdToken: async () => ({
+        sub: "auth0|owner",
+        exp: Math.floor(NOW.getTime() / 1_000) + 300,
+        iat: Math.floor(NOW.getTime() / 1_000),
+        nonce: new URL(authorizationUrl).searchParams.get("nonce"),
+        acr: AUTH0_MFA_ACR,
+        amr: ["pwd", "mfa"],
+        auth_time: Math.floor(NOW.getTime() / 1_000),
+      }),
+      validateLinkedIdentity: async () => true,
+    });
+    const started = controller.start(binding);
+    authorizationUrl = started.authorization_url;
+    const state = new URL(authorizationUrl).searchParams.get("state")!;
+    const completing = controller.complete(
+      `http://127.0.0.1:8767/callback?code=valid-code-123&state=${state}`,
+    );
+    expect(controller.cancelForSession(binding)).toBe(1);
+    releaseFetch();
+    await expect(completing).rejects.toMatchObject({
+      code: "step_up_intent_not_found",
+    });
+    expect(issued).not.toHaveBeenCalled();
   });
 
   it.each([

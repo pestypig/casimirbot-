@@ -1,0 +1,9 @@
+# CFP-1 browser-guest Minecraft rights packet independent review — 2026-09-20
+
+Status: independent documentation and question-scope review **PASS**. This is not a qualified legal disposition, Minecraft commercial permission, owner-approved external contact, runtime acceptance or CFP-1 stage advancement.
+
+The independent reviewer read the [browser-guest rights recheck](2026-09-20-cfp1-minecraft-browser-guest-rights-scope-recheck-208.md), [R-MC-01 submission](../../../work-packets/eh-g8-cfp1-minecraft-commercial-rights-review-submission-v1.md), [unsent inquiry draft](../../../work-packets/eh-g8-cfp1-game-counsel-inquiry-draft-v1.md), [D11 owner queue](../../../work-packets/eh-g8-cfp1-owner-decision-and-review-queue-v1.md) and [canonical G8 work program](../../../helix-environment-harness-work-program-v1.md). The reviewer checked the question map against the current official [Minecraft EULA](https://www.minecraft.net/en-us/eula) and [Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines), and reported that the local links resolve.
+
+Review result: the packet accurately labels a **proposed** first-cohort browser guest who may have no Minecraft installation or reasoning client, preserves the host-owned Minecraft client/player and exact owner grant, and **asks rather than decides** whether the guest needs a paid game copy. The official Mod, outside-service and server connecting-address conditions support the specific questions; they do not establish permission for this arrangement. PBT remains an internal capacity candidate, not a license or customer token purchase. The held external inquiry remains unsent, with no stage or claims promotion.
+
+Remaining: a qualified R-MC-01 return for the selected final topology, D07 cost/limit selection, D11 other qualified returns and D12 claim/component freeze. CFP-1 remains active at `specified`; CFP-2/3 remain blocked by the canonical work program.

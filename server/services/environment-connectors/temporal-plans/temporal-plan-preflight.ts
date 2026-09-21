@@ -4,9 +4,9 @@ import type { HelixReasoningTaskBindingStore } from "../../local-supervisor/reas
 import { resolveTemporalPerceptionContext } from "./temporal-perception-context";
 import { EnvironmentTemporalFrontierStore } from "./temporal-frontier-store";
 import { TemporalPlanError } from "./temporal-plan-error";
-import { readBoundSessionEvidence } from "../session/bound-session-evidence";
 import { compileEnvironmentTimePlanToMinecraftFluidSequenceArtifact as serial,
   compileEnvironmentTimePlanToMinecraftReactiveProgramArtifact as reactive } from "./minecraft-environment-time-compiler";
+import type { TemporalExecutionAssociation, TemporalExecutionAssociationVerifier } from "./temporal-execution-association";
 
 /** Internal preflight. No ledger admission, database write, tool registration or dispatch. */
 export const preflightTemporalPlan = async (input: {
@@ -16,11 +16,39 @@ export const preflightTemporalPlan = async (input: {
   compilation: { target: "serial"; options: Omit<Parameters<typeof serial>[0], "plan"> } |
     { target: "reactive"; options: Omit<Parameters<typeof reactive>[0], "plan"> };
 }, bindingStore: ReasoningTaskAssociationVerifier) => {
-  if (input.context.profileId !== input.binding.profileRef || input.context.runId !== input.binding.runId) {
+  const association: TemporalExecutionAssociation = {
+    kind: "reasoning_binding", associationId: input.binding.bindingId,
+    associationEpoch: input.binding.bindingEpoch, profileRef: input.binding.profileRef,
+    runId: input.binding.runId ?? "", roomId: input.context.roomId,
+    participantId: input.context.participantId,
+    continuationRef: input.binding.clientContinuationRef,
+  };
+  return preflightTemporalPlanWithAssociation({ ...input, association }, async () => {
+    await bindingStore.verifyTaskAssociation(input.binding);
+  });
+};
+
+/** Shared compiler/broker preflight; association verification never replaces
+ * the exact goal, observation, frontier, catalog or action-authority checks. */
+export const preflightTemporalPlanWithAssociation = async (input: {
+  context: Parameters<typeof resolveTemporalPerceptionContext>[0];
+  association: TemporalExecutionAssociation;
+  plan: unknown; frontierId: string;
+  compilation: { target: "serial"; options: Omit<Parameters<typeof serial>[0], "plan"> } |
+    { target: "reactive"; options: Omit<Parameters<typeof reactive>[0], "plan"> };
+}, verifyAssociation: TemporalExecutionAssociationVerifier) => {
+  const { association } = input;
+  if (input.context.profileId !== association.profileRef || input.context.runId !== association.runId ||
+      input.context.roomId !== association.roomId || input.context.participantId !== association.participantId ||
+      !association.runId || !association.associationId || !association.continuationRef ||
+      !Number.isSafeInteger(association.associationEpoch) || association.associationEpoch < 1) {
     throw new TemporalPlanError("temporal_plan_task_context_mismatch");
   }
   const plan = helixEnvironmentTemporalPlanSchema.parse(input.plan);
-  const { context } = await readBoundSessionEvidence(input, bindingStore);
+  await verifyAssociation(association);
+  const context = await resolveTemporalPerceptionContext(input.context);
+  // Membership, session, run or authority can change during asynchronous reads.
+  await verifyAssociation(association);
   const frontier = await new EnvironmentTemporalFrontierStore().read({
     frontierId: input.frontierId, profileId: input.context.profileId, participantId: input.context.participantId,
     expectedEvidenceRef: context.evidence.observation.evidence_ref,
@@ -65,8 +93,8 @@ export const preflightTemporalPlan = async (input: {
       resident.clock.world_tick_index >= frontier.expires_at_environment_sequence) throw new TemporalPlanError("temporal_plan_frontier_expired_or_unmapped");
   const compilation = input.compilation.target === "serial"
     ? serial({ ...input.compilation.options, plan }) : reactive({ ...input.compilation.options, plan });
-  const binding = await bindingStore.verifyTaskAssociation(input.binding);
-  return { plan, compilation, binding, frontier, resident_clock_observation: resident,
+  await verifyAssociation(association);
+  return { plan, compilation, association, frontier, resident_clock_observation: resident,
     preflight_only: true as const, execution_authority: false as const, answer_authority: false as const,
     terminal_eligible: false as const };
 };

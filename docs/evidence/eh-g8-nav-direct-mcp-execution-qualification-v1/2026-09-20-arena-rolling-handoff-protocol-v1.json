@@ -1,0 +1,54 @@
+{
+  "schema": "helix.nav_eq_arena_rolling_handoff_protocol.v1",
+  "frozen_at": "2026-09-20T15:53:30Z",
+  "scope": "First direct MCP arena rolling-handoff trial, not full NAV-EQ acceptance",
+  "runtime_package_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3A44999919AD06BA9F",
+  "service_instance_ref": "service_instance:50f1c88ffb72f58e659c6e4c84a20605",
+  "world_id": "minecraft:local:combat-c0",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "run_id": "run_41c41e3f-ad32-472e-8267-84ebb0f367f1",
+  "goal_id": "environment_durable_goal:ec93aecf341454c0ced6ace7bfe67681bbb4a9cecd6be778a9b563df78be5e96",
+  "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+  "action_authority_id": "environment_action_authority:826e7fd6-8a70-4c48-a426-719119dda505",
+  "authority_expires_at": "2026-09-20T15:59:00Z",
+  "start_position": [-5.14, 65, -5.63],
+  "course_envelope": {
+    "x_min": -6.5,
+    "x_max": 0.5,
+    "z_min": -6.5,
+    "z_max": 5.5,
+    "y": 65,
+    "basis": "Bounded spatial observations and a fresh same-player perception snapshot; route cells must be rechecked when the frontier changes",
+    "planned_root": ["back 500 ms", "back 1750 ms", "right 750 ms", "forward 2250 ms"],
+    "root_expected_waypoint_approx": [-2, 65, -5.6],
+    "successors": "Up to three freshly observed distinct-lane sweeps within the envelope; each requires a verified predecessor checkpoint and exact hash linkage"
+  },
+  "numeric_pass_limits": {
+    "required_successor_count": 3,
+    "minimum_overlap_of_useful_execution_and_successor_planning_ms": 500,
+    "maximum_gap_between_useful_motion_segments_ms": 1000,
+    "maximum_dispatch_to_first_tick_ms": 500,
+    "maximum_manual_release_ms": 1000,
+    "maximum_direct_user_cancel_release_ms": 1500,
+    "maximum_position_error_at_waypoint_blocks": 1.25,
+    "maximum_health_loss": 0,
+    "maximum_world_block_mutations": 0,
+    "maximum_inventory_transfers": 0,
+    "maximum_duplicate_or_post_revoke_motion_events": 0
+  },
+  "time_and_measurement": {
+    "game_tick_rate_hz": 20,
+    "prior_calibration_source_to_delivery_offset_ticks": 96,
+    "prior_calibration_dispatch_to_first_tick_ms": 124,
+    "wall_clock_origin": "UTC timestamps on MCP and resident receipts",
+    "resident_clock_origin": "Exact clock snapshot in each published frontier",
+    "report": ["resident computation", "dispatch-to-first-tick p50/p95/p99 with n", "useful motion ratio", "stationary and missed ticks", "queue depth", "successor readiness", "committed runway", "observation re-entry", "replan delay", "cancellation and release", "duplicate/stale effects", "evidence volume", "progress per model/tool round trip"],
+    "unavailable_measurements": "Report as unavailable, never zero"
+  },
+  "stop_criteria": [
+    "Any actor, world, source, producer, authority or run identity divergence",
+    "Hazard, hostile entity, health loss, manual takeover, boundary uncertainty or failed action checkpoint",
+    "Any hidden world or inventory mutation, duplicate effect, late effect or failed frozen numeric limit"
+  ],
+  "claim_ceiling": "At most a measured rolling-handoff trial on this installed profile; full NAV-EQ remains specified until every required interruption, reconnect and revoke scenario passes"
+}

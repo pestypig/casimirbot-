@@ -12,6 +12,11 @@ Downstream gate unlocked: none automatically; CFP stage admission remains in the
 
 # CFP-1 harness platform build plan v1
 
+> **Execution entry point:** Agents delivering the product start with the
+> [Platform Market Launch Execution Guide](eh-g8-casimirbot-platform-market-launch-execution-v1.md).
+> This document supplies supporting architecture and detailed scenarios; it is
+> not the day-to-day backlog or status ledger.
+
 ## Focus and authority
 
 On 2026-09-14 the owner directed this task to concentrate on the harness platform. Minecraft remains an evolving proof of concept: its detailed behavior will be developed through the existing game and NAV work. This platform task prepares how people discover, connect, use, share and extend the harness across programs. It does not require the final game experience to be designed before platform specification can progress.
@@ -26,7 +31,7 @@ The supported capability set will develop with evidence. Record intended capabil
 | --- | --- | --- |
 | Personal user | Understand the product, download the harness, connect an existing supported reasoning client and program, approve a scope, do useful work, stop and return later | Free supported MCP tools, legible readiness and consent, attributable results, supported recovery. No paid trial, room setup or mandatory second reasoning runtime. |
 | Collaboration host | Sign in, obtain the selected hosted service, create a room, invite participants and share chosen program capabilities | Stable account, verified hosted eligibility, room membership, separate owner grants, history and revoke/recovery. Payment does not grant program control. |
-| Participant | Join an eligible room, understand whose programs and capabilities are shared, collaborate within the assigned scope, leave or lose access cleanly | Exact participant identity and attribution; no access to another person's reasoning account or unshared programs. Guest/payer terms still need an owner decision. |
+| Participant | Join an eligible room through the authenticated domain, understand whose programs and capabilities are shared, make a bounded first-party request under an owner's exact grant, leave or lose access cleanly | Exact participant identity and attribution; no required guest GPT/Codex account and no access to another person's reasoning account or unshared programs. The browser request is a provisional CFP-1/3 target, not current accepted behavior. |
 | Program developer | Use the existing kit to expose a program's observations, then separately admitted actions; test personal use and opt into sharing the same operations | Versioned contracts, examples, diagnostics, conformance, compatibility and maintenance rules. Installing a manifest does not confer trust or action authority. |
 | Operator/support owner | Diagnose connection or entitlement failures, maintain compatible releases and restore service without restoring revoked authority | Sanitized evidence, durable state, explicit environment/version differences, rollback and recovery procedures. Support access does not bypass owner permissions. |
 

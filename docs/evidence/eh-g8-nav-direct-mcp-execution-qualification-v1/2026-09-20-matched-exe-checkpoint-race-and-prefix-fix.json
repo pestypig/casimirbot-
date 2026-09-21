@@ -1,0 +1,127 @@
+{
+  "schema": "helix.nav_eq_matched_exe_checkpoint_race_and_prefix_fix.v1",
+  "date": "2026-09-20",
+  "claim_ceiling": "Matched installed diagnostic and source-level race repair only; no admitted rolling successor or NAV-EQ acceptance",
+  "installed_runtime": {
+    "package": "apps/desktop/release-nav-eq-diagnostic-20260920/win-unpacked",
+    "exe_sha256": "91AFC7E5CA6E19838A92A666C59838AC145D7C91D8C1B2809FB22209216E0FAE",
+    "service_instance_ref": "service_instance:11a99ca542d0a701056c571761a8f114",
+    "runtime_tree_verdict": "PASS",
+    "runtime_manifest_sha256": "bd3b37e70f8b4cc1e1eadad05b9411794fb02442ded16721c2429edcba3e63f9",
+    "diagnostic_source_included": true,
+    "checkpoint_prefix_fix_included": false,
+    "retained_rollback": "apps/desktop/release-nav-eq-heartbeat-20260920/win-unpacked",
+    "recycled_superseded_build": "apps/desktop/release-nav-eq-20260920"
+  },
+  "live_scope": {
+    "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "world_id": "minecraft:local:combat-c0",
+    "player": "DatDamPig",
+    "run_id": "run_a0b6e581-234c-4640-ac43-7e76f4ea19c8",
+    "goal_id": "environment_durable_goal:ccdc2688a0c730973cbb08e3a5b0204cc8ad3c33e43d16879f27c0a5784267e7",
+    "action_authority_id": "environment_action_authority:b26455bb-b36d-4463-8c22-3bb6041a945e",
+    "authority_status_at_close": "expired",
+    "active_workflows_at_close": 0,
+    "controls_asserted_at_close": false,
+    "post_trial_health": 20
+  },
+  "trials": [
+    {
+      "protocol": "2026-09-20-south-floor-sweep-protocol-v11.json",
+      "root_plan_id": "nav_eq:south_sweep:v11:root:1",
+      "root_plan_hash": "sha256:7238ac99539ef1d04ebc8941bdccebed3c9186f371d2306b24e016abc4e36e88",
+      "retained_result_ref": "environment_action_evidence:357158667fc36cfc429cc30eb32f3a3715a10f207",
+      "retained_outcome": "succeeded",
+      "native_duration_ticks": 333,
+      "post_pose": [6.84, 65, -2.4],
+      "in_motion_frontier": "missed_after_completion",
+      "child_submitted": false
+    },
+    {
+      "protocol": "2026-09-20-south-floor-sweep-protocol-v12.json",
+      "root_plan_id": "nav_eq:south_sweep:v12:root:1",
+      "root_plan_hash": "sha256:0ba5f23a9640f9e9f003e6d1fa3889672b67fd4b04b8a329ec3d1117b9e1c351",
+      "in_motion_probe_ref": "environment_probe_evidence:4ae1cf16b3f079b8f64c7dce5c252d5bae680f65",
+      "in_motion_frontier_id": "environment_frontier:0f9560c9-87b8-4a4d-afb9-717e730ec2c0",
+      "verified_checkpoint_id": "checkpoint:south-sweep-after-5",
+      "successor_context_available": true,
+      "child_submitted": false,
+      "child_guard_defect": "The trial orchestrator required x>2 even though the bounded child would activate after the root's eastward finish; center-lane x=-0.36 incorrectly stopped submission.",
+      "retained_result_ref": "environment_action_evidence:64164c69ef6d4a26619e1d0a761acda38929145e0",
+      "retained_outcome": "request_canceled",
+      "cancel_reason": "temporal_runway_exhausted",
+      "native_duration_ticks": 326,
+      "world_mutation_performed": false,
+      "inventory_mutation_performed": false,
+      "controls_released": true
+    },
+    {
+      "protocol": "2026-09-20-south-floor-sweep-protocol-v13.json",
+      "root_plan_id": "nav_eq:south_sweep:v13:root:1",
+      "root_plan_hash": "sha256:084d33c992b3544c24b00c7930b6ae8425ed8b45cc67917a21c8537fda93f483",
+      "in_motion_probe_ref": "environment_probe_evidence:4b2104b125807e5a70bd9b50d8acda27ad4ba3f4",
+      "in_motion_frontier_id": "environment_frontier:9e0d3672-942a-4256-98b7-d418feef9f66",
+      "successor_context_available": false,
+      "diagnostic_code": "temporal_checkpoint_action_event_mismatch",
+      "child_submitted": false,
+      "retained_result_ref": "environment_action_evidence:9efe44ef88c43505e69597beb2859538a5310b0d6",
+      "retained_outcome": "succeeded",
+      "native_duration_ticks": 333,
+      "required_checkpoints_satisfied": 11,
+      "predicted_end_approx": [6.6, 65, -2.9],
+      "fresh_post_pose": [0.7, 65, -2.87],
+      "endpoint_discrepancy_open": true,
+      "world_mutation_performed": false,
+      "inventory_mutation_performed": false,
+      "controls_released": true
+    }
+  ],
+  "read_only_race_diagnostic": {
+    "source": "Exact workflow rows in the current local pg-mem snapshot; no credentials or raw payload emitted",
+    "frontier_created_at": "2026-09-20T18:40:42.499Z",
+    "paired_action_sequence": 12,
+    "paired_action_observed_at": "2026-09-20T18:40:41.980Z",
+    "paired_settlement_count": 13,
+    "newer_action_sequence": 13,
+    "newer_action_observed_at": "2026-09-20T18:40:42.981Z",
+    "newer_settlement_count": 17,
+    "paired_settlements_are_exact_prefix": true,
+    "both_workflow_states": "running",
+    "same_native_plan_and_clock_origin": true,
+    "clock_tick_monotonic": true,
+    "interpretation": "The observed rows support a critical-lane append overtaking the environment projection during frontier construction. They do not prove which internal comparison executed at the instant of the failed request."
+  },
+  "source_fix": {
+    "file": "server/services/environment-connectors/temporal-plans/temporal-checkpoint-evidence.ts",
+    "change": "For the latest running action event, accept an append-only settlement extension whose complete paired prefix remains hash-identical; keep the environment event as the exact checkpoint anchor and retain all state, identity, plan, clock, hash and freshness checks.",
+    "adversarial_test": "Truncated or changed checkpoint prefix, stopped workflow and manual takeover still fail closed.",
+    "live_status": "packaged in the subsequent package swap; not live exercised"
+  },
+  "subsequent_package_swap": {
+    "package": "apps/desktop/release-nav-eq-prefix-20260920/win-unpacked",
+    "runtime_tree_verdict": "PASS",
+    "runtime_manifest_sha256": "ef9cc2c34faa1496b5af86b7a9102c2cdcc9cea0846f2bb81a59e3b356997e0c",
+    "staged_server_service_sha256_prefix": "362960e3b1a5",
+    "current_main_pid_at_swap": 33836,
+    "running_exe_path_verified": true,
+    "mcp_device_check_after_swap": "succeeded; connector online and probe-ready",
+    "live_prefix_fix_exercised": false,
+    "retained_rollback": "apps/desktop/release-nav-eq-diagnostic-20260920/win-unpacked",
+    "recycled_superseded_build": "apps/desktop/release-nav-eq-heartbeat-20260920",
+    "recycle_method": "Windows Recycle Bin after exact target and process-path verification; recoverable",
+    "active_completed_nav_eq_packages_after_cleanup": 2,
+    "minecraft_and_fabric_server_stopped": false
+  },
+  "verification": {
+    "focused_temporal_tests": "23/23 PASS",
+    "server_build": "PASS with four unrelated duplicate-key/case warnings",
+    "helix_ask_discipline_quick": "PASS; no Ask-sensitive files classified",
+    "environment_docs_audit": "PASS; zero failures"
+  },
+  "next_required_work": [
+    "Repeat the in-motion handoff on the newly packaged prefix-preserving verifier; packaging and component tests are not live proof.",
+    "Require a measured endpoint/pose postcondition for route success, since v13 native sequence completion did not establish the predicted destination.",
+    "Admit and retain one guarded successor before claiming any rolling handoff; then pursue the three-successor, reroute, interrupt, reconnect and revocation exits."
+  ],
+  "maturity": "specified"
+}

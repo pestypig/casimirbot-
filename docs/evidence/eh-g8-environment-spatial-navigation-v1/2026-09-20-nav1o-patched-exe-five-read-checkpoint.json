@@ -1,0 +1,33 @@
+{
+  "schema": "helix.nav1o_patched_exe_five_read_checkpoint.v1",
+  "date": "2026-09-20",
+  "runtime_exe_sha256": "BF93EB7B9F8E5A7618066B21D1CFD5F0D996721C6F757FACBF4B3D0AB17FDF37",
+  "service_instance_ref": "service_instance:8c061787ca3954283abdee04f92bdc43",
+  "source_world_id": "minecraft:local:combat-c0",
+  "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+  "read_authority": "existing authenticated room observation binding; no active Player Embodiment grant",
+  "probe": {"kind": "perception_snapshot", "horizontal_radius": 2, "vertical_radius": 2, "include_navigation_collision": true},
+  "observations": [
+    {"n": 1, "evidence_ref": "environment_probe_evidence:19fd6ecff9e0ae0e7df6a2d163e135ed8720966b", "game_tick": 17909711, "external_wall_ms": 2321, "native_capture_ms": 2.05},
+    {"n": 2, "evidence_ref": "environment_probe_evidence:9494797f613730e3633062fe1f7a0a09df7c7c9e", "game_tick": 17909753, "external_wall_ms": 1807, "native_capture_ms": 1.23},
+    {"n": 3, "evidence_ref": "environment_probe_evidence:e68efb5fa5dcf690510f19dc6e44503f6979640f", "game_tick": 17909793, "external_wall_ms": 2300, "native_capture_ms": 1.33},
+    {"n": 4, "evidence_ref": "environment_probe_evidence:d1f8377381f48bb06e220b967f33a7b26f15282c", "game_tick": 17909830, "external_wall_ms": 1754, "native_capture_ms": 4.02},
+    {"n": 5, "evidence_ref": "environment_probe_evidence:3ab9b2b9af9d543835bd844bfafb4de864040426", "game_tick": 17909870, "external_wall_ms": 2069, "native_capture_ms": 1.4}
+  ],
+  "shared_result": {
+    "all_five_outcomes": "succeeded",
+    "replay_cells_per_read": 125,
+    "empty_cells_per_read": 100,
+    "explicitly_unsupported_cells_per_read": 25,
+    "unknown_or_unsupported_treated_as_traversable": false,
+    "stationary_position": [-3, 65, -3.7],
+    "health": 20,
+    "nearby_entities": 0,
+    "nearby_hazards": 0,
+    "external_wall_median_ms": 2069,
+    "native_capture_median_ms": 1.4
+  },
+  "timing_caveat": "External MCP wall time and native capture duration measure different paths. These five exploratory reads are not a reliability SLO or simultaneous moving-sensor proof.",
+  "action_during_series": false,
+  "claim_ceiling": "Matched installed EXE stationary NAV1-O read repeatability only; full NAV1 and NAV-EQ remain open."
+}

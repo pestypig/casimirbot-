@@ -11,7 +11,8 @@ import { preparationIntentsFor } from "../services/environment-connectors/sessio
 import { PreparationIntentError, PREPARATION_INTENT_FAILURES } from "../services/environment-connectors/session/preparation-intent-store";
 import { prepareBrowserEnvironmentSession } from "../services/environment-connectors/session/prepare-browser-session";
 import { EnvironmentSessionPreparationError } from "../services/environment-connectors/session/preparation-error";
-import { admitTemporalPlan } from "../services/environment-connectors/temporal-plans/temporal-plan-admission";
+import { admitDirectTemporalPlan, admitTemporalPlan } from "../services/environment-connectors/temporal-plans/temporal-plan-admission";
+import { createDirectMcpTemporalContext } from "../services/environment-connectors/temporal-plans/direct-mcp-temporal-context";
 import { temporalPlanErrorProjection } from "../services/environment-connectors/temporal-plans/temporal-plan-error";
 import { isEnvironmentActionBrokerError } from "../services/environment-connectors/actions/action-broker";
 import { temporalAdmissionRequestMetadataSchema } from "../services/environment-connectors/temporal-plans/temporal-admission-request-schema";
@@ -3304,8 +3305,11 @@ const registerEnvironmentTransitionShadowTools = (server: McpServer): void => {
   server.registerTool("helix_minecraft_actor_status", {
     title: "Read the selected Minecraft actor status",
     description:
-      "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The result also carries a separately labeled same-revision perception snapshot compatibility observation for clients whose MCP catalog has not yet refreshed; callers should still refresh their catalog to use the dedicated situation-probe tool. Both observations are evidence for Codex re-entry, never assistant answers or terminal authority.",
-    inputSchema: z.object({ room_id: helixSharedLiveRoomIdSchema }).strict(),
+      "Requests one fresh, read-only actor-status observation through the authenticated room, selected player subject, active connector, and exact probe schema. The result also carries a separately labeled same-revision perception snapshot compatibility observation for clients whose MCP catalog has not yet refreshed. An explicit include_navigation_collision opt-in applies only to that perception snapshot; default reads do not capture collision data. Callers should still refresh their catalog to use the dedicated situation-probe tool. Both observations are evidence for Codex re-entry, never assistant answers or terminal authority.",
+    inputSchema: z.object({
+      room_id: helixSharedLiveRoomIdSchema,
+      include_navigation_collision: z.boolean().optional(),
+    }).strict(),
     outputSchema: minecraftActorStatusOutputSchema,
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     _meta: oauthToolMeta(HELIX_MINECRAFT_STATUS_MCP_SCOPES),
@@ -3413,6 +3417,7 @@ export type HelixMcpToolLifecycleObservation = Readonly<{
 export const createHelixMcpServer = (input: {
   principal: HelixAgentApiPrincipal;
   surface?: "full" | "local_supervisor_coordination";
+  toolListChangedNotificationsDeliverable?: boolean;
   service?: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
   reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
@@ -4956,6 +4961,79 @@ export const createHelixMcpServer = (input: {
         }),
       );
     }
+    server.registerTool(
+      "helix_environment_temporal_plan_submit_direct",
+      {
+        title: "Submit a direct-client Minecraft temporal plan",
+        description: "Submits a caller-authored serial plan through the authenticated MCP client session, current room/run membership, fresh perception, finite Player Embodiment authority, and the existing compiler/broker. It does not bind or steer a Codex chat, authenticate a provider thread, grant action authority, or prove execution by its admission receipt.",
+        inputSchema: z.object({
+          goal_id: localSupervisorContinuationSchema,
+          expected_revision: z.number().int().nonnegative(),
+          frontier_id: localSupervisorContinuationSchema,
+          probe_request_id: localSupervisorContinuationSchema,
+          prior_turn_id: localSupervisorContinuationSchema,
+          request: temporalAdmissionRequestMetadataSchema,
+          plan: helixEnvironmentTemporalPlanSchema,
+          mutation_scope: helixMinecraftFluidMutationScopeSchema,
+          resource_bindings: z.record(z.string().min(1).max(160), z.enum(HELIX_MINECRAFT_REACTIVE_RESOURCES)).optional(),
+          checkpoint: z.object({ event_id: localSupervisorContinuationSchema,
+            checkpoint_id: localSupervisorContinuationSchema }).strict().optional(),
+        }).strict(),
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+        _meta: oauthToolMeta(HELIX_MINECRAFT_ACTION_MCP_SCOPES),
+      },
+      args => callLocalSupervisorTool(HELIX_MINECRAFT_ACTION_MCP_SCOPES, async () => {
+        requireAllAgentScopes(HELIX_MINECRAFT_ACTION_MCP_SCOPES);
+        requireCurrentRoomFeature();
+        const profileRef = input.principal.accountProfileId;
+        const authenticatedMcpClientRef = requireLocalSupervisorClientRef();
+        const accountSessionId = input.principal.accountContext.session_id;
+        if (!accountSessionId ||
+            (!isAuthenticatedNativeDesktopPrincipal() && !input.principal.tokenExpiresAt)) {
+          throw new HelixAgentApiServiceError(403, "direct_mcp_session_unavailable",
+            "A current authenticated MCP client session is required for direct execution.", false);
+        }
+        const roomId = args.request.room_id;
+        const runId = args.request.run_id;
+        const participantId = await resolveSelfParticipantId(roomId);
+        const verifyCurrent = async () => {
+          requireCurrentRoomFeature();
+          if (await resolveSelfParticipantId(roomId) !== participantId ||
+              !roomBindingStore.listRunPreparationCandidates ||
+              !(await roomBindingStore.listRunPreparationCandidates({
+                owner: roomOwner, roomId, participantId, runId,
+              })).some(candidate => candidate.runId === runId)) {
+            throw new HelixAgentApiServiceError(409, "direct_mcp_run_unverified",
+              "The exact room participant and run are no longer current.", false);
+          }
+        };
+        const direct = createDirectMcpTemporalContext({
+          serviceInstanceRef: coordinationStore.serviceInstanceRef,
+          profileRef, authenticatedMcpClientRef, accountSessionId,
+          roomId, runId, participantId,
+          authorizationExpiresAt: isAuthenticatedNativeDesktopPrincipal()
+            ? null : input.principal.tokenExpiresAt!,
+          verifyCurrent,
+        });
+        await direct.verifyAssociation(direct.association);
+        const receipt = await admitDirectTemporalPlan({
+          preflight: { context: { profileId: profileRef, participantId,
+            roomId, runId, goalId: args.goal_id, expectedRevision: args.expected_revision,
+            turnId: args.request.turn_id, probeRequestId: args.probe_request_id,
+            priorTurnId: args.prior_turn_id },
+            association: direct.association, plan: args.plan, frontierId: args.frontier_id,
+            compilation: { target: "serial", options: { mutation_scope: args.mutation_scope,
+              resource_bindings: args.resource_bindings } } },
+          request: { ...args.request, participant_id: participantId },
+          checkpoint: args.checkpoint ? { eventId: args.checkpoint.event_id,
+            checkpointId: args.checkpoint.checkpoint_id } : undefined,
+        }, direct.verifyAssociation);
+        return { ok: true, receipt, execution_context_kind: "authenticated_mcp_client_session",
+          provider_task_verified: false, room_steering_authority: false,
+          answer_authority: false, assistant_answer: false, terminal_eligible: false,
+          raw_content_included: false, reentry_required: true, admission_not_execution_proof: true };
+      }),
+    );
     async function refreshSupervisorPresence(rawArgs: z.infer<typeof supervisorPresenceSchema>) {
         requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES);
         const identity = localSupervisorIdentity(rawArgs.client_continuation_ref);
@@ -5564,10 +5642,12 @@ export const createHelixMcpServer = (input: {
         // router has been packaged. A native executor may still override these
         // fields below if it truthfully reports a non-stable transition.
         reconnect_required: false as const,
-        catalog_refresh_required: false as const,
+        catalog_refresh_required:
+          input.toolListChangedNotificationsDeliverable === false,
         stable_scope_routing: true as const,
         shared_live_room_catalog_pre_advertised: true as const,
-        tool_list_changed_supported: true as const,
+        tool_list_changed_supported:
+          input.toolListChangedNotificationsDeliverable !== false,
         authority_limited_to_tunnel_transport: true as const,
         environment_authority_granted: false as const,
         trading_authority_granted: false as const,
@@ -5590,12 +5670,18 @@ export const createHelixMcpServer = (input: {
           ...transitionOutputFlags,
           ...(outcome ? {
             reconnect_required: outcome.reconnectRequired,
-            catalog_refresh_required: outcome.catalogRefreshRequired,
+            catalog_refresh_required:
+              outcome.catalogRefreshRequired ||
+              input.toolListChangedNotificationsDeliverable === false,
             stable_scope_routing: outcome.stableScopeRouting,
           } : {}),
         };
       };
       const requestToolCatalogRefresh = async (): Promise<boolean> => {
+        // The stateless JSON HTTP transport has no standalone SSE stream to
+        // carry this unscoped notification. Do not call the SDK and mistake
+        // its resolved (but undelivered) send for a client refresh receipt.
+        if (input.toolListChangedNotificationsDeliverable === false) return false;
         try {
           await server.server.sendToolListChanged();
           return true;
@@ -5870,6 +5956,7 @@ export const createHelixMcpServer = (input: {
         ["helix_local_supervisor_relay_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_local_supervisor_presence_disconnect", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_workstation_human_control_present", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_environment_temporal_plan_submit_direct", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
         ...(input.reasoningTaskBindingStore ? [
           ["helix_environment_temporal_plan_submit", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
           ["helix_environment_session_ready_up", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
@@ -10294,6 +10381,7 @@ export const createHelixMcpServer = (input: {
       ["helix_environment_goal_inspect", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_temporal_frontier_publish", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_temporal_plan_submit", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
+      ["helix_environment_temporal_plan_submit_direct", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_append", HELIX_MINECRAFT_ACTION_MCP_SCOPES],
       ["helix_environment_goal_checkpoint_hash", HELIX_SHARED_LIVE_ROOM_READ_SCOPE],
       ["helix_environment_action_authority_inspect", HELIX_MINECRAFT_STATUS_MCP_SCOPES],

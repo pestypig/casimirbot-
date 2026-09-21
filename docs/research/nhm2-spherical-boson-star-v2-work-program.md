@@ -4,7 +4,56 @@ Status: canonical program-control document.
 
 Active program gate: **G2H-E-S5-A4 — P8P observer progress and turnaround calibration**
 
-Status date: **September 4, 2026**
+Status date: **September 21, 2026**
+
+Current P8P control status: **no authenticated P=1024 turnaround result; P8Q
+STOP**. The [R39 build-only result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r39-build-fixture-result.md)
+is a fixture failure, not a numerical result. The
+[R40 stopped-disk result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r40-long-local-path-result.md)
+authenticates a retained evidence archive but not a local classification of
+its contents. The later R41-R43 proposal/review documents and external
+candidate-neutral workflow experiments do not, by themselves, close that
+evidence gap, establish a passing build-only fixture, or admit a calibration.
+The next dependency remains authenticated R39 evidence retrieval and
+classification, then an independently verified build-only correction. Only
+after those may one unchanged P=1024 attempt be separately admitted under
+valid explicit resource, permission and cost authority. The September 20
+external V4-R1 successor operating charter, SHA-256
+`5a33865e7240f4d33f27300c967e8ac44e7f996f518ed68ee1bf144d2544dc49`,
+was explicitly approved and consumed in **one** Stage-A helper attempt. Its
+[terminal result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-v4-r1-r44-terminal-result.md)
+is independently audited `R44_FAILED`: the helper's read-only boot filesystem
+prevented guest startup, no R40 archive was captured, and its stopped scheduling
+baseline was not fully restored. The original account and empty startup metadata
+were restored, but the absolute STOP timestamp remains. The helper is stopped;
+no retry or Stage B/C execution is admitted under this consumed attempt.
+The separately approved [R46 one-shot recovery](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r46-terminal-result.md)
+is also consumed as `R46_FAILED`. Its snapshot and clone were authenticated,
+but Google rejected the frozen helper-create scope spelling before any helper
+existed. The 95 safety observations and post-run Compute read found that helper
+absent; the sources remain stopped and no R40 archive was recovered. Only a
+new, independently reviewed candidate-neutral correction may be proposed.
+R47 was subsequently approved and consumed exactly once. Its helper reached
+the guest but failed at the frozen `lsblk` disk-count guard before archive
+export; the exact helper is stopped and the evidence is retained. R47 is not
+retryable. The current [R48 recovery-readiness packet](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r48-recovery-readiness.md)
+records the reviewed correction and exact final external proposal/ledger
+hashes. R48 was subsequently authorized and consumed exactly once. Its
+[terminal result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r48-terminal-result.md)
+is `R48_FAILED`: all preflight reads passed, but the detached safety child died
+before READY because the production CLI omitted the safety entry's required
+process-liveness port. The parent issued no clone/helper creation or other
+cloud mutation command, protected sources were re-read unchanged, and the R40
+archive remains unrecovered. R48 is not retryable. A locally verified additive
+R49 wrapper supplies only the missing lifecycle port; it is not yet an
+execution proposal or authorization. Batch remains the
+selected scheduler for a later unchanged P=1024 calibration, conditional on
+authenticated R39 classification, build-only PASS and a separate explicit
+resource/permission/cost authorization. Only
+`P8Q_STOP_CALIBRATION_NOT_AUTHENTICATED` applies now.
+Historical no-action statements below describe their dated
+checkpoints, not current authorization. No candidate, proof, geometry/state,
+lane, lamp, physical, propulsion or transport authority is promoted here.
 
 This document preserves the complete scientific objective while identifying the
 single gate that repository agents are permitted to treat as the current

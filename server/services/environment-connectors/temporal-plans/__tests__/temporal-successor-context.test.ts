@@ -3,6 +3,7 @@ import { newDb } from "pg-mem";
 import { afterEach, expect, it, vi } from "vitest";
 import * as database from "../../../helix-ask/realtime-room/room-store/database";
 import * as checkpoint from "../temporal-checkpoint-evidence";
+import { TemporalPlanError } from "../temporal-plan-error";
 import { readTemporalSuccessorContext } from "../temporal-successor-context";
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -29,7 +30,7 @@ it("executes scoped lookup SQL against the local database column contract", asyn
     for (const call of query.mock.results) expect(await call.value).toHaveProperty("rows");
   } finally { await db.end(); }
 });
-it.each(["valid", "no_event", "no_plan", "wrong_authority", "unverified", "older_perception", "newer_progress_same_checkpoint", "invalid_time", "invalid_tick", "no_checkpoint"])(
+it.each(["valid", "no_event", "no_plan", "wrong_authority", "unverified", "unexpected_verifier_failure", "older_perception", "newer_progress_same_checkpoint", "invalid_time", "invalid_tick", "no_checkpoint"])(
   "publishes only a scoped verified successor locator (%s)", async scenario => {
     const fixture = JSON.parse(readFileSync("minecraft/helix-fabric-player-agent/src/test/resources/compiled-rolling-walk.json", "utf8"));
     const p = fixture.source;
@@ -42,7 +43,8 @@ it.each(["valid", "no_event", "no_plan", "wrong_authority", "unverified", "older
         compilation_artifact: fixture.artifact, action_request_id: "action:test" }] });
     vi.spyOn(database, "readSharedRealtimeRoomDatabase").mockResolvedValue({ query } as any);
     const verify = vi.spyOn(checkpoint, "readTemporalCheckpointEvidence");
-    if (scenario === "unverified") verify.mockRejectedValue(new Error("temporal_checkpoint_event_hash_mismatch"));
+    if (scenario === "unverified") verify.mockRejectedValue(new TemporalPlanError("temporal_checkpoint_event_hash_mismatch"));
+    else if (scenario === "unexpected_verifier_failure") verify.mockRejectedValue(new Error("private diagnostic must not escape"));
     else verify.mockResolvedValue({ event_id: "event:test", checkpoint_id: "checkpoint:compiled-walk",
       workflow_id: "workflow:test", observed_at: scenario === "newer_progress_same_checkpoint"
         ? "2026-09-06T00:00:02Z" : "2026-09-06T00:00:00Z", world_tick_index: 100,
@@ -59,12 +61,28 @@ it.each(["valid", "no_event", "no_plan", "wrong_authority", "unverified", "older
     expect(result.available).toBe(["valid", "newer_progress_same_checkpoint"].includes(scenario));
     expect(result.execution_authority).toBe(false);
     expect(result.terminal_eligible).toBe(false);
+    const absentDiagnostics: Record<string, string> = {
+      no_event: "no_recent_player_workflow_event",
+      no_plan: "no_matching_temporal_admission",
+      wrong_authority: "temporal_plan_identity_mismatch",
+      unverified: "temporal_checkpoint_event_hash_mismatch",
+      unexpected_verifier_failure: "checkpoint_verification_unclassified",
+      no_checkpoint: "recent_workflow_has_no_source_checkpoint",
+    };
+    if (absentDiagnostics[scenario]) {
+      expect(result).toMatchObject({ reason_code: "no_current_verified_checkpoint",
+        diagnostic_code: absentDiagnostics[scenario] });
+    }
+    if (scenario === "unexpected_verifier_failure") {
+      expect(JSON.stringify(result)).not.toContain("private diagnostic");
+    }
     if (scenario === "older_perception") {
       expect(result).toMatchObject({ reason_code: "perception_precedes_verified_checkpoint" });
       expect(verify).toHaveBeenCalled();
     }
     if (["invalid_time", "invalid_tick"].includes(scenario)) {
-      expect(result).toMatchObject({ reason_code: "checkpoint_perception_clock_invalid" });
+      expect(result).toMatchObject({ reason_code: "checkpoint_perception_clock_invalid",
+        diagnostic_code: "checkpoint_perception_clock_invalid" });
     }
     if (scenario === "valid") {
       expect(result).toMatchObject({ previous_plan_id: p.plan_id, previous_plan_hash: p.plan_hash,

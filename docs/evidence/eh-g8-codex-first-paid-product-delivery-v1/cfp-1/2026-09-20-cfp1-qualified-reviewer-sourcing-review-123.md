@@ -1,0 +1,5 @@
+# CFP-1 qualified-reviewer sourcing review — 2026-09-20
+
+An independent technical reviewer read the [D11 sourcing brief](../../../work-packets/eh-g8-cfp1-qualified-reviewer-sourcing-brief-v1.md), its owner-decision-queue backlink and the cited public sites for [Brad Simon](https://www.bradsimonlaw.com/), [Legal Moves](https://legalmoveslawfirm.com/video-game-law/) and [Stripe's partner directory](https://stripe.com/partners). Verdict: **PASS for a screening brief**. The named practice descriptions match those sites; the brief correctly requires separate verification of qualifications, jurisdiction, conflicts, scope and fees, and a qualified tax/accounting reviewer where counsel does not cover that work. Local links resolve.
+
+This is not independent verification of bar standing or a professional engagement. No lead was contacted, appointed or asked for a legal, privacy, tax or financial disposition. D11 and D12 remain open; CFP-1 stays active (`specified`), CFP-2/3 blocked and G8 active. No external message, payment or setting change occurred.

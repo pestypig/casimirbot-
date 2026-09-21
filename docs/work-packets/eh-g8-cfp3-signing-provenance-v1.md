@@ -27,11 +27,16 @@ Current stage authority: `docs/helix-environment-harness-work-program-v1.md`.
 ## Admission prerequisites
 
 Require recorded CFP-1 closure and CFP-2 completion in canonical authority,
-reviewed rights for the selected monetized components, selected commercial
+reviewed rights for every planned distributed component and the selected
+paid/trial connector relationship, selected commercial
 term/trial/device/offline/expiry/refund/service terms, frozen capability IDs,
 versions and all numerical acceptance limits. Signing and feed provisioning
 are independently owned external dependencies. Mere presence of this packet,
 a passing source test, or preparation in parallel opens no implementation stage.
+
+CFP-2 completion includes a private signed [SIGNED-QUALIFICATION](eh-g8-cfp2-signed-qualification-v1.md) tuple used to prove P1/PNA2. Consume its publisher, source/artifact manifest and installed failures as inputs, but **do not reuse its EXE or signature as the customer cohort**. This packet remains responsible for a new, immutable, rights-reviewed final signed build, complete release closure/notices and coordination with the public distribution packet. CFP-4 repeats the useful-task and full lifecycle matrix on those final bytes. A changed signing identity, component or staged byte requires the applicable rights and acceptance recheck; the CFP-2 tuple is no customer-feed authorization.
+
+The controlling [CFP-1 identity/signing cash guard](eh-g8-cfp1-d07-identity-and-signing-cash-guard-owner-freeze-v1.md) conditionally selects Azure Artifact Signing Basic for a U.S. individual seller under `$15` per rolling 30 days. Before enrollment, prove the actual Individual billing account, legal-name/sold-to-address match, approved seller and public certificate identity, qualified D11 treatment, checkout/tax and least-privilege signer custody. Use an isolated SKU scope or exact reconciliation. Reserve each artifact/batch before dispatch; count every provider-billed artifact signature and conservatively count retries; prohibit overage; enforce at most 1,000 signatures per provider billing month and rolling 30 days, with routine/candidate work capped at 800 and 200 protected for same-or-newer security/rights repair. Unrelated Azure spend stays outside sponsor PBT and outside the `$15` line.
 
 Prerequisite audit:
 `docs/audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md`.

@@ -1,0 +1,7 @@
+# CFP-1 desktop dependency-rights checkpoint — 2026-09-19
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains **active (specification)**; CFP-2/3 remain **blocked**. No build, license, vendor, installer, feed or production setting changed.
+
+The [C02–C04 source inspection](2026-09-19-desktop-dependency-rights-evidence-gap-61.md) at HEAD `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93` separates 49 non-dev desktop-lockfile candidates, including 23 optional multi-platform entries, from the observed local Windows x64 native tree. It identifies the mixed sharp native package label, the older staged service hash/commit, and the absence of emitted bundler module-origin metadata. The broad client output contains 636 staged files; the earlier 100-file media crosswalk cannot account for bundled JS/MJS/CSS, host/service modules or final installer notices. These are reviewer inputs, not a shipped SBOM or license disposition.
+
+Independent read-only review reported **PASS** on counts, hashes, source/old-artifact separation, local links and C02–C04 handoffs. `npm run helix:environment-harness:docs-audit` passed with `ok: true`; scoped `git diff --check` passed. A qualified reviewer still must dispose the planned package, native, client and tunnel boundaries and notice conditions; CFP-3 later proves exact signed bytes, origin graph and customer-accessible notices. No CFP-1 rights row or release claim is closed by this checkpoint.

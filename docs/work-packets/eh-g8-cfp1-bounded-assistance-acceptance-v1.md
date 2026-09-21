@@ -68,6 +68,14 @@ cumulative limit or a movement prohibition. External removal of a target must
 be reported as an externally satisfied or changed condition, never as an
 agent-attributed success. All failed attempts remain in evidence.
 
+The [D03 technical freeze](eh-g8-cfp1-conditional-minecraft-shared-action-freeze-v1.md)
+therefore reserves player mod `0.4.13` and action-manifest adapter `0.4.12` as
+the planned stationary qualification successors. Those labels describe future
+reviewed builds; no such release artifacts exist or pass today. The installed
+proof must reject the current `0.4.12`/`0.4.11` execution path for this claim,
+and must demonstrate `stationary_target_not_ready` plus zero locomotion on the
+success and denial fixtures before the successor can be advertised.
+
 ## Exact identity manifest and proposed repeatability
 
 The source-version candidate is desktop `0.1.0-alpha.11`, Electron `43.4.0`,
@@ -75,12 +83,29 @@ Minecraft `1.21.8`, Fabric Loader `0.18.4`, Fabric API `0.136.1+1.21.8`,
 Java `21`, PlayerAgent `0.4.12`, Sensor `0.3.0`, connector core `0.2.0`.
 These are inspected source values, not a tested compatible package. No
 acceptance from the older PlayerAgent `0.4.0` receipt transfers to this set.
+The [D01 source recheck](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-personal-operation-source-version-recheck-140.md)
+also found that the `0.4.12` player package currently reports action-manifest
+adapter version `0.4.11`, whereas the sensor package/runtime adapter both
+report `0.3.0`. Treat package, manifest/protocol, adapter and catalog versions
+as distinct identity fields. Before freezing a signed cohort, align the player
+label or document and verify its intended compatibility relation using the
+actual received manifest; do not infer it from the package filename.
+
+The planned qualification tuple changes the player and action-manifest fields
+to `0.4.13` and `0.4.12` respectively, while retaining sensor `0.3.0` and core
+`0.2.0` only if their reviewed contents remain unchanged and hash-verified.
+CFP-3 must build, install and identify that tuple; source inspection of the
+current versions is only the negative baseline.
 
 Before implementation dispatch, freeze the specification/source-baseline
 manifest: selected Windows edition/build/architecture, hardware/resource
 baseline, supported client and transport/profile, source HEAD plus dirty hashes,
 input dependency versions, fixture definitions, numeric limits and required
-identity fields. Exact Windows/hardware/client selections remain open.
+identity fields. The [first-cohort compatibility target](eh-g8-cfp1-first-cohort-compatibility-target-v1.md)
+now selects Codex desktop AppX `26.915.4065.0` x64 and Windows 11 25H2 x64,
+build family 26200, as the first **qualification** tuple. The exact hardware
+floor, artifact identity and final customer-support wording remain open;
+the local package observation is not an installed task pass.
 
 After building the implementation, and before each evaluation, capture and
 freeze the per-run artifact manifest: actual machine/game allocation and client

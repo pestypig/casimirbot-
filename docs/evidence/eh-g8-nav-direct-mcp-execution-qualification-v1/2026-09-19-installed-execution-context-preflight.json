@@ -1,0 +1,90 @@
+{
+  "schema": "eh.g8.nav_eq.installed_execution_context_preflight.v1",
+  "date": "2026-09-19",
+  "installation_class": "matched unsigned development EXE with dedicated combat-c0 Fabric server and client",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "world_id": "minecraft:local:combat-c0",
+  "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+  "selected_subject": "DatDamPig",
+  "continuation_ref": "codex_task:01a03464-1f5e-7f93-bd17-e4ca8a0bec9e",
+  "run_id": "run_8d19b15d-11f0-4182-b07f-fa64ebf2b511",
+  "run_preparation_intent_id": "environment_preparation:79a5bb59b4ce9d2332ee404081bbe10a",
+  "preflight_sequence": [
+    {
+      "step": "initial_authority_inspection",
+      "player_authorities": 0,
+      "action_connector_readiness": 0,
+      "read_only_source_online_fresh_probe_ready": true
+    },
+    {
+      "step": "first_walk_only_authority_request",
+      "requested_domain_adapter": "minecraft.fabric_mod.v1",
+      "result": "internal_error",
+      "subsequent_authority_count": 0,
+      "interpretation": "The request used the read-only source adapter rather than the action adapter. Source inspection identified the mismatch; the opaque error does not prove which internal exception occurred."
+    },
+    {
+      "step": "corrected_walk_only_authority",
+      "domain_adapter": "minecraft.fabric_client.v1",
+      "action_authority_id": "environment_action_authority:3883e0cc-8f4d-4e65-8ae4-5aed12fd1e58",
+      "allowed_capability_ids": ["com.casimirbot.minecraft.player.walk"],
+      "autonomy_mode": "approved_capabilities",
+      "manual_override_policy": "cancel",
+      "lease_expires_at": "2026-09-19T22:06:01.720Z",
+      "result": "active"
+    },
+    {
+      "step": "opaque_local_action_pairing",
+      "result": "player_pairing_inbox_staged",
+      "pairing_or_credential_value_exposed": false,
+      "subsequent_connector_readiness": "ready",
+      "heartbeat_fresh": true,
+      "manifest_admitted": true
+    },
+    {
+      "step": "exact_task_registration_and_browser_preparation",
+      "registration_accepted": true,
+      "browser_preparation_targeted_current_task_and_nav_room": true,
+      "prepared_run_id": "run_8d19b15d-11f0-4182-b07f-fa64ebf2b511",
+      "verified_room_and_retained_run_presence": true,
+      "task_binding_authority": false,
+      "execution_authority_from_preparation": false
+    },
+    {
+      "step": "installed_agent_access_binding_review",
+      "verified_run_displayed": true,
+      "binding_checkbox_checked": false,
+      "bind_current_helix_chat_enabled": false,
+      "ui_reason": "The client declared tool activity only and has not declared supported steering pickup. The UI did not treat presence refresh or run preparation as task-binding approval."
+    },
+    {
+      "step": "authority_reduction_and_post_state",
+      "revoke_receipt_status": "suspended",
+      "post_revoke_visible_player_authority_count": 0,
+      "post_revoke_action_connector_readiness_count": 0,
+      "post_revoke_actor_observation_outcome": "succeeded",
+      "post_revoke_actor_observation_revision": 1789855268635,
+      "post_revoke_position": { "x": -2.1, "y": 65, "z": 7.7 },
+      "post_revoke_health": 20
+    }
+  ],
+  "source_contract_inspection": {
+    "file": "server/mcp/helix-mcp-server.ts",
+    "operation": "helix_environment_temporal_plan_submit",
+    "requires_room_feature": true,
+    "requires_exact_reasoning_binding_id_and_epoch": true,
+    "calls_verify_task_association_before_temporal_admission": true,
+    "separate_direct_execution_context_advertised": false,
+    "continuation_ready_requires_provider_transport": true,
+    "current_client_truthful_observability": "tool_activity_only"
+  },
+  "first_divergent_stage": "exact-task temporal source admission after successful actor pairing and run preparation",
+  "disposition": "Do not invent a continuation transport, bypass task association, or count ordinary bounded actions as NAV-EQ rolling temporal execution. The direct-execution context remains a product-owned prerequisite; NAV-EQ stays specified.",
+  "effects": {
+    "temporal_plan_submitted": false,
+    "player_motion": false,
+    "inventory_mutation": false,
+    "world_mutation": false,
+    "nav_eq_live_accepted": false
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schema": "helix.nav_eq_new_package_mfa_no_callback.v1",
+  "observed_at_utc": "2026-09-21T01:37:12Z",
+  "claim_ceiling": "A new, exact isolated-package device-registration intent started and the user reported another failure, but the native EXE received no OAuth callback. The browser's result for this second attempt is not yet classified, so no Auth0 error cause, registration, MCP recovery, Minecraft observation, or NAV-EQ action is claimed.",
+  "package": {
+    "path": "apps/desktop/release-nav-eq-mfa-retry-20260921/win-unpacked",
+    "exe_sha256": "10a7892a7304a2f267911df3c57bed02169dd941d898910e20cccb9d5fbc2be1",
+    "private_loopback_port": 59664,
+    "healthz_at_launch": 200
+  },
+  "attempt": {
+    "step_up_start_at_utc": "2026-09-21T01:34:22.741Z",
+    "user_report": "did not work again",
+    "native_callback_event_observed_by_01_37_12_utc": false,
+    "browser_outcome": "not_yet_classified_for_this_attempt",
+    "one_time_code_or_oauth_url_inspected": false
+  },
+  "retention": {
+    "old_prefix_package": "moved to Windows Recycle Bin after exact-path and no-running-process checks; recoverable",
+    "previous_verified_nav_package": "retained as immediate rollback",
+    "current_candidate": "running",
+    "unrelated_processes_stopped": false
+  },
+  "next_diagnostic": "Classify only the non-secret browser outcome (still on Verify Your Identity versus Auth0 generic error). If Auth0 failed before redirect, inspect the tenant-side event type and non-secret error description through an authorized administrator; do not infer a bad code from HTTP 400 alone. Use the installed Stop waiting control to invalidate this exact pending intent before any future attempt. Do not repeat OTP submissions without a new diagnostic basis.",
+  "nav_eq_maturity": "specified"
+}

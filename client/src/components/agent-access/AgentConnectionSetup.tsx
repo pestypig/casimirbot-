@@ -139,6 +139,7 @@ export function AgentConnectionSetup() {
     undefined,
     restore,
   );
+  const nativeHarnessControlAvailable = Boolean(window.casimirDesktop?.startMcpTunnel);
   const [remote, setRemote] = useState<RemoteState>({ kind: "idle" });
   const [codexPlugin, setCodexPlugin] =
     useState<DesktopCodexPluginState | null>(null);
@@ -610,6 +611,22 @@ export function AgentConnectionSetup() {
     : !status?.verified_run_association
       ? "For Minecraft, prepare a room below and wait for a verified run before binding. Chat-only binding remains optional."
       : "Review and bind the current Helix chat to this exact AI task. This is a user consent action.";
+  const bindingDisabledReason = !status ? null
+    : !activeChatId
+      ? "Open or create a Helix chat before binding."
+      : remote.kind === "loaded" && remote.readFailed === true
+        ? "The latest connection check failed. Use Recheck connection; the control will enable after a current read succeeds."
+        : !status.client_session_ref
+          ? "This AI task has not checked in to the current harness session yet."
+          : !status.readiness.agent_ready
+            ? "This exact AI task has not passed the current connection check yet."
+            : status.readiness.continuation_readiness === "unavailable"
+              ? connectedToolActivityOnly
+                ? "This task declared tool activity only, so Helix cannot send steering to it. The AI client must publish continuation-ready presence."
+                : "Steering pickup is not currently available. Keep this panel open while the same AI task refreshes its presence."
+              : bindingBusy
+                ? "The current binding request is still being processed."
+                : null;
 
   const waitingForSessionSetup = (setup.viewedStep === "ready" || setup.viewedStep === "check") &&
     status?.readiness.client_authorization === "active" &&
@@ -780,6 +797,17 @@ export function AgentConnectionSetup() {
       onboardingPhase === "checking_readiness"
     )
       return;
+    if (!nativeHarnessControlAvailable) {
+      revealBindingAfterStart.current = false;
+      pendingHarnessStart.current = false;
+      setOnboardingPhase("checking_readiness");
+      setOperationError(null);
+      setDiagnosticStatus(
+        "This browser panel cannot start the installed private MCP tunnel. It can only check the CasimirBot service at this page's address. Open Agent Access inside the installed CasimirBot app to start the harness, or use MCP to present that native panel; existing task bindings are unchanged.",
+      );
+      await refresh(setup.selectedProfile ?? "codex_app", setup.viewedStep);
+      return;
+    }
     setOnboardingPhase("starting_native_harness");
     revealBindingAfterStart.current = true;
     pendingHarnessStart.current = false;
@@ -1273,7 +1301,7 @@ export function AgentConnectionSetup() {
                 ? "Starting harness…"
                 : onboardingPhase === "checking_readiness"
                   ? "Checking connection…"
-                  : "Start Harness"}
+                  : nativeHarnessControlAvailable ? "Start Harness" : "Check current service"}
             </button>
           ) : null}
           <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300">
@@ -1291,6 +1319,11 @@ export function AgentConnectionSetup() {
       >
         {currentCopy.body}
       </p>
+      {!nativeHarnessControlAvailable ? (
+        <p className="mt-2 rounded-lg border border-amber-300/20 bg-amber-400/5 p-3 text-xs leading-5 text-amber-50/85">
+          Browser view: this page can check only the service at its current address. Starting the private MCP tunnel and binding its exact AI task must be done in the installed CasimirBot Agent Access panel. MCP can bring that native panel forward without approving anything.
+        </p>
+      ) : null}
       {nativeTrustControl}
 
       {setup.viewedStep === "choose" ? (
@@ -1330,7 +1363,7 @@ export function AgentConnectionSetup() {
                 ? "Starting harness…"
                 : onboardingPhase === "checking_readiness"
                   ? "Checking connection…"
-                  : "Start Harness"}
+                  : nativeHarnessControlAvailable ? "Start Harness" : "Check current service"}
             </button>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -1649,6 +1682,7 @@ export function AgentConnectionSetup() {
               data-helix-interaction-kind="human_only"
               data-helix-authority-state="client_local"
               type="button"
+              aria-describedby={bindingDisabledReason ? "reasoning-binding-disabled-reason" : undefined}
               disabled={
                 !activeChatId ||
                 (remote.kind === "loaded" && remote.readFailed === true) ||
@@ -1666,6 +1700,11 @@ export function AgentConnectionSetup() {
                   ? "Replace binding"
                   : "Bind current Helix chat"}
             </button>
+            {bindingDisabledReason ? (
+              <p id="reasoning-binding-disabled-reason" className="w-full text-amber-100" role="status">
+                {bindingDisabledReason}
+              </p>
+            ) : null}
             {reasoningBinding ? (
               <button
                 data-helix-control-id="workstation.panel.agent-access.agent-connection-setup.check-reasoning-binding"

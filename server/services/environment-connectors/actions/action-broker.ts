@@ -5,6 +5,7 @@ import { closeTemporalEpochGapSql } from "./temporal-epoch-gap";
 import { reactiveCheckpointMeasurementsValid } from "./reactive-checkpoint-measurements";
 import { serializeHelixEnvironmentPlanHashContent, canonicalEnvironmentTimeValue, helixEnvironmentTimeSha256, helixEnvironmentAffordanceFrontierSchema } from "@shared/helix-environment-time";
 import { retainTemporalAdmission } from "../temporal-plans/temporal-admission-retention";
+import { verifyRegisteredDirectMcpTemporalAssociation } from "../temporal-plans/direct-mcp-temporal-registry";
 import { publishTemporalAdmission } from "./temporal-admission-publication";
 import { readTemporalPublicationClock, measureTemporalProposalReceipt } from "../temporal-plans/temporal-publication-clock";
 import { resolveTemporalEventChain, resolveTemporalResultChain, verifyTemporalResidentEffects, temporalResidentResultEffectsValid, verifyTemporalSuccessorAcceptance, retainAcceptedTemporalLease } from "../temporal-plans/temporal-event-plan";
@@ -3783,12 +3784,30 @@ export const leasePendingEnvironmentActions = async (input: {
   }, { requireLocalSnapshot: true });
 };
 
-/** Internal resident-only delivery. A route must supply the server-owned binding
- * store; a connector's claim is never used to impersonate the reasoning client. */
+/** A retained direct-client context is not a provider-thread binding. Recheck
+ * the short-lived, server-owned session handoff before publishing a successor;
+ * a missing entry after restart or expiry fails closed. */
+const temporalSuccessorAssociationCurrent = async (input: {
+  bindingStore?: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
+  profileRef: string; runId: string; roomId: string; participantId: string;
+  associationId: string; associationEpoch: number; continuationRef: string;
+}): Promise<boolean> => {
+  if (input.associationId.startsWith("direct_mcp_context:")) {
+    return verifyRegisteredDirectMcpTemporalAssociation(input);
+  }
+  if (!input.bindingStore) return false;
+  const binding = input.bindingStore.inspect({ profileRef: input.profileRef, bindingId: input.associationId });
+  return binding.status === "active" && binding.binding_epoch === input.associationEpoch &&
+    binding.run_id === input.runId && binding.provider_thread_ref_hash === crypto.createHash("sha256")
+      .update(input.continuationRef).digest("hex");
+};
+
+/** Internal resident-only delivery. A route supplies server-owned association
+ * verification; a connector's claim never impersonates a reasoning client. */
 export const leasePendingEnvironmentTemporalSuccessor = async (input: {
   claim: EnvironmentActionConnectorClaim;
   residentActionRequestId: string; predecessorPlanId: string; predecessorPlanHash: string; checkpointId: string;
-  bindingStore: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
+  bindingStore?: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
 }): Promise<HelixEnvironmentActionRequest | null> => {
   const pollReceived = readTemporalPublicationClock();
   let leaseTimingIdentity: Record<string, unknown> | undefined;
@@ -3854,10 +3873,13 @@ export const leasePendingEnvironmentTemporalSuccessor = async (input: {
     return row?.node_id === association.native_node_id && row?.checkpoint_id === association.checkpoint_id &&
       row?.tick_index === association.native_tick_index && row?.monotonic_elapsed_ns === association.workflow_monotonic_elapsed_ns;
   })) return null;
-  const binding = input.bindingStore.inspect({ profileRef: input.claim.ownerProfileId, bindingId: candidate.reasoning_binding_id });
-  if (binding.status !== "active" || binding.binding_epoch !== Number(candidate.reasoning_binding_epoch) ||
-      binding.run_id !== resident.run_id || binding.provider_thread_ref_hash !== crypto.createHash("sha256")
-        .update(candidate.client_continuation_ref).digest("hex")) return null;
+  if (!(await temporalSuccessorAssociationCurrent({
+    bindingStore: input.bindingStore, profileRef: input.claim.ownerProfileId,
+    runId: resident.run_id, roomId: resident.room_id, participantId: resident.participant_id,
+    associationId: candidate.reasoning_binding_id,
+    associationEpoch: Number(candidate.reasoning_binding_epoch),
+    continuationRef: candidate.client_continuation_ref,
+  }))) return null;
   const successor = helixEnvironmentActionRequestSchema.parse(parseJson(candidate.request_payload, null));
   if (!successor.temporal_plan || successor.temporal_plan.previous_plan_id !== input.predecessorPlanId ||
       successor.temporal_plan.previous_plan_hash !== input.predecessorPlanHash || successor.run_id !== resident.run_id ||
@@ -3889,9 +3911,13 @@ export const leasePendingEnvironmentTemporalSuccessor = async (input: {
       new Date(Math.min(Date.parse(iso(candidate.deadline_at)), Date.parse(iso(root.deadline_at)), now.getTime() + DEFAULT_LEASE_MS)).toISOString()]);
   if (updated.rows[0]) {
     leaseSqlFinishedMs = readTemporalPublicationClock().elapsed_ms;
+    const directContext = candidate.reasoning_binding_id.startsWith("direct_mcp_context:");
     leaseTimingIdentity = {
-      reasoning_binding_id: candidate.reasoning_binding_id,
-      reasoning_binding_epoch: Number(candidate.reasoning_binding_epoch),
+      execution_context_kind: directContext ? "direct_mcp_client_session" : "reasoning_task_binding",
+      temporal_association_id: candidate.reasoning_binding_id,
+      temporal_association_epoch: Number(candidate.reasoning_binding_epoch),
+      ...(directContext ? {} : { reasoning_binding_id: candidate.reasoning_binding_id,
+        reasoning_binding_epoch: Number(candidate.reasoning_binding_epoch) }),
     };
   }
   return updated.rows[0] ? requestProjection(updated.rows[0]) : null;
@@ -3930,7 +3956,7 @@ export const leasePendingEnvironmentTemporalSuccessor = async (input: {
 export const readEnvironmentTemporalDeliveryState = async (input: {
   claim: EnvironmentActionConnectorClaim;
   residentActionRequestId: string; predecessorPlanId: string; predecessorPlanHash: string; checkpointId: string;
-  bindingStore: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
+  bindingStore?: Pick<import("../../local-supervisor/reasoning-task-binding-store").HelixReasoningTaskBindingStore, "inspect">;
 }) => withSharedRealtimeRoomTransaction(async db => {
   const authority = assertAuthorityUsable(await readAuthorityConnectorRow(db, input.claim.authorityId));
   if (authority.owner_profile_id !== input.claim.ownerProfileId || authority.credential_id !== input.claim.credentialId ||
@@ -3961,10 +3987,13 @@ export const readEnvironmentTemporalDeliveryState = async (input: {
       plan?.identity?.source_id !== input.claim.sourceId || plan?.identity?.subject_id !== input.claim.subjectBindingId ||
       plan?.identity?.authority_id !== input.claim.authorityId || plan?.identity?.authority_revision !== input.claim.policyVersion ||
       plan?.previous_plan_id !== input.predecessorPlanId || plan?.previous_plan_hash !== input.predecessorPlanHash) return null;
-  const binding = input.bindingStore.inspect({ profileRef: input.claim.ownerProfileId, bindingId: row.reasoning_binding_id });
-  if (binding.status !== "active" || binding.binding_epoch !== Number(row.reasoning_binding_epoch) ||
-      binding.run_id !== resident.run_id || binding.provider_thread_ref_hash !== crypto.createHash("sha256")
-        .update(row.client_continuation_ref).digest("hex")) return null;
+  if (!(await temporalSuccessorAssociationCurrent({
+    bindingStore: input.bindingStore, profileRef: input.claim.ownerProfileId,
+    runId: resident.run_id, roomId: resident.room_id, participantId: resident.participant_id,
+    associationId: row.reasoning_binding_id,
+    associationEpoch: Number(row.reasoning_binding_epoch),
+    continuationRef: row.client_continuation_ref,
+  }))) return null;
   return { action_request_id: row.action_request_id as string, recorded_status: row.status as string,
     effects_verified: false as const, automatic_replay_allowed: false as const,
     execution_authority: false as const, answer_authority: false as const, terminal_eligible: false as const };

@@ -1,0 +1,9 @@
+# Independent CFP-1 reviewer-packet and GitHub inventory review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`), CFP-2/3 blocked. An independent read-only reviewer checked the current D11 component-rights, privacy/financial and reviewer-sourcing packets, then [authenticated GitHub inventory 148](2026-09-20-cfp1-authenticated-github-channel-inventory-148.md) and its D08/D09/C15/C10 handoffs. This is a specification/source review, not a qualified legal, tax or financial disposition.
+
+The initial D11 packet review caught an overclaim in C10: “published” could imply the read-only kit already existed as a public artifact. The coordinator changed it to a proposed registered system-clock starter **if published after review**. The reviewer rechecked and returned **PASS**. F-04 now carries the database-only versus adverse Autoscale distinction without selecting $10, and the sourcing brief records the owner's Legal Moves inquiry hold without authorizing contact.
+
+The GitHub review caught a separate authority distinction: the owner selected a **separate public binary-only release route**, while `pestypig/casimirbot-desktop-releases` is only the proposed exact repository name. After that correction, the reviewer returned **PASS**. The current source repo's public/admin state is accurately reported, and the two 404/listing results are bounded to the connected account; they do not prove global nonexistence or reserve either name. Rights, prior-install migration, channel provisioning, source visibility and CFP-1/3 stage holds remain open. Local links resolve.
+
+No external inquiry, repository mutation, payment, runtime or production setting change occurred. D07/D11/D12 remain open; CFP-1 stays active (`specified`), CFP-2/3 blocked and G8 active.

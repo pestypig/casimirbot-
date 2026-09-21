@@ -1,0 +1,37 @@
+{
+  "schema": "helix.nav_eq_native_mfa_retry_source_candidate.v1",
+  "observed_at_utc": "2026-09-21T01:18:09Z",
+  "claim_ceiling": "A failed isolated-profile Auth0 MFA challenge returned HTTP 400 before the desktop callback. A native-session-only cancel/retry recovery path is implemented and deterministically verified in source, but it is not in the running installed EXE. Device registration, private MCP transport, live Minecraft observation and NAV-EQ execution remain unverified.",
+  "failure_observation": {
+    "auth0_mfa_challenge_response_status": 400,
+    "browser_result": "Auth0 displayed a generic error page after the one-time-code form",
+    "auth0_error_cause": "not_established",
+    "isolated_exe_callback_received": false,
+    "isolated_exe_step_up_starts_utc": [
+      "2026-09-21T00:43:22.545Z",
+      "2026-09-21T00:46:44.610Z"
+    ],
+    "fresh_start_after_native_panel_reopen_observed": false,
+    "native_installed_window_observation": "The sole returned CasimirBot EXE window was on its private node at port 59664; Device & Security displayed an unregistered device, a waiting-for-Auth0 message, and a disabled Register button. The in-app browser's port 1522 had no current listener. This proves the installed window is still waiting, but does not establish which window the user's earlier click targeted.",
+    "running_exe_replaced": false,
+    "one_time_code_or_transaction_url_recorded": false
+  },
+  "source_candidate": {
+    "classification": "installed-account security admission and presentation; no Helix Ask agent-loop behavior changed",
+    "native_recovery": "Stop waiting in Device & Security calls a private, developer-session-bound cancel route and re-enables retry without MCP",
+    "effect_boundary": "Cancels pending exact-session/device intents; a new attempt supersedes old intents; canceled callbacks cannot mint an MFA receipt, including when token exchange was in flight",
+    "external_authentication": "Auth0 remains the only MFA authority; no agent completion, factor access, or callback bypass was added",
+    "runtime_maturity": "deterministically verified source candidate, not installed live acceptance"
+  },
+  "verification": {
+    "focused_files_passed": 3,
+    "focused_tests_passed": 32,
+    "desktop_typescript": "pass",
+    "server_build": "pass_with_preexisting_unrelated_warnings",
+    "client_production_build": "pass_with_preexisting_unrelated_warnings",
+    "full_repository_typecheck": "stopped_without_verdict_when_free_physical_ram_fell_below_0.5_gb",
+    "installed_runtime": "not_tested"
+  },
+  "next_boundary": "Package and test the exact source candidate on an isolated installed profile when the shared worktree and memory budget are safe. The user must start a fresh Auth0 ceremony and complete MFA privately; diagnose any repeated Auth0 HTTP 400 separately. Only after native device registration and Full Harness trust should the private MCP tunnel and Minecraft source be qualified.",
+  "nav_eq_maturity": "specified"
+}

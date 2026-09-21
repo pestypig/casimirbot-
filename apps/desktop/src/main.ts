@@ -109,6 +109,10 @@ import {
   shouldRegisterDesktopProtocol,
 } from "./auth0-account-link";
 import {
+  startAuth0LoopbackCallback,
+  type Auth0LoopbackCallbackLease,
+} from "./auth0-loopback-callback";
+import {
   buildDesktopServiceEnvironment,
   resolveDesktopUserDataOverride,
 } from "./service-environment";
@@ -195,6 +199,8 @@ let mcpFullLeaseTimer: NodeJS.Timeout | null = null;
 let mcpTransitionGeneration = 0;
 let quitting = false;
 let pendingAuth0Callback: string | null = null;
+let activeAuth0LoopbackCallback: Auth0LoopbackCallbackLease | null = null;
+let auth0LoopbackGeneration = 0;
 let pendingWorkstationGuidance:
   | Readonly<{ payload: Readonly<Record<string, unknown>>; expiresAt: number }>
   | null = null;
@@ -1069,6 +1075,32 @@ const completeDesktopAuth0Callback = async (
   }
 };
 
+const armDesktopAuth0LoopbackCallback = async (
+  runtime: DesktopRuntime,
+  authorizationUrl: string,
+): Promise<void> => {
+  const expectedState = new URL(authorizationUrl).searchParams.get("state") ?? "";
+  const generation = ++auth0LoopbackGeneration;
+  await activeAuth0LoopbackCallback?.close();
+  activeAuth0LoopbackCallback = null;
+  const lease = await startAuth0LoopbackCallback({
+    expectedState,
+    onCallback: (callbackUrl) => completeDesktopAuth0Callback(runtime, callbackUrl),
+  });
+  if (generation !== auth0LoopbackGeneration || quitting) {
+    await lease.close();
+    throw new Error("desktop_auth0_callback_cancelled");
+  }
+  activeAuth0LoopbackCallback = lease;
+};
+
+const closeDesktopAuth0LoopbackCallback = async (): Promise<void> => {
+  ++auth0LoopbackGeneration;
+  const lease = activeAuth0LoopbackCallback;
+  activeAuth0LoopbackCallback = null;
+  await lease?.close();
+};
+
 const registerDesktopIpc = (
   runtime: DesktopRuntime,
   codexIntegration: Awaited<ReturnType<typeof inspectCodexPluginIntegration>>,
@@ -1268,7 +1300,13 @@ const registerDesktopIpc = (
       ) {
         throw new Error("The Auth0 authorization request is invalid");
       }
-      await shell.openExternal(authorizationUrl);
+      await armDesktopAuth0LoopbackCallback(runtime, authorizationUrl);
+      try {
+        await shell.openExternal(authorizationUrl);
+      } catch (error) {
+        await closeDesktopAuth0LoopbackCallback();
+        throw error;
+      }
       return Object.freeze({ opened: true });
     },
   );
@@ -1317,7 +1355,13 @@ const registerDesktopIpc = (
       if (confirmation.response !== 1) {
         return Object.freeze({ opened: false, cancelled: true });
       }
-      await shell.openExternal(authorizationUrl);
+      await armDesktopAuth0LoopbackCallback(runtime, authorizationUrl);
+      try {
+        await shell.openExternal(authorizationUrl);
+      } catch (error) {
+        await closeDesktopAuth0LoopbackCallback();
+        throw error;
+      }
       return Object.freeze({ opened: true, cancelled: false });
     },
   );
@@ -1511,6 +1555,7 @@ if (!singleInstance) {
 
   app.on("before-quit", () => {
     quitting = true;
+    void closeDesktopAuth0LoopbackCallback();
     mcpTunnelRecoverySupervisor?.cancel("operator_stop");
     void mcpTunnelController?.stop();
     texturePackOverlayController?.stop("desktop_quit");

@@ -1,0 +1,34 @@
+{
+  "schema": "helix.nav_eq_direct_client_live_runtime_handoff.v1",
+  "observed_at": "2026-09-20T07:59:48Z",
+  "scope": "controlled installed-EXE handoff and read-only MCP recheck; no Minecraft movement",
+  "previous_package": "apps/desktop/release-nav1o-catalog-20260919/win-unpacked/CasimirBot.exe",
+  "new_package": "apps/desktop/release-nav-eq-20260920/win-unpacked/CasimirBot.exe",
+  "handoff": {
+    "other_task_runtime_use": "other active repository task explicitly reported no use of the running CasimirBot runtime or MCP tunnel",
+    "previous_main_process_id": 16624,
+    "previous_main_window_close": "CloseMainWindow accepted; previous CasimirBot process family exited",
+    "new_main_process_id": 21236,
+    "new_package_process_family_observed": true,
+    "local_mcp_listener_port": 51996,
+    "minecraft_client_or_server_stopped": false
+  },
+  "new_runtime_check": {
+    "device_check_schema": "helix.environment_connector.device_check_list.v1",
+    "device_check_generated_at": "2026-09-20T07:57:50.564Z",
+    "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+    "world_id": "minecraft:local:combat-c0",
+    "health": "online",
+    "freshness": "fresh",
+    "probe_ready": true,
+    "blocking_reasons": [],
+    "device_check_observation_ref": "mcp_evidence_observation:helix.environment.device_check.inspect:75ee9cc2-83ee-4260-9150-71481ffe3ff1",
+    "task_plugin_catalog_has_direct_submit_tool": false,
+    "task_plugin_catalog_has_legacy_submit_tool": true,
+    "read_preparation_result": "insufficient_scope",
+    "read_preparation_required_scope": "helix.environment_actions.write",
+    "direct_submit_attempted": false
+  },
+  "claim_ceiling": "New package is running and paired read-only health is fresh. The current Codex task has not rediscovered the direct-submit MCP tool and its current bearer lacks the action-write scope. No authority, plan admission, successor execution or NAV-EQ movement has been established."
+}

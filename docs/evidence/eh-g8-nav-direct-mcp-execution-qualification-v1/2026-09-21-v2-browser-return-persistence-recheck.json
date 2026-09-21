@@ -1,0 +1,99 @@
+{
+  "schema": "helix.environment_harness.nav_eq.connector_browser_return_recheck.v1",
+  "recorded_at": "2026-09-21T06:09:59.0060238Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "CasimirBot Device Check v2 account persistence after a normal ChatGPT OAuth browser return",
+  "lifecycle_stage": "tool admission and connector-account persistence diagnostic",
+  "reaction_timescale": "one interactive OAuth return plus immediate read-only authorization recheck",
+  "authority_owner": "the user owns connector authorization; ChatGPT owns connector-account persistence; Helix derives capability readiness from the signed client",
+  "current_maturity": "diagnostic connector checkpoint",
+  "target_maturity": "authenticated callable direct temporal MCP route",
+  "browser_observation": {
+    "surface": "ChatGPT in-app browser Plugins settings",
+    "casimirbot_device_check_listed": true,
+    "casimirbot_device_check_v2_listed": true,
+    "v2_detail_heading_visible": true,
+    "v2_full_public_action_catalog_visible": true,
+    "v2_connect_another_account_control_visible": true,
+    "v2_connected_account_row_visible": false
+  },
+  "normal_connection_attempt": {
+    "started_from_v2_plugin_detail": true,
+    "provider_choice": "Sign in with CasimirBot Device Check v2",
+    "oauth_browser_return_completed": true,
+    "temporary_chatgpt_callback_tab_closed_automatically": true,
+    "returned_to_v2_plugin_detail": true,
+    "connected_account_row_appeared": false,
+    "oauth_callback_code_or_state_retained": false,
+    "browser_history_or_callback_url_retained": false
+  },
+  "post_return_authorization_recheck": {
+    "capability_profile": "g2-action",
+    "connected_v1": {
+      "display_name": "CasimirBot Device Check",
+      "ready": true,
+      "required_scopes": [
+        "helix.rooms.read",
+        "helix.environment_actions.read",
+        "helix.environment_actions.write"
+      ],
+      "granted_required_scopes": [
+        "helix.rooms.read",
+        "helix.environment_actions.read",
+        "helix.environment_actions.write"
+      ],
+      "missing_scopes": [],
+      "recovery_action": "none",
+      "authorization_expires_at": "2026-09-21T07:09:52.560Z"
+    },
+    "v2": {
+      "display_name": "CasimirBot Device Check v2",
+      "ready": false,
+      "error_code": "USER_NOT_LOGGED_IN",
+      "connected": false
+    },
+    "credentials_or_raw_claims_included": false
+  },
+  "current_task_catalog_recheck": {
+    "connected_v1_authorization_status_callable": true,
+    "connected_v1_temporal_frontier_publish_callable": false,
+    "connected_v1_temporal_plan_submit_direct_callable": false,
+    "v2_authorization_status_callable": true,
+    "v2_temporal_frontier_publish_callable": true,
+    "v2_temporal_plan_submit_direct_callable": true,
+    "authenticated_direct_temporal_route_available": false
+  },
+  "browser_console_observation": {
+    "v2_specific_javascript_error_observed": false,
+    "generic_chatgpt_router_warnings_observed": true,
+    "generic_warnings_assigned_as_cause": false
+  },
+  "finding": {
+    "plugin_installation_or_catalog_missing": false,
+    "oauth_browser_return_missing": false,
+    "v2_connector_account_persisted": false,
+    "current_task_schema_refreshed_connected_v1_direct_tools": false,
+    "first_unresolved_stage": "ChatGPT connector-account persistence or post-exchange validation after the browser return",
+    "exact_internal_cause_claimed": false,
+    "connected_v1_preserved": true,
+    "nav_eq_maturity": "specified"
+  },
+  "safety_and_scope": {
+    "minecraft_action_attempted": false,
+    "environment_authority_changed": false,
+    "durable_run_or_goal_created": false,
+    "temporal_plan_submitted": false,
+    "desktop_or_tunnel_restarted": false,
+    "connected_v1_disconnected": false,
+    "credentials_included": false,
+    "oauth_callback_values_included": false
+  },
+  "stop_fail_criteria": [
+    "Do not invoke a direct temporal tool through the unauthenticated v2 client.",
+    "Do not diagnose a Helix source defect from a connector-side post-return failure without source-attributed evidence.",
+    "Do not substitute the ordinary Minecraft player-action route for NAV-EQ temporal compiler and broker qualification.",
+    "Do not promote NAV-EQ from this connector checkpoint."
+  ],
+  "downstream_gate_unlocked": "The plugin-list, public-catalog, and browser-return stages are ruled out as the first divergence; connector-account persistence remains the authenticated-tool boundary."
+}

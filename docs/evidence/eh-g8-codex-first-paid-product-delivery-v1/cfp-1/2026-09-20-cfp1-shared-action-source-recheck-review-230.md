@@ -1,0 +1,7 @@
+# CFP-1 shared-action source recheck review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`); CFP-2/3 blocked.
+
+An independent read-only reviewer compared [source recheck 229](2026-09-20-cfp1-shared-action-current-source-recheck-229.md) with the inspected action broker and environment room routes. It reported **PASS**: HEAD and both working-file SHA-256 values matched; the broker's membership/requester predicates still deny a guest acting on the host-paired participant with `action_policy_denied` 403; the inspected first-party room routes expose no guest native-effect request; and the concurrent NAV edit changes direct-MCP temporal successor delivery rather than those admission checks. The [D03 candidate](../../../work-packets/eh-g8-cfp1-first-paid-shared-action-candidate-v1.md) and [owner queue](../../../work-packets/eh-g8-cfp1-owner-decision-and-review-queue-v1.md) correctly keep the action conditional.
+
+The environment-harness docs audit returned `ok: true`, a targeted seven-document relative-link check found no missing links, and `git diff --check` returned no whitespace error. This review is source-snapshot validation, not a qualified commercial-rights disposition, implemented guest delegation, installed negative/positive effect test or D12 integrated claim freeze. CFP-1 remains active and no downstream stage is admitted.

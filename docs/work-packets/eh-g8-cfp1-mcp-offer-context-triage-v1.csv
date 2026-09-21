@@ -38,6 +38,7 @@
 "helix_environment_subject_select","environment","personal_candidate","","unselected","not_run","256554ca2637b2978a83616d9f9670069fdfd8c4"
 "helix_environment_temporal_frontier_publish","environment","specialist_unqualified","","unselected","not_run","256554ca2637b2978a83616d9f9670069fdfd8c4"
 "helix_environment_temporal_plan_submit","environment","specialist_unqualified","","unselected","not_run","256554ca2637b2978a83616d9f9670069fdfd8c4"
+"helix_environment_temporal_plan_submit_direct","environment","specialist_unqualified","direct_mcp_nav_qualification_only","unselected","not_run","cc5a7a4c1ac956606aea756f59e6fcb0324a9f93"
 "helix_evidence_observation_get","evidence","safety_or_status","","unselected","not_run","256554ca2637b2978a83616d9f9670069fdfd8c4"
 "helix_local_supervisor_coordination_read","local","personal_candidate","","unselected","not_run","256554ca2637b2978a83616d9f9670069fdfd8c4"
 "helix_local_supervisor_presence_disconnect","local","safety_or_status","","unselected","not_run","256554ca2637b2978a83616d9f9670069fdfd8c4"

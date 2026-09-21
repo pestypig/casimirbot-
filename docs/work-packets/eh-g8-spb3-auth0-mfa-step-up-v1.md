@@ -178,6 +178,41 @@ provider enrollment, provider traffic, public MCP grant, or billable authority.
 Auth0 production-tier selection for TOTP remains a release dependency for a
 public pilot and does not transfer this development-tenant evidence to SPB-4.
 
+## Isolated-profile retry gap — 2026-09-21
+
+The 2026-09-21 isolated-profile NAV preflight found a retryability gap outside
+the earlier one-node live acceptance tuple: an Auth0 MFA challenge returned
+HTTP 400 before callback, leaving the native Device & Security UI waiting with
+its Register control disabled. The
+[NAV recovery checkpoint](../evidence/eh-g8-nav-direct-mcp-execution-qualification-v1/2026-09-21-native-mfa-retry-source-candidate.json)
+records a source-only, deterministically verified cancel/retry candidate. It
+preserves the existing MFA and receipt authority; the running installed EXE
+has not yet been updated or live-tested with this recovery. Do not extend the
+earlier SPB-3 live-accepted claim to this new retry path.
+
+The later [isolated package smoke](../evidence/eh-g8-nav-direct-mcp-execution-qualification-v1/2026-09-21-mfa-retry-isolated-package-smoke.json)
+verified that the cancel/retry candidate is in a separately named unsigned
+development EXE and that its disposable-profile launch and packaged runtime
+tree pass. This supersedes only the sentence above describing the running
+package as old: the candidate now runs the isolated NAV profile, with the
+previous verified EXE retained as rollback. At 01:34:22.741Z a fresh
+registration intent reached that package. The user reported another Auth0
+failure before any native callback event appeared. The Auth0-side cause remains
+unverified, and neither the retry button's live effect nor device registration
+has been accepted on this tuple. The original SPB-3 live acceptance remains
+limited to its earlier exact installed-node evidence.
+
+The later [network and callback-route preflight](../evidence/eh-g8-nav-direct-mcp-execution-qualification-v1/2026-09-21-auth0-network-and-callback-route-preflight.json)
+found basic Auth0 HTTPS reachability and no meaningful workstation-to-Auth0
+clock skew. The latest challenge POST and tenant event remain unclassified.
+Separately, the isolated profile cannot receive the global custom-protocol
+callback because the registered handler targets the previous EXE. A
+current-source native guard now refuses to open Auth0 unless this non-isolated
+instance owns that callback route; both UIs explain the failure and the MFA
+intent is cancelled. It passed 32 focused tests and desktop
+typecheck, but has not been packaged or live accepted. This does not revise
+the original SPB-3 accepted tuple or diagnose the upstream HTTP 400.
+
 ## Stop/fail criteria
 
 - Auth0 configuration or tenant policy does not return a signed MFA claim.

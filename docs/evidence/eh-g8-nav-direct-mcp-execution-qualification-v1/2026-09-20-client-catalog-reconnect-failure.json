@@ -1,0 +1,28 @@
+{
+  "schema": "eh_g8_nav_eq_client_catalog_reconnect_failure.v1",
+  "date_utc": "2026-09-20",
+  "plugin": "CasimirBot Device Check v2",
+  "direct_action_in_refreshed_plugin_settings": true,
+  "direct_action_in_current_codex_callable_catalog": false,
+  "reconnect_attempt": {
+    "entry_point": "Connected plugin settings > Plugin actions > Reconnect",
+    "method": "existing Google sign-in",
+    "visible_result": "We couldn't connect this account. Please try again.",
+    "stable_failure_code": "owner_profile_id_missing"
+  },
+  "existing_connection_after_failure": {
+    "helix_room_list_succeeded": true,
+    "device_check_generated_at": "2026-09-20T08:19:00.342Z",
+    "source_health": "online",
+    "source_freshness": "fresh",
+    "probe_ready": true,
+    "action_authority_count": 0,
+    "connector_action_readiness_count": 0
+  },
+  "limits": [
+    "The callback failure is not attributed to a specific CasimirBot or ChatGPT component without further evidence.",
+    "A working pre-existing read session does not imply a successful reconnect or a refreshed callable action catalog.",
+    "The old room-binding-required temporal action was not used as a substitute for the unavailable direct action.",
+    "No run, Player Embodiment authority, temporal plan or motion was created; NAV-EQ remains specified."
+  ]
+}

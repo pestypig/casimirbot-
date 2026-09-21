@@ -5,8 +5,8 @@ Lifecycle stage: tool admission; source admission
 Reaction timescale: short semantic replanning; bounded native execution where applicable
 Authority owner: Account/room-policy implementer; independent authorization reviewer
 Current maturity: specified
-Target maturity: deterministically verified and separately recorded ordinary-user diagnostic acceptance within the frozen scope
-Required evidence: canonical CFP-1 closure, approved rights/terms and acceptance freeze, exact installed evaluation identity, assigned files and resources, positive and negative scoped results
+Target maturity: deterministically verified with separately recorded ordinary-user signed-evaluation acceptance within the frozen scope
+Required evidence: canonical CFP-1 closure, approved rights/terms and acceptance freeze, CFP-2.SIGNED-QUALIFICATION tuple for signed-install cases, assigned files and resources, positive and negative scoped results
 Explicit non-goals: no dispatch from this draft, verified purchase claim, production license bypass, publication, commercial permission, bundled reasoning runtime or broader G8 promotion
 Downstream gate unlocked: CFP-3 only after all CFP-2 component evidence is reviewed by the coordinator
 
@@ -31,11 +31,17 @@ expiry or purchase may become a requirement for the personal customer path.
 
 The [CFP-1 source-catalog worksheet](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-mcp-source-catalog-11.csv) is an unselected registration inventory, not an ordinary-user allowlist. Consume only owner-selected supported-offer rows with exact handler, capability, version and acceptance mapping; account-policy work must also preserve truthful unavailable/shadow catalog states and the broader G8 parity obligation. Do not infer that all source registrations belong to the first personal pilot.
 
-Read [CFP-1](eh-g8-cfp1-product-rights-and-offer-contract-v1.md), the [personal/hosted capability-boundary proposal](eh-g8-cfp1-personal-hosted-capability-boundary-v1.md), the [controlling task proposal](eh-g8-cfp1-bounded-assistance-acceptance-v1.md), [route and primitive inspection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md), and [CFP-0 audit](../audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md). Freeze exact versions/hardware/fixtures, final numeric limits, owners and source hashes before dispatch. The earlier six-resource collection proposal is not this task.
+Read [CFP-1](eh-g8-cfp1-product-rights-and-offer-contract-v1.md), the [personal/hosted capability-boundary proposal](eh-g8-cfp1-personal-hosted-capability-boundary-v1.md), the [P1 free personal connection profile](eh-g8-cfp1-free-personal-codex-connection-profile-v1.md), the [D02 finite session/grant proposal](eh-g8-cfp1-public-session-and-client-grant-lifecycle-decision-v1.md) **after account/security freeze**, the [public account/device/offline decision](eh-g8-cfp1-public-account-device-and-offline-policy-decision-v1.md) after its owner/security freeze, the [controlling task proposal](eh-g8-cfp1-bounded-assistance-acceptance-v1.md), [route and primitive inspection](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/public-room-and-primitive-feasibility-addendum.md), and [CFP-0 audit](../audits/eh-g8-cfp0-repository-release-gap-audit-2026-09-06.md). Freeze exact versions/hardware/fixtures, final numeric limits, owners and source hashes before dispatch. The earlier six-resource collection proposal is not this task.
 
 Minecraft EULA/Usage Guidelines commercialization and indirect product-access restrictions require review of the full design, including evaluation admission. No free-mod/paid-harness separation or test fixture establishes permission. Required approval of that boundary cannot be substituted by an engineering test. Existing independently authorized environment packets retain their own scope.
 
 CFP-2 proves free ordinary-user personal capability with trusted profile/node, client scope, owner/target consent and effect authority. No purchase, expiring trial or commercial/evaluation software grant is required. Test fixture isolation is not customer eligibility. CFP-3 adds hosted grants only to hosted requests; repeat never-subscribed and expired-hosted personal journeys in CFP-3/4.
+The current device store's same-ID registration conflict path can reactivate a
+revoked device without advancing `recovery_generation`. The selected account
+policy must make every same-ID reactivation reject or advance/fence that
+generation atomically. Test revoked same-ID `registerDevice` as well as the
+explicit recovery route; old MCP, source and effect authority must remain
+denied after either path.
 
 ## Work and file ownership
 
@@ -65,4 +71,4 @@ Any generic purchaser room unlock, role promotion, forged evaluation grant, cros
 
 Each run records its exact installation class, runtime/client/companion versions and hashes, source HEAD plus relevant dirty hashes, grant provenance, expected/actual results, complete trial count, timings, effect and observation references, first divergence, representative failures and not-run surfaces. Write new immutable artifacts under docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-2/<task-id>/<run-id>/. Keep previous failed cohorts. No secret, private reasoning or raw account store belongs in exports.
 
-A distinct reviewer checks bounds and evidence before handoff. Parent CFP-2 closure requires all three child results; a child does not advance G8, publish, charge or change source visibility. Unresolved technical prerequisites return to their owning packets.
+A distinct reviewer checks bounds and evidence before handoff. Parent CFP-2 closure requires all four child results, including [SIGNED-QUALIFICATION](eh-g8-cfp2-signed-qualification-v1.md); a child does not advance G8, publish, charge or change source visibility. Unresolved technical prerequisites return to their owning packets.

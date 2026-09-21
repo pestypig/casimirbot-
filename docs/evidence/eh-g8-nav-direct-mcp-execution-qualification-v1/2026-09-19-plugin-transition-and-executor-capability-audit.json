@@ -1,0 +1,46 @@
+{
+  "schema": "eh.g8.nav_eq.plugin_transition_and_executor_capability_audit.v1",
+  "date": "2026-09-19",
+  "continuation_ref": "01a03464-1f5e-7f93-bd17-e4ca8a0bec9e",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+  "service_instance_ref": "service_instance:46128165103faa688d0c2ed54ebd85fb",
+  "installed_read_observations": {
+    "device_check_v2_succeeded": true,
+    "combat_c0_fabric_source_online_fresh_probe_ready": true,
+    "full_mcp_transition_initial_state": "required",
+    "governed_transition_request_ref": "desktop_tunnel_request:f1cba05e-6f19-4018-ac37-0e2f4f12309c",
+    "trusted_device_delegation_applied": true,
+    "transition_execute_receipt": "desktop_tunnel_receipt:066f9cf9-03b7-42fa-b85a-c2f51c0abc65",
+    "transition_scope": "full_helix_agent",
+    "post_transition_action_authority_inspection_succeeded": true,
+    "post_transition_visible_player_authorities": 0,
+    "post_transition_connector_readiness_entries": 0
+  },
+  "source_contract_inference_not_live_rejection": {
+    "serial_target_requires_action_kind": "execute_sequence",
+    "executor_capability_id": "com.casimirbot.minecraft.player.sequence.execute",
+    "catalog_conditions": [
+      "policy_listed",
+      "native_fabric_available",
+      "start_deadline_supported"
+    ],
+    "policy_listed_derived_from_authority_allowed_capability_ids": true,
+    "prior_walk_only_lease_would_not_satisfy_serial_executor_catalog_gate": true,
+    "missing_executor_gate_reason_if_reached": "temporal_plan_executor_unavailable",
+    "source_refs": [
+      "server/services/environment-connectors/temporal-plans/temporal-plan-preflight.ts:40",
+      "server/services/environment-connectors/actions/action-broker.ts:3074",
+      "shared/helix-minecraft-player-capabilities.ts:46"
+    ]
+  },
+  "limits": {
+    "plugin_settings_change_directly_verified": false,
+    "native_manifest_execution_features_live_verified": false,
+    "exact_task_direct_execution_context_available": false,
+    "temporal_plan_submitted": false,
+    "player_motion": false,
+    "nav_eq_live_accepted": false
+  },
+  "disposition": "The authenticated plugin and full tunnel transport work. NAV-EQ still needs a separately verified direct execution context and, for a serial plan, finite policy admission of the sequence executor plus the intended movement actions. No gameplay authority was inferred from transport access."
+}

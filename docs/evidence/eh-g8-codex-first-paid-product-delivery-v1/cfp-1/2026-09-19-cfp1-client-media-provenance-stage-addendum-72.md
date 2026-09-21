@@ -1,0 +1,9 @@
+# CFP-1 client media provenance checkpoint — 2026-09-19
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains **active (specification)**; CFP-2/3 remain **blocked**. This is a rights-review input, not a rights disposition, installed release acceptance or authorization to distribute. No source asset, builder, runtime, account, commerce, release or production setting changed.
+
+The [client-public media provenance analysis](2026-09-19-client-public-media-git-provenance-leads-71.md) and [36-row Git trail](2026-09-19-client-public-media-git-provenance-leads-70.csv) connect the previously recorded media byte crosswalk to source files and first recorded additions. All 36 inspected `client/public` hashes match the earlier crosswalk. The seven first-add commits use the owner-identified `pestypig` Git author identity; Git custody does not prove artwork, model, sound or brand creation, or commercial redistribution rights. The analysis separates 36 source items from the other 64 package-derived font/WASM assets and from unmapped bundled libraries.
+
+The [C01–C15 component rights submission](../../../work-packets/eh-g8-cfp1-component-rights-review-submission-v1.md) now directs C03 and C14 reviewers to these per-file leads. Creator/generation inputs, any outside source or contributor agreement, distribution scope, notices and exact retained bytes still need evidence, replacement or exclusion and a qualified review disposition. Broad `dist/public` staging is not an allowlist. CFP-3 must verify the exact selected signed artifact later; this inspection does not promote any customer media claim.
+
+Independent read-only review verified the 36 hashes, Git trail, seven-commit grouping, metadata leads, analysis links and limited stage language with **PASS**. The CFP-1 owner scope, hosted terms, operation/context set and qualified commercial-rights decisions remain open; this checkpoint admits no child stage.

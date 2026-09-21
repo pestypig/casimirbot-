@@ -32,6 +32,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     private static final int LOCAL_STATUS_INTERVAL_TICKS = 5;
     private static final int MAX_PENDING_DELIVERIES = 768;
     private static final int RESERVED_TERMINAL_DELIVERIES = 3;
+    private static final long SLOW_DELIVERY_MILLIS = 750;
 
     private record ActiveEnvelope(
         Map<String, Object> wire,
@@ -126,6 +127,7 @@ final class PlayerActionRuntime implements AutoCloseable {
     private volatile boolean manualInputDetected;
     private volatile long latestEventSequence = -1;
     private volatile long latestAcknowledgedEventSequence = -1;
+    private volatile long lastProjectionAcknowledgedNanos;
     private volatile String lastTransportError = "";
     private volatile ActiveEnvelope activeEnvelope;
     private volatile LocalDiagnosticEnvelope localDiagnosticEnvelope;
@@ -237,6 +239,20 @@ final class PlayerActionRuntime implements AutoCloseable {
         ticks++;
         latestClockSnapshot = captureClockSnapshot(ticks);
         if (ticks % LOCAL_STATUS_INTERVAL_TICKS == 0) publishLocalStatus();
+        if (activeEnvelope != null && ticks % (HEARTBEAT_INTERVAL_TICKS * 5) == 0) {
+            long heartbeatAgeMillis = lastHeartbeatAcceptedAt == null ? -1
+                : Math.max(0L, java.time.Duration.between(lastHeartbeatAcceptedAt, Instant.now()).toMillis());
+            long lastProjectionAgeMillis = lastProjectionAcknowledgedNanos == 0L ? -1
+                : Math.max(0L, (System.nanoTime() - lastProjectionAcknowledgedNanos) / 1_000_000L);
+            logger.info(
+                "Helix player-action delivery health: projection_pending={} projection_flush_pending={} " +
+                "pending_count={} latest_ack_sequence={} last_projection_ack_age_ms={} heartbeat_age_ms={} " +
+                "heartbeat_queued={}",
+                !deliveryOutbox.isProjectionEmpty(), projectionDeliveryFlushPending.get(),
+                deliveryOutbox.size(), latestAcknowledgedEventSequence, lastProjectionAgeMillis,
+                heartbeatAgeMillis, heartbeatPublishPending.get()
+            );
+        }
         if (!config.ready() || http == null) return;
         if (!connectedIdentityMatches()) {
             if (controller.activeWorkflowId() != null) {
@@ -660,6 +676,7 @@ final class PlayerActionRuntime implements AutoCloseable {
 
     private void scheduleHeartbeatPublish() {
         if (!heartbeatPublishPending.compareAndSet(false, true)) return;
+        long queuedAtNanos = System.nanoTime();
         // Heartbeats and environment projection share one executor so the
         // advertised cursor cannot race the interval after the server commits
         // a batch but before this client processes that batch's acknowledgement.
@@ -667,6 +684,10 @@ final class PlayerActionRuntime implements AutoCloseable {
         // deadline-sensitive lane.
         projectionDeliveryNetwork.execute(() -> {
             try {
+                long queueDelayMillis = Math.max(0L, (System.nanoTime() - queuedAtNanos) / 1_000_000L);
+                if (queueDelayMillis >= SLOW_DELIVERY_MILLIS) {
+                    logger.warn("Helix player-action heartbeat queued behind projection for {} ms", queueDelayMillis);
+                }
                 publishHeartbeat();
             } finally {
                 heartbeatPublishPending.set(false);
@@ -702,6 +723,7 @@ final class PlayerActionRuntime implements AutoCloseable {
         manifestId = id("environment_action_manifest");
         latestEventSequence = -1;
         latestAcknowledgedEventSequence = -1;
+        lastProjectionAcknowledgedNanos = 0L;
         manifestReady = false;
         heartbeatReady = false;
         eventStreamResyncRequired = false;
@@ -1323,9 +1345,14 @@ final class PlayerActionRuntime implements AutoCloseable {
     private void scheduleProjectionDeliveryFlush() {
         if (deliveryOutbox.isProjectionEmpty() ||
             !projectionDeliveryFlushPending.compareAndSet(false, true)) return;
+        long queuedAtNanos = System.nanoTime();
         projectionDeliveryNetwork.execute(() -> {
             boolean drained = false;
             try {
+                long queueDelayMillis = Math.max(0L, (System.nanoTime() - queuedAtNanos) / 1_000_000L);
+                if (queueDelayMillis >= SLOW_DELIVERY_MILLIS) {
+                    logger.warn("Helix player-action projection flush queued for {} ms", queueDelayMillis);
+                }
                 drained = flushProjectionDeliveryOutbox();
             } finally {
                 projectionDeliveryFlushPending.set(false);
@@ -1344,22 +1371,55 @@ final class PlayerActionRuntime implements AutoCloseable {
         return flushDeliveryLane(true);
     }
 
+    static Map<String, Object> projectionBatchPayload(
+        List<PlayerActionDeliveryOutbox.Delivery> deliveries
+    ) {
+        if (deliveries.isEmpty()) throw new IllegalArgumentException("Empty projection delivery");
+        if (deliveries.size() == 1) return deliveries.get(0).payload();
+        Map<String, Object> merged = new LinkedHashMap<>(deliveries.get(0).payload());
+        merged.remove("batch_hash");
+        List<Object> events = new ArrayList<>();
+        for (PlayerActionDeliveryOutbox.Delivery delivery : deliveries) {
+            Object value = delivery.payload().get("events");
+            if (!(value instanceof List<?> members)) {
+                throw new IllegalArgumentException("Projection delivery has no event list");
+            }
+            events.addAll(members);
+        }
+        merged.put("events", events);
+        merged.put("last_sequence", deliveries.get(deliveries.size() - 1).payload().get("last_sequence"));
+        merged.put("batch_hash", SectionHasher.hashIncludingNulls(merged));
+        return merged;
+    }
+
     private boolean flushDeliveryLane(boolean projectionLane) {
         while (true) {
+            List<PlayerActionDeliveryOutbox.Delivery> projectionBatch = projectionLane
+                ? deliveryOutbox.peekProjectionBatch() : List.of();
             List<PlayerActionDeliveryOutbox.Delivery> criticalBatch = projectionLane
                 ? List.of() : deliveryOutbox.peekCriticalBatch(workflowEventBatchSupported);
             PlayerActionDeliveryOutbox.Delivery delivery = projectionLane
-                ? deliveryOutbox.peekProjection()
+                ? projectionBatch.isEmpty() ? null : projectionBatch.get(0)
                 : criticalBatch.isEmpty() ? null : criticalBatch.get(0);
             if (delivery == null) break;
             boolean batched = criticalBatch.size() > 1;
             try {
+                long attemptStartedNanos = System.nanoTime();
+                Map<String, Object> payload = projectionLane
+                    ? projectionBatchPayload(projectionBatch)
+                    : batched ? Map.of("events", criticalBatch.stream()
+                        .map(PlayerActionDeliveryOutbox.Delivery::payload).toList())
+                    : delivery.payload();
                 PlayerActionHttpClient.Response receipt = http.post(
                     batched ? "/requests/events" : delivery.stage().endpointSuffix(),
-                    batched ? Map.of("events", criticalBatch.stream().map(PlayerActionDeliveryOutbox.Delivery::payload).toList())
-                        : delivery.payload()
+                    payload
                 );
                 if (!receipt.ok()) {
+                    if (projectionLane) {
+                        logger.warn("Helix player-action projection request failed after {} ms with HTTP {}",
+                            Math.max(0L, (System.nanoTime() - attemptStartedNanos) / 1_000_000L),
+                            receipt.statusCode());
+                    }
                     String transportError = PlayerActionDeliveryOutbox.transportErrorCode(
                         delivery.stage(),
                         receipt.statusCode(),
@@ -1376,22 +1436,38 @@ final class PlayerActionRuntime implements AutoCloseable {
                     }
                     return false;
                 }
-                boolean acknowledged = batched
-                    ? "helix.environment_action.events_receipt.v1".equals(receipt.body().get("schema")) &&
-                        deliveryOutbox.acknowledgeCriticalBatch(criticalBatch, receipt.body().get("event_ids"))
-                    : deliveryOutbox.acknowledge(delivery);
+                boolean acknowledged = projectionLane
+                    ? "helix.environment_event_batch_receipt.v1".equals(receipt.body().get("schema")) &&
+                        java.util.Objects.equals(receipt.body().get("batch_id"), payload.get("batch_id")) &&
+                        receipt.body().get("latest_event_sequence") instanceof Number latest &&
+                        payload.get("last_sequence") instanceof Number expectedLast &&
+                        latest.longValue() == expectedLast.longValue() &&
+                        deliveryOutbox.acknowledgeProjectionBatch(projectionBatch)
+                    : batched
+                        ? "helix.environment_action.events_receipt.v1".equals(receipt.body().get("schema")) &&
+                            deliveryOutbox.acknowledgeCriticalBatch(criticalBatch, receipt.body().get("event_ids"))
+                        : deliveryOutbox.acknowledge(delivery);
                 if (!acknowledged) {
-                    recordTransportError("action_delivery_workflow_receipt_mismatch");
+                    recordTransportError(projectionLane
+                        ? "action_delivery_projection_receipt_mismatch"
+                        : "action_delivery_workflow_receipt_mismatch");
                     return false;
                 }
                 if (
                     acknowledged &&
                     delivery.stage() == PlayerActionDeliveryOutbox.Stage.ENVIRONMENT_EVENT_BATCH
                 ) {
+                    lastProjectionAcknowledgedNanos = System.nanoTime();
                     latestAcknowledgedEventSequence = acknowledgedEventSequence(
                         latestAcknowledgedEventSequence,
-                        delivery.payload()
+                        payload
                     );
+                    long elapsedMillis = Math.max(0L,
+                        (lastProjectionAcknowledgedNanos - attemptStartedNanos) / 1_000_000L);
+                    if (elapsedMillis >= SLOW_DELIVERY_MILLIS) {
+                        logger.warn("Helix player-action projection acknowledged after {} ms at sequence {}",
+                            elapsedMillis, latestAcknowledgedEventSequence);
+                    }
                 }
                 logger.debug(
                     "Helix player-action delivery acknowledged: stage={} pending={}",

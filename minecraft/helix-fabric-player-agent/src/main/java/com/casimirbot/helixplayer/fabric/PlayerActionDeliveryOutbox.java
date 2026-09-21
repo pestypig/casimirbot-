@@ -52,6 +52,7 @@ final class PlayerActionDeliveryOutbox {
     private Delivery criticalInFlight;
     private List<Delivery> criticalBatchInFlight;
     private Delivery projectionInFlight;
+    private List<Delivery> projectionBatchInFlight;
     private final java.util.IdentityHashMap<Delivery, Long> ordinals = new java.util.IdentityHashMap<>();
     private long tailOrdinal;
 
@@ -156,10 +157,66 @@ final class PlayerActionDeliveryOutbox {
         return null;
     }
 
+    /** Freeze one ordered projection prefix so an uncertain POST retries byte-identically. */
+    synchronized List<Delivery> peekProjectionBatch() {
+        if (projectionBatchInFlight != null) return projectionBatchInFlight;
+        if (projectionInFlight != null) {
+            projectionBatchInFlight = List.of(projectionInFlight);
+            return projectionBatchInFlight;
+        }
+        List<Delivery> selected = new ArrayList<>();
+        int bytes = 32;
+        long expectedSequence = -1;
+        Map<String, Object> first = null;
+        for (Delivery delivery : pending) {
+            if (delivery.stage() != Stage.ENVIRONMENT_EVENT_BATCH) continue;
+            Map<String, Object> payload = delivery.payload();
+            int size = HelixJson.stringifyIncludingNulls(payload)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8).length + 1;
+            if (!selected.isEmpty()) {
+                if (first == null || !(payload.get("first_sequence") instanceof Number sequence) ||
+                    sequence.longValue() != expectedSequence ||
+                    !java.util.Objects.equals(payload.get("room_id"), first.get("room_id")) ||
+                    !java.util.Objects.equals(payload.get("source_id"), first.get("source_id")) ||
+                    !java.util.Objects.equals(payload.get("world_id"), first.get("world_id")) ||
+                    !java.util.Objects.equals(payload.get("producer_epoch_ref"), first.get("producer_epoch_ref")) ||
+                    !java.util.Objects.equals(payload.get("producer_plane"), first.get("producer_plane")) ||
+                    bytes + size > 512 * 1024) break;
+            } else {
+                first = payload;
+            }
+            selected.add(delivery);
+            bytes += size;
+            if (!(payload.get("last_sequence") instanceof Number last)) break;
+            expectedSequence = last.longValue() + 1;
+            if (selected.size() == 32) break;
+        }
+        if (selected.isEmpty()) return List.of();
+        projectionInFlight = selected.get(0);
+        projectionBatchInFlight = List.copyOf(selected);
+        return projectionBatchInFlight;
+    }
+
+    synchronized boolean acknowledgeProjectionBatch(List<Delivery> expected) {
+        if (expected == null || expected != projectionBatchInFlight || expected.isEmpty()) return false;
+        for (Delivery delivery : expected) {
+            if (!ordinals.containsKey(delivery)) return false;
+        }
+        for (Delivery delivery : expected) {
+            pending.removeIf(candidate -> candidate == delivery);
+            ordinals.remove(delivery);
+        }
+        projectionBatchInFlight = null;
+        projectionInFlight = null;
+        return true;
+    }
+
     synchronized boolean acknowledge(Delivery expected) {
         if (expected == null) return false;
         if (expected.stage() != Stage.ENVIRONMENT_EVENT_BATCH &&
             criticalBatchInFlight != null && criticalBatchInFlight.size() > 1) return false;
+        if (expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH &&
+            projectionBatchInFlight != null && projectionBatchInFlight.size() > 1) return false;
         Delivery selected = expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH
             ? projectionInFlight
             : criticalInFlight;
@@ -171,6 +228,7 @@ final class PlayerActionDeliveryOutbox {
             ordinals.remove(expected);
             if (expected.stage() == Stage.ENVIRONMENT_EVENT_BATCH) {
                 projectionInFlight = null;
+                projectionBatchInFlight = null;
             } else {
                 criticalInFlight = null;
                 criticalBatchInFlight = null;

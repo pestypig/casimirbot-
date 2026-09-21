@@ -1,0 +1,32 @@
+{
+  "schema": "eh.g8.nav_eq.serial_executor_policy_regression.v1",
+  "date": "2026-09-19",
+  "change_classification": "tool admission regression test only",
+  "test_change": "server/services/environment-connectors/temporal-plans/__tests__/temporal-plan-preflight.test.ts",
+  "cases_added": [
+    "executor_unlisted",
+    "executor_without_native_fabric",
+    "executor_without_start_deadline"
+  ],
+  "expected_typed_failure": "temporal_plan_executor_unavailable",
+  "verification": [
+    {
+      "command": "npx vitest run server/services/environment-connectors/temporal-plans/__tests__/temporal-plan-preflight.test.ts --pool=forks",
+      "result": "PASS",
+      "tests": "12/12"
+    },
+    {
+      "command": "npx vitest run server/services/environment-connectors/actions/__tests__/temporal-action-catalog.test.ts --pool=forks",
+      "result": "PASS",
+      "tests": "2/2"
+    }
+  ],
+  "claim_limits": {
+    "component_regression_only": true,
+    "native_manifest_verified_live": false,
+    "direct_execution_context_verified": false,
+    "temporal_plan_submitted": false,
+    "minecraft_movement_executed": false,
+    "nav_eq_live_accepted": false
+  }
+}

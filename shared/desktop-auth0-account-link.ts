@@ -11,6 +11,10 @@ export const DESKTOP_AUTH0_ACCOUNT_LINK_CALLBACK_PATH =
   "/api/account/session/agent-bindings/auth0/callback" as const;
 
 export const DESKTOP_AUTH0_ACCOUNT_LINK_REDIRECT_URI =
+  "http://127.0.0.1:8767/callback" as const;
+
+// Retained only to recognize callbacks from older, already-issued flows.
+export const DESKTOP_AUTH0_LEGACY_PROTOCOL_CALLBACK_URI =
   "casimirbot://oauth/callback" as const;
 
 export type DesktopAuth0AccountLinkStartReceipt = Readonly<{

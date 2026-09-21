@@ -1,0 +1,108 @@
+{
+  "schema": "helix.nav_eq_v16_v17_corrected_exe_checkpoint.v1",
+  "date_utc": "2026-09-20",
+  "claim_ceiling": "Two corrected-EXE direct-MCP roots completed; no rolling successor was admitted and NAV-EQ remains specified",
+  "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked",
+  "runtime_manifest_sha256": "71dc5248039f98ee2bb145bc4afe6b05c0a6259fb2b4a1ef24af610d14fe98d3",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "world_id": "minecraft:local:combat-c0",
+  "player": "DatDamPig",
+  "v16": {
+    "protocol": "2026-09-20-south-floor-return-protocol-v16.json",
+    "root_plan_id": "nav_eq:south_return:v16:root:5",
+    "root_plan_hash": "sha256:cfe978929c921b7e743ccfe15bee536fbcec6777cb5142e019093cc52ae6727c",
+    "workflow_id": "nav-eq-v16-root-workflow-5",
+    "action_evidence_ref": "environment_action_evidence:9a349a222d6358b44d5ec6028f5388ddd8871cbe9",
+    "outcome": "succeeded",
+    "duration_ticks": 330,
+    "measured_end_position": [0.57, 65, 2.37],
+    "health": 20,
+    "world_mutation_performed": false,
+    "inventory_mutation_performed": false,
+    "rolling_successor_admitted": false,
+    "qualification_limit": "The follow-up frontier was after root completion, not an in-motion handoff"
+  },
+  "v17": {
+    "protocol": "2026-09-20-south-floor-sweep-protocol-v17.json",
+    "run_id": "run_4bc16200-39ae-47c7-b778-df33d514658b",
+    "goal_id": "environment_durable_goal:15a756a5fe4befac67264d5a98be26e2d4c40ccb57ee539220b715c82132a2e2",
+    "root_plan_id": "nav_eq:south_sweep:v17:root:2",
+    "root_plan_hash": "sha256:b8e2439134b1dece1b127284fd997c132871e3a794cc482297eb19f0d96207f2",
+    "action_request_id": "nav-eq-v17-root-action-2",
+    "workflow_id": "nav-eq-v17-root-workflow-2",
+    "admitted_at": "2026-09-20T20:49:28.551Z",
+    "action_evidence_ref": "environment_action_evidence:60e75404d26e8fba61465f1c4cdd50b6f3d929adf",
+    "outcome": "succeeded",
+    "duration_ticks": 330,
+    "measured_end_position": [6.72, 65, -2.24],
+    "post_action_probe_evidence_ref": "environment_probe_evidence:c716b797c92712c2d1b496169926b7500c0894e1",
+    "health": 20,
+    "world_mutation_performed": false,
+    "inventory_mutation_performed": false,
+    "in_motion_frontiers": [
+      {
+        "frontier_id": "environment_frontier:c91ab8ca-3572-4ca2-96fa-c5e1bb61ea25",
+        "observation_at": "2026-09-20T20:49:35.244Z",
+        "frontier_created_at": "2026-09-20T20:49:36.975Z",
+        "live_diagnostic_code": "no_recent_player_workflow_event",
+        "archived_matching_events_in_five_seconds_at_frontier_create": 5,
+        "newest_archived_matching_event_observed_at": "2026-09-20T20:49:36.272Z"
+      },
+      {
+        "frontier_id": "environment_frontier:babd4543-0ae2-4d50-a909-1459a250be9a",
+        "observation_at": "2026-09-20T20:49:40.955Z",
+        "frontier_created_at": "2026-09-20T20:49:42.674Z",
+        "live_diagnostic_code": "no_recent_player_workflow_event",
+        "archived_matching_events_in_five_seconds_at_frontier_create": 0,
+        "newest_archived_matching_event_observed_at": null
+      }
+    ],
+    "archived_environment_event_sequence_range": [20, 30],
+    "last_archived_environment_event_observed_at": "2026-09-20T20:49:37.271Z",
+    "archived_action_workflow_sequence_range": [0, 19],
+    "last_archived_action_workflow_event_at": "2026-09-20T20:49:45.876Z",
+    "retained_heartbeat_gap": {
+      "last_before_root_received_at": "2026-09-20T20:47:56.367Z",
+      "last_before_root_latest_event_sequence": 19,
+      "next_received_at": "2026-09-20T20:52:26.226Z",
+      "next_latest_event_sequence": null,
+      "last_error_at_these_boundary_heartbeats": null,
+      "limitation": "No accepted heartbeat during the root is retained; this does not prove which projection request or network path stalled."
+    },
+    "fabric_log_at_lease_expiry": {
+      "log_path": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/logs/latest.log",
+      "local_time": "2026-09-20 16:50:00 America/New_York",
+      "warning_code": "action_delivery_environment_event_batch_http_409_action_authority_inactive",
+      "following_warning_code": "action_authority_inactive",
+      "interpretation": "A projection batch was explicitly rejected after the finite action authority became inactive. This does not identify why the earlier in-motion frontier lacked a committed recent event."
+    },
+    "read_only_checkpoint_replay": {
+      "cutoff": "2026-09-20T20:49:44.000Z",
+      "result": "verified",
+      "environment_sequence": 30,
+      "action_sequence": 16,
+      "checkpoint_id": "checkpoint:south-sweep-after-5"
+    },
+    "rolling_successor_admitted": false
+  },
+  "diagnosis": {
+    "identity_comparison": "The retained V17 root events match the plan and durable goal on environment, action epoch, source, subject, room, world and player plane; an initial comparison against the plan's nonexistent room/world fields was erroneous and discarded.",
+    "supported_observation": "The action workflow continued to a terminal result while the archived environment event projection ends about 8.6 seconds earlier. No accepted heartbeat is retained between 20:47:56 and 20:52:26. At authority expiry, the Fabric projection lane logged a 409 action_authority_inactive for an event batch. The live frontier reported no recent matching workflow event before expiry.",
+    "uncertainty": "Archived event observed_at does not prove event commit time. The first frontier had timestamp-eligible archived events at its creation time, but their visibility to the live query at that instant is unverified. The second frontier had none within five seconds. Critical and projection outbox lanes can progress independently; no specific transport failure, queue stall, or publication lag has yet been established.",
+    "next_test": "Re-pair the current source and player, use a newly frozen movement-only lease with sufficient post-motion evidence-drain runway, retain bounded event-batch acknowledgement/commit timing and projection-lane error status, then repeat an in-motion frontier and submit a child only if the live verified locator is available. Do not relax the five-second evidence gate merely to make this pass."
+  },
+  "verification": {
+    "read_only_diagnostic_script": "scripts/nav-eq-inspect-successor-window.ts",
+    "checkpoint_replay_script": "scripts/nav-eq-replay-checkpoint-diagnostic.ts",
+    "focused_temporal_tests": "36/36 passed before the discarded hypothesis was reverted; successor test rerun 12/12 passed",
+    "live_successor_acceptance": false
+  },
+  "build_retention": {
+    "running": "apps/desktop/release-nav-eq-verified-20260920",
+    "rollback": "apps/desktop/release-nav-eq-prefix-20260920",
+    "superseded_diagnostic_recycled": "apps/desktop/release-nav-eq-diagnostic-20260920",
+    "recoverable": true,
+    "new_exe_built_during_this_checkpoint": false
+  },
+  "maturity": "NAV-EQ specified"
+}

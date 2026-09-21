@@ -1,0 +1,38 @@
+{
+  "schema": "helix.nav_eq_isolated_native_agent_access_bootstrap_checkpoint.v1",
+  "observed_at_utc": "2026-09-21T00:35:16Z",
+  "claim_ceiling": "The isolated installed EXE restored its local service and the user completed native account linking, but no private MCP tunnel or authenticated Minecraft read was established. NAV-EQ remains specified; this is a transport/onboarding checkpoint, not movement or observation acceptance.",
+  "installed_node": {
+    "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "profile": "C:/Users/dan/AppData/Local/CasimirBotNavEqIsolated20260920",
+    "local_origin": "http://127.0.0.1:59664",
+    "healthz_status": 200,
+    "healthz_ready": true,
+    "native_agent_access_state": "step_5_waiting_for_ai_task",
+    "native_account_link": "linked_per_agent_access_ui",
+    "full_harness_device_trust": "user_action_required_per_agent_access_ui"
+  },
+  "mcp_transport": {
+    "tunnel_client_process_count": 0,
+    "isolated_profile_tunnel_run_file_count": 0,
+    "workstation_human_control_present_result": "McpServerError: Session terminated",
+    "environment_device_check_result": "McpServerError: Session terminated",
+    "interpretation": "The MCP presentation tool cannot bootstrap the disconnected private tunnel it depends on. Local service readiness and native account linking alone do not establish a usable MCP client session."
+  },
+  "deterministic_source_checks": {
+    "command": "npx vitest run direct-mcp-temporal-context, direct-mcp-temporal-registry, temporal-successor-context, temporal-frontier-publisher --pool=forks --maxWorkers=1",
+    "test_files_passed": 4,
+    "tests_passed": 30,
+    "scope": "Current shared source only; not packaged-runtime or live execution evidence"
+  },
+  "minecraft": {
+    "fabric_server_started": false,
+    "fabric_client_started": false,
+    "player_authority_granted": false,
+    "collision_observation_captured": false,
+    "temporal_plan_submitted": false,
+    "gameplay_effect": false
+  },
+  "next_boundary": "After the user reviews and grants native Full Harness device trust, establish the private tunnel and exact Codex MCP session; then re-pair a fresh Fabric source and selected player before a matched-runtime NAV1-O read and the frozen NAV-EQ course. Do not infer authority from account linkage, local health, or Device Check alone.",
+  "nav_eq_maturity": "specified"
+}

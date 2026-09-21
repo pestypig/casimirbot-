@@ -1,0 +1,49 @@
+{
+  "schema": "helix.nav_eq_isolated_protocol_diagnostic.v1",
+  "observed_at_utc": "2026-09-21T02:14:44Z",
+  "claim_ceiling": "A credential-free Windows ShellExecute test reached the exact running isolated EXE under a temporary per-user custom-protocol association and the original association was restored. Chrome/Auth0 redirect, MFA callback completion, device registration and NAV-EQ execution remain unproved.",
+  "preflight": {
+    "current_handler": "previous NAV-EQ EXE",
+    "candidate_image_exists": true,
+    "previous_image_exists": true,
+    "isolated_profile_exists": true,
+    "one_candidate_parent_and_its_children_running": true,
+    "candidate_private_port_59664_listening": true
+  },
+  "temporary_test": {
+    "authorization": "explicit user approval for temporary handler and restoration",
+    "scope": "HKCU casimirbot URL protocol open command only",
+    "target": "current NAV-EQ MFA-retry EXE plus exact isolated user-data argument",
+    "diagnostic_url": "casimirbot://diagnostic",
+    "oauth_code_or_state_present": false,
+    "temporary_handler_readback_verified": true,
+    "journal_events": [
+      "2026-09-21T02:11:56.385Z process_entry",
+      "2026-09-21T02:11:56.388Z second_instance",
+      "2026-09-21T02:11:56.389Z callback_unrecognized"
+    ],
+    "diagnostic_rejected_as_non_callback": true,
+    "original_handler_restored_and_readback_verified": true,
+    "chrome_command_line_diagnostic": "No new native journal event; not a conclusive Auth0 browser-redirect test",
+    "browser_control_direct_custom_scheme": "Blocked by browser URL policy; no workaround attempted",
+    "browser_external_protocol_dispatch_tested": false,
+    "temporary_browser_test_watchdog_stopped_and_removed": true
+  },
+  "source_candidate": {
+    "behavior": "Keep isolated profiles from automatically registering globally; when an operator has already selected this exact executable and isolated profile as the callback owner, allow the native preflight to verify that exact profile-specific route rather than rejecting every isolated profile.",
+    "files": [
+      "apps/desktop/src/auth0-account-link.ts",
+      "apps/desktop/src/main.ts",
+      "tests/desktop-auth0-account-link.spec.ts"
+    ],
+    "focused_tests": "32/32 passed across three desktop/auth UI test files",
+    "desktop_typecheck": "passed",
+    "packaged_or_live_verified": false
+  },
+  "next": [
+    "Before another owner MFA attempt, verify the browser's external-protocol dispatch to the exact isolated profile with no credential in the diagnostic URL.",
+    "Keep any temporary global association bounded and restore the previous owner after the live test.",
+    "Revalidate native registration and the authenticated MCP connection before restarting Fabric or sending a Minecraft read."
+  ],
+  "nav_eq_maturity": "specified"
+}

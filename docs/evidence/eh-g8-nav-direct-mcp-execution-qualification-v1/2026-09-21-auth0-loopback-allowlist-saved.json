@@ -1,0 +1,33 @@
+{
+  "schema": "eh_g8_nav_eq_auth0_loopback_allowlist_saved_v1",
+  "date_utc": "2026-09-21",
+  "environment": "Auth0 development tenant and one isolated Windows CasimirBot developer profile; no Minecraft or Fabric action",
+  "authorization": "The owner explicitly approved adding only the exact loopback callback URI to the existing CasimirBot Desktop Account Link Native application.",
+  "auth0_configuration": {
+    "application": "CasimirBot Desktop Account Link",
+    "application_type": "Native",
+    "added_allowed_callback": "http://127.0.0.1:8767/callback",
+    "existing_callbacks_preserved": [
+      "casimirbot://oauth/callback",
+      "http://127.0.0.1:1522/api/auth/auth0/callback"
+    ],
+    "verification": "Auth0 Dashboard displayed Successfully saved your changes; after reloading Application Details, all three exact callback entries remained present.",
+    "propagation_notice": "Auth0 Dashboard stated that changes may take up to 30 seconds to take effect."
+  },
+  "installed_candidate": {
+    "output": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+    "exact_exe_process_count": 5,
+    "private_service_listener": "127.0.0.1:59664 listening"
+  },
+  "remaining": [
+    "A fresh owner-driven MFA flow must verify browser return, native callback receipt, signed-token exchange and device registration on this exact isolated profile.",
+    "Codex MCP attach, NAV1-O live observation and NAV-EQ movement remain unaccepted."
+  ],
+  "maturity": {
+    "auth0_loopback_configuration": "live accepted",
+    "auth0_loopback_runtime": "deterministically verified",
+    "nav_eq": "specified"
+  },
+  "secrets_in_artifact": false
+}

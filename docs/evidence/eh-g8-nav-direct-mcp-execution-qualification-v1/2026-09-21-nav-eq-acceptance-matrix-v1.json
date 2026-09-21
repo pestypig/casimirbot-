@@ -1,0 +1,128 @@
+{
+  "schema": "helix.nav_eq_acceptance_matrix.v1",
+  "recorded_at": "2026-09-21T06:36:00.000Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "status": "active",
+  "declared_maturity": "specified",
+  "execution_profile": {
+    "desktop_executable_sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+    "runtime_manifest_sha256": "4A3F5EC60E1DC2E29A94A49C94A659EE0750583BA73D8F4C08CEB2886BF6DBB1",
+    "fabric_jar_sha256": "9DE77E3309F7F9DD1533D4BDCF1794475D259A63D87C01CADF57A3B02BB56F47",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "producer_epoch_ref": "adapter_epoch:f855c8c9bc8df139baa97fc96dce5847074a1d15",
+    "world_id": "minecraft:minehut:8fc80440-6fe",
+    "player": "DatDamPig"
+  },
+  "requirements": [
+    {
+      "requirement_id": "matched_runtime_observation_qualified",
+      "status": "passed",
+      "evidence_refs": [
+        "2026-09-21-live-observation-and-full-route-transition.json",
+        "2026-09-21-v1-catalog-refresh-and-live-observation-recheck.json"
+      ],
+      "acceptance_data": {
+        "actor_probe_succeeded": true,
+        "perception_probe_succeeded": true,
+        "provenance_valid": true,
+        "producer_epoch_reverified": true,
+        "player_motion_observed": false
+      }
+    },
+    {
+      "requirement_id": "authenticated_direct_tool_callable",
+      "status": "blocked",
+      "evidence_refs": [
+        "2026-09-21-v1-catalog-refresh-and-live-observation-recheck.json",
+        "2026-09-21-v2-list-presence-and-immediate-connect-failure.json"
+      ],
+      "acceptance_data": {
+        "authenticated_callable": false,
+        "authenticated_namespace": null,
+        "v1_browser_catalog_contains_tool": true,
+        "v2_authenticated": false
+      }
+    },
+    {
+      "requirement_id": "frozen_pre_admission_protocol",
+      "status": "partial",
+      "evidence_refs": [
+        "2026-09-21-current-runtime-pre-admission-protocol-v21.json"
+      ],
+      "acceptance_data": {
+        "ready_to_freeze": false,
+        "motion_authorized": false,
+        "unresolved_live_field_count": 27
+      }
+    },
+    {
+      "requirement_id": "rolling_course_three_successors",
+      "status": "not_started",
+      "evidence_refs": [],
+      "acceptance_data": {
+        "external_mcp_route": false,
+        "rolling_successor_count": 0
+      }
+    },
+    {
+      "requirement_id": "changed_affordance_replan",
+      "status": "not_started",
+      "evidence_refs": [],
+      "acceptance_data": null
+    },
+    {
+      "requirement_id": "direct_user_cancel_and_manual_takeover",
+      "status": "not_started",
+      "evidence_refs": [],
+      "acceptance_data": null
+    },
+    {
+      "requirement_id": "transport_reconnect_and_checkpoint_reconcile",
+      "status": "not_started",
+      "evidence_refs": [],
+      "acceptance_data": null
+    },
+    {
+      "requirement_id": "explicit_revoke_and_zero_effect_stale_rejection",
+      "status": "not_started",
+      "evidence_refs": [],
+      "acceptance_data": null
+    },
+    {
+      "requirement_id": "required_measurements_complete",
+      "status": "partial",
+      "evidence_refs": [
+        "2026-09-21-nav-eq-measurement-contract-v1.json"
+      ],
+      "acceptance_data": {
+        "measurement_contract_defined": true,
+        "required_metric_count": 16,
+        "measured_metric_count": 0,
+        "ready_for_acceptance": false
+      }
+    },
+    {
+      "requirement_id": "artifact_and_lineage_manifest_complete",
+      "status": "partial",
+      "evidence_refs": [
+        "2026-09-21-current-runtime-pre-admission-protocol-v21.json",
+        "2026-09-21-current-runtime-integrity-verification.json"
+      ],
+      "acceptance_data": {
+        "runtime_hashes_frozen": true,
+        "runtime_integrity_verified": true,
+        "root_plan_frozen": false,
+        "successor_lineage_complete": false
+      }
+    },
+    {
+      "requirement_id": "stop_fail_criteria_clear",
+      "status": "not_started",
+      "evidence_refs": [],
+      "acceptance_data": null
+    }
+  ],
+  "claim_ceiling": "One matched-runtime observation requirement is proven. NAV-EQ remains specified; no movement qualification or maturity promotion is claimed."
+}

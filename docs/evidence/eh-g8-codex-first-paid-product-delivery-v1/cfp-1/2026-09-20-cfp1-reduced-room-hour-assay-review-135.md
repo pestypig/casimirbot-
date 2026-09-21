@@ -1,0 +1,7 @@
+# Independent CFP-1 D07 reduced-hour assay review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. CFP-1 remains **active (`specified`)**; CFP-2/3 remain **blocked**. This is an independent read-only review of the [public assay](2026-09-20-cfp1-reduced-room-hour-assay-134.md), its private account-rate calculation and the linked living work packets. It does not select price or caps, prove marginal costs, authorize a paid game action or advance a stage.
+
+**Verdict: PASS for arithmetic, evidence custody and claim boundary.** The reviewer matched the restricted private file to the SHA-256 recorded in evidence 134 and recalculated the scenarios from its account-observed rate. The original 40-paid/7-trial hour case fails database-only break-even and 20% contribution sensitivities; the reduced 20/2 and 10/1 cases pass those **database-only** screens. The public Stripe domestic-card and Billing comparators match the published rates used in the calculation. The public additions reveal neither the account rate nor derived private dollar amounts.
+
+The revised packets consistently make 20 paid/two trial active room-hours a **measurement load**, retain 40/7 as adverse stress, and require ten-effect trial usefulness and every remaining marginal cost input. D07/D11/D12, qualified rights/financial review and the CFP-1 stage hold remain open. A passing database-only sensitivity must not be quoted as an all-in margin or customer term.

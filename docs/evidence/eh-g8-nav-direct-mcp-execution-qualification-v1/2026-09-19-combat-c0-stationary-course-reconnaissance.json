@@ -1,0 +1,68 @@
+{
+  "schema": "eh.g8.nav_eq.stationary_course_reconnaissance.v1",
+  "date": "2026-09-19",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "world_id": "minecraft:local:combat-c0",
+  "selected_subject": "DatDamPig",
+  "read_only_observations": {
+    "actor_evidence_ref": "environment_probe_evidence:4d95ae6effbd197fb7cb761a89699ae0e7a116e0",
+    "actor_health": 20,
+    "actor_max_health": 20,
+    "actor_position": { "x": -2.1, "y": 65, "z": 7.7 },
+    "actor_world": "minecraft:overworld",
+    "perception_evidence_ref": "environment_probe_evidence:9033536c7cf045d170bbce75a975115aadb83b5b",
+    "perception_observed_at": "2026-09-19T22:16:22.542Z",
+    "perception_reachable_foothold_count": 98,
+    "perception_coverage_boundary_reached": true,
+    "spatial_region_evidence_ref": "environment_probe_evidence:6abe2d8f44efbdd6aa9a1e9cfe3caf0af954b6b3",
+    "spatial_region_observed_at": "2026-09-19T22:17:40.537Z",
+    "spatial_region_purpose": "movement_safety",
+    "spatial_region_center": { "x": -3, "y": 65, "z": 7 },
+    "spatial_region_bounds": {
+      "min": { "x": -10, "y": 62, "z": 0 },
+      "max": { "x": 4, "y": 68, "z": 14 }
+    },
+    "columns_complete_within_bounds": true,
+    "omitted_column_count": 0,
+    "sampled_straight_lines": [
+      {
+        "direction": "north",
+        "fixed_x": -3,
+        "z_from": 6,
+        "z_through": 0,
+        "sampled_contiguous_clear_supported_cells": 7,
+        "feet_y": 65,
+        "head_y": 66,
+        "support_y": 64
+      },
+      {
+        "direction": "east",
+        "fixed_z": 7,
+        "x_from": -2,
+        "x_through": 4,
+        "sampled_contiguous_clear_supported_cells": 7,
+        "feet_y": 65,
+        "head_y": 66,
+        "support_y": 64
+      },
+      {
+        "direction": "south",
+        "first_cell": { "x": -3, "y": 65, "z": 8 },
+        "first_cell_clear": false
+      },
+      {
+        "direction": "west",
+        "sampled_contiguous_clear_supported_cells": 4,
+        "first_blocked_cell": { "x": -8, "y": 65, "z": 7 }
+      }
+    ]
+  },
+  "interpretation": "The current arena has a candidate short, level north/east microcourse. The sampled geometry is not a frozen NAV-EQ course, movement admission, dynamic hazard guarantee, or evidence of useful overlap across three rolling successors.",
+  "effects": {
+    "action_authority_granted": false,
+    "temporal_plan_submitted": false,
+    "player_motion": false,
+    "world_mutation": false,
+    "nav_eq_live_accepted": false
+  }
+}

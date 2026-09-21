@@ -1,0 +1,7 @@
+# Independent CFP-1 MCP catalog-drift review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. CFP-1 remains **active (`specified`)**; CFP-2/3 remain **blocked**. This is an independent read-only review of the [current source-catalog drift check](2026-09-20-cfp1-current-mcp-source-catalog-drift-132.md), the living [offer worksheet](../../../work-packets/eh-g8-cfp1-mcp-offer-context-triage-v1.csv) and related planning references. It does not review an installed customer client, grant rights or close CFP-1.
+
+**Verdict: PASS for inventory and claim-boundary consistency.** The reviewer reproduced 129 registration sites, 95 statically resolved names, 90 descriptor gaps, eight orphan descriptors and nine unresolved registration sites. All 95 static names occur in the 105-row worksheet; the other ten are exactly the finite two-name Surface Registry expansion and eight declared companion constants. The worksheet has 105 unique names and lane counts 23 personal, 15 safety/status, 11 hosted-context, 51 unqualified specialist, four bridge/solver unresolved and one unavailable placeholder. Every row remains `unselected` and `not_run`.
+
+The reviewer confirmed that the single added direct temporal-plan name is an unqualified NAV source-registration row, the historical 104-name snapshot remains dated, and the canonical work-program backlink does not claim installed or customer acceptance. At review, the MCP file hashes matched evidence 132. The MCP evidence audit itself remains failed; this PASS covers the reconciliation and wording only.

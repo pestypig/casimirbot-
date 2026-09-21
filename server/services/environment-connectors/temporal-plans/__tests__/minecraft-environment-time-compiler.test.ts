@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import * as roomDatabase from "../../../helix-ask/realtime-room/room-store/database";
 import * as actionRegistry from "../../../situation-room/environment-action-adapter-registry";
 import { verifyTemporalCheckpointSettlement } from "../temporal-checkpoint-settlement";
+import { registerDirectMcpTemporalAssociation, revokeDirectMcpTemporalAssociation, verifyRegisteredDirectMcpTemporalAssociation } from "../direct-mcp-temporal-registry";
 import { readTemporalCheckpointEvidence } from "../temporal-checkpoint-evidence";
 import { resolveTemporalEventArguments, resolveTemporalEventChain, resolveTemporalResultChain, verifyTemporalSuccessorAcceptance } from "../temporal-event-plan";
 import { environmentConnectorSha256 } from "../../catalog";
@@ -16,6 +17,7 @@ import { temporalSequenceResultMeasurementsValid, readRecordedWorkflowEvidence, 
 import { helixEnvironmentActionRequestSchema } from "@shared/helix-environment-action";
 import {
   buildHelixEnvironmentTemporalPlan,
+  helixEnvironmentTimeSha256,
   type HelixEnvironmentTemporalPlan,
 } from "../../../../../shared/helix-environment-time";
 import {
@@ -267,10 +269,20 @@ describe("Minecraft Environment Time compatibility compiler", () => {
     // Exercise the internal delivery transaction with retained identities, not
     // connector-supplied task credentials. The query adapter is mocked here.
     try {
-      for (const scenario of ["valid", "lease_response_loss", "http_response_loss", "controls", "goal_stopped", "goal_revision", "checkpoint", "binding", "stale_event"]) {
-        const realStorage = ["valid", "lease_response_loss", "http_response_loss"].includes(scenario);
+      for (const scenario of ["direct", "valid", "lease_response_loss", "http_response_loss", "controls", "goal_stopped", "goal_revision", "checkpoint", "binding", "stale_event"]) {
+        const realStorage = ["valid", "direct", "lease_response_loss", "http_response_loss"].includes(scenario);
         let leased = false;
         let mutations = 0;
+        const direct = scenario === "direct";
+        const associationId = direct ? "direct_mcp_context:test-successor" : "binding";
+        const continuationRef = direct ? "direct_mcp_session:test-successor" : "continuation";
+        if (direct) expect(await registerDirectMcpTemporalAssociation({ association: {
+          kind: "direct_mcp_client", associationId, associationEpoch: 1, continuationRef,
+          profileRef: "owner", runId: root.run_id, roomId: root.room_id, participantId: root.participant_id,
+        }, verify: async () => {} })).toBe(true);
+        if (direct) expect(await verifyRegisteredDirectMcpTemporalAssociation({ associationId,
+          associationEpoch: 1, continuationRef, profileRef: "owner", runId: root.run_id,
+          roomId: root.room_id, participantId: root.participant_id })).toBe(true);
         const fixtureToken = "synthetic-et6-connector-test-only";
         let fixtureScopes = ["action.poll"];
         const deadline = new Date(Date.now() + 60000).toISOString();
@@ -297,11 +309,11 @@ describe("Minecraft Environment Time compatibility compiler", () => {
           (action_request_id,action_authority_id,run_id,request_payload,status,connector_manifest_id,deadline_at,policy_version,attempt_count)
           VALUES ($1,$2,$3,$4,$5,'manifest',$6,1,0)`, [action.action_request_id, action.action_authority_id,
             action.run_id, JSON.stringify(action), action === root ? "running" : "admitted", deadline]);
-        await sqlPool.query(`INSERT INTO helix_environment_temporal_plan_admissions VALUES ($1,$2,$3,$4,$5,'binding',1,'continuation',$6)`,
+        await sqlPool.query(`INSERT INTO helix_environment_temporal_plan_admissions VALUES ($1,$2,$3,$4,$5,$6,1,$7,$8)`,
           [successor.action_request_id, root.action_request_id, plan.plan_id, plan.plan_hash, JSON.stringify({
             resident_action_request_id: root.action_request_id, workflow_id: root.workflow_id, plan_id: plan.plan_id,
             plan_hash: plan.plan_hash, checkpoint_id: "checkpoint:walk", native_node_id: "settled",
-            native_tick_index: 10, workflow_monotonic_elapsed_ns: 500000000 }), JSON.stringify(next)]);
+            native_tick_index: 10, workflow_monotonic_elapsed_ns: 500000000 }), associationId, continuationRef, JSON.stringify(next)]);
         const query = vi.fn(async (sql: string, values?: unknown[]) => {
           if (realStorage && /temporal_plan_admissions|FROM helix_environment_action_requests|UPDATE helix_environment_action_requests/.test(sql)) {
             const result = await sqlPool.query(sql, values);
@@ -323,13 +335,24 @@ describe("Minecraft Environment Time compatibility compiler", () => {
           if (sql.includes("connector_manifests")) return { rows: [{ manifest_id: "manifest", producer_epoch_ref: plan.identity.producer_epoch }] };
           if (sql.includes("connector_heartbeats")) return { rows: [{ status: "active", received_at: new Date(), emergency_stop_latched: false, control_engines: [] }] };
           if (sql.includes("durable_goals")) return { rows: [{ status: scenario === "goal_stopped" ? "canceled" : "active", current_sequence: scenario === "goal_revision" ? 2 : 1 }] };
+          if (sql.includes("helix_environment_temporal_frontiers")) {
+            const frontier = { schema: "environment.affordance_frontier.v1", frontier_id: "frontier:successor",
+              identity: next.identity, clocks: next.clocks,
+              expires_at_environment_sequence: next.clocks.environment.sequence + 100,
+              entries: [], newly_available_capability_ids: [], newly_blocked_capability_ids: [],
+              materially_changed_capability_ids: [], expired_capability_ids: [],
+              strategy_recommendation_included: false, execution_authority: false,
+              answer_authority: false, assistant_answer: false, terminal_eligible: false };
+            return { rows: [{ frontier_payload: frontier, payload_hash: helixEnvironmentTimeSha256(frontier),
+              retained_until: deadline, observed_at: new Date().toISOString() }] };
+          }
           if (sql.includes("action_control_requests")) return { rows: scenario === "controls" ? [{}] : [] };
           if (sql.includes("action_workflow_events")) return { rows: [{ event_payload: runningEvent, event_hash: environmentConnectorSha256(runningEvent),
             producer_epoch_ref: plan.identity.producer_epoch, created_at: runningEvent.created_at }] };
           if (sql.includes("temporal_plan_admissions")) return { rows: leased && !sql.includes("a.source_plan") ? [] : [{ request_payload: successor,
             source_plan: next, status: leased ? "leased" : "admitted",
-            action_request_id: successor.action_request_id, deadline_at: deadline, reasoning_binding_id: "binding", reasoning_binding_epoch: 1,
-            client_continuation_ref: "continuation", checkpoint_association: { resident_action_request_id: root.action_request_id,
+            action_request_id: successor.action_request_id, deadline_at: deadline, reasoning_binding_id: associationId, reasoning_binding_epoch: 1,
+            client_continuation_ref: continuationRef, checkpoint_association: { resident_action_request_id: root.action_request_id,
               workflow_id: root.workflow_id, plan_id: plan.plan_id, plan_hash: plan.plan_hash, checkpoint_id: "checkpoint:walk",
               native_node_id: "settled", native_tick_index: scenario === "checkpoint" ? 9 : 10, workflow_monotonic_elapsed_ns: 500000000 } }] };
           if (sql.includes("SET status='leased'")) { leased = true; mutations++; return { rows: [{ request_payload: successor }] }; }
@@ -343,10 +366,15 @@ describe("Minecraft Environment Time compatibility compiler", () => {
           sourceId: root.source_id, worldId: root.world_id, participantId: root.participant_id, subjectBindingId: root.subject_binding_id,
           subjectNativeId: root.subject_native_id } as Parameters<typeof leasePendingEnvironmentTemporalSuccessor>[0]["claim"], residentActionRequestId: root.action_request_id,
           predecessorPlanId: plan.plan_id, predecessorPlanHash: plan.plan_hash, checkpointId: "checkpoint:walk",
-          bindingStore: { inspect: () => ({ status: scenario === "binding" ? "revoked" : "active", binding_epoch: 1, run_id: root.run_id,
-            provider_thread_ref_hash: createHash("sha256").update("continuation").digest("hex") } as never) } };
+          bindingStore: direct ? undefined : { inspect: () => {
+            return { status: scenario === "binding" ? "revoked" : "active", binding_epoch: 1, run_id: root.run_id,
+              provider_thread_ref_hash: createHash("sha256").update("continuation").digest("hex") } as never;
+          } } };
         const lease = () => leasePendingEnvironmentTemporalSuccessor(deliveryInput);
-        if (scenario === "valid") {
+        if (direct) expect(await readEnvironmentTemporalDeliveryState(deliveryInput)).toMatchObject({
+          action_request_id: successor.action_request_id,
+        });
+        if (scenario === "valid" || scenario === "direct") {
           const competing = await Promise.all(Array.from({ length: 8 }, () => lease()));
           expect(competing.filter(value => value !== null)).toEqual([successor]);
           expect((await sqlPool.query("SELECT attempt_count FROM helix_environment_action_requests WHERE action_request_id=$1",
@@ -394,6 +422,10 @@ describe("Minecraft Environment Time compatibility compiler", () => {
           recorded_status: realStorage ? "leased" : "admitted", effects_verified: false,
           automatic_replay_allowed: false, execution_authority: false });
         expect(mutations).toBe(beforeInspection);
+        if (scenario === "direct") {
+          revokeDirectMcpTemporalAssociation(associationId);
+          expect(await readEnvironmentTemporalDeliveryState(deliveryInput)).toBeNull();
+        }
         if (scenario === "valid") {
           for (const patch of [
             { checkpointId: "wrong" }, { predecessorPlanHash: "wrong" },
@@ -554,11 +586,19 @@ describe("Minecraft Environment Time compatibility compiler", () => {
     expect(await readTemporalCheckpointEvidence({ query } as never, input))
       .toMatchObject({ action_event_id: pairedActionEvent.event_id, execution_authority: false });
     const safeLatest = actionEvent;
+    const appendedSettlement = { ...pairedActionEvent.measurements.checkpoint_settlements[0],
+      checkpoint_id: "checkpoint:newer", node_id: "newer", tick_index: 13, monotonic_elapsed_ns: 700 };
+    actionEvent = { ...safeLatest, measurements: { ...safeLatest.measurements,
+      checkpoint_settlements: [...pairedActionEvent.measurements.checkpoint_settlements, appendedSettlement] } };
+    expect(await readTemporalCheckpointEvidence({ query } as never, input))
+      .toMatchObject({ action_event_id: pairedActionEvent.event_id, execution_authority: false });
     for (const changedLatest of [
       { ...safeLatest, manual_override_detected: true },
       { ...safeLatest, workflow_state: "canceled", controls_released: true },
       { ...safeLatest, measurements: { ...safeLatest.measurements, sequence_id: "different-plan" } },
       { ...safeLatest, measurements: { ...safeLatest.measurements, checkpoint_settlements: [] } },
+      { ...safeLatest, measurements: { ...safeLatest.measurements,
+        checkpoint_settlements: [{ ...pairedActionEvent.measurements.checkpoint_settlements[0], tick_index: 11 }, appendedSettlement] } },
       { ...safeLatest, sequence: 0 },
       { ...safeLatest, sequence: pairedActionEvent.sequence },
     ]) {

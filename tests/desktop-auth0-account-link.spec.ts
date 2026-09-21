@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   DESKTOP_AUTH0_ACCOUNT_LINK_REDIRECT_URI,
+  DESKTOP_AUTH0_LEGACY_PROTOCOL_CALLBACK_URI,
   parseDesktopAuth0AccountLinkCompletion,
   parseDesktopAuth0AccountLinkStartReceipt,
 } from "../shared/desktop-auth0-account-link";
 import {
   extractDesktopAuth0Callback,
+  canReceiveDesktopAuth0Callback,
+  desktopAuth0ProtocolClientArgs,
   isAllowedDesktopAuth0AuthorizationUrl,
   isAllowedDesktopAuth0StepUpAuthorizationUrl,
   shouldRegisterDesktopProtocol,
@@ -64,7 +67,7 @@ describe("desktop Auth0 account-link host boundary", () => {
   });
 
   it("extracts only the exact custom-protocol callback from process arguments", () => {
-    const callback = `${DESKTOP_AUTH0_ACCOUNT_LINK_REDIRECT_URI}?code=code-value-123&state=${"s".repeat(43)}`;
+    const callback = `${DESKTOP_AUTH0_LEGACY_PROTOCOL_CALLBACK_URI}?code=code-value-123&state=${"s".repeat(43)}`;
     expect(extractDesktopAuth0Callback(["CasimirBot.exe", callback])).toBe(
       callback,
     );
@@ -126,5 +129,29 @@ describe("desktop Auth0 account-link host boundary", () => {
   it("does not let isolated smoke profiles replace protocol ownership", () => {
     expect(shouldRegisterDesktopProtocol(false)).toBe(true);
     expect(shouldRegisterDesktopProtocol(true)).toBe(false);
+  });
+
+  it("matches the exact executable and isolated profile without claiming the global handler", () => {
+    expect(desktopAuth0ProtocolClientArgs({
+      defaultAppEntryScript: null,
+      isolatedUserDataPath: null,
+    })).toEqual([]);
+    expect(desktopAuth0ProtocolClientArgs({
+      defaultAppEntryScript: "C:\\repo\\main.js",
+      isolatedUserDataPath: null,
+    })).toEqual(["C:\\repo\\main.js"]);
+    expect(desktopAuth0ProtocolClientArgs({
+      defaultAppEntryScript: null,
+      isolatedUserDataPath: "C:\\profiles\\isolated one",
+    })).toEqual(["--user-data-dir=C:\\profiles\\isolated one"]);
+    expect(desktopAuth0ProtocolClientArgs({
+      defaultAppEntryScript: "C:\\repo\\main.js",
+      isolatedUserDataPath: "C:\\profiles\\isolated one",
+    })).toEqual([
+      "C:\\repo\\main.js",
+      "--user-data-dir=C:\\profiles\\isolated one",
+    ]);
+    expect(canReceiveDesktopAuth0Callback({ exactCurrentProfileRouteOwned: true })).toBe(true);
+    expect(canReceiveDesktopAuth0Callback({ exactCurrentProfileRouteOwned: false })).toBe(false);
   });
 });

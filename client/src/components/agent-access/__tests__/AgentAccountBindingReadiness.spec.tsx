@@ -189,6 +189,26 @@ describe("AgentAccountBindingReadiness", () => {
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === "GET")).toHaveLength(2);
     expect(screen.queryByText("Account linked for agent access")).not.toBeInTheDocument();
   });
+  it("shows a callback-route failure without leaving account linking busy", async () => {
+    const fetchMock = vi.fn(async (_url, options) => response(options?.method === "POST" ? {
+      schema: "casimir_desktop_auth0_account_link_start/1", ok: true,
+      authorization_url: "https://tenant.auth0.com/authorize",
+      expires_at: new Date(Date.now() + 600_000).toISOString(),
+      provider: "auth0", pkce: "S256", client_secret_used: false,
+      bearer_included: false, subject_included: false,
+    } : bindingsBody({ oauth_ready: false, bindings: [] })));
+    vi.stubGlobal("fetch", fetchMock);
+    window.casimirDesktop = {
+      openAuth0AccountLink: vi.fn(async () => {
+        throw new Error("Error invoking remote method 'account-link': Error: desktop_auth0_callback_route_unavailable");
+      }),
+    } as any;
+    render(<AgentAccountBindingReadiness />);
+    fireEvent.click(await screen.findByRole("button", { name: "Link Auth0" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("cannot receive its Auth0 callback");
+    expect(screen.getByRole("button", { name: "Link Auth0" })).not.toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Stop waiting" })).not.toBeInTheDocument();
+  });
   it("renders only sanitized provider, issuer, status, and tenant references", async () => {
     const fetchMock = vi.fn().mockResolvedValue(response(bindingsBody()));
     vi.stubGlobal("fetch", fetchMock);

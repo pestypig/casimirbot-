@@ -1,0 +1,152 @@
+{
+  "schema": "helix.nav1o_installed_collision_repeatability_checkpoint.v1",
+  "date": "2026-09-20",
+  "scope": "Exploratory stationary read-only matched-runtime observation series; not a frozen full NAV1 reliability acceptance",
+  "runtime_package_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3E3A44999919AD06BA9F",
+  "package_hash_erratum": "2026-09-20-installed-package-hash-transcription-erratum.json",
+  "service_instance_ref": "service_instance:50f1c88ffb72f58e659c6e4c84a20605",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "world_id": "minecraft:local:combat-c0",
+  "selected_player": "DatDamPig",
+  "probe": {
+    "kind": "perception_snapshot",
+    "include_navigation_collision": true,
+    "horizontal_radius": 4,
+    "vertical_radius": 2
+  },
+  "read_results": [
+    {
+      "i": 1,
+      "elapsed_ms": 2566,
+      "transport_error": false,
+      "status": "completed",
+      "outcome": "succeeded",
+      "evidence_ref": "environment_probe_evidence:568ecd123d073738043d33a6a6d4e6451a19bbfb",
+      "observed_at": "2026-09-20T16:28:46.752Z",
+      "revision": 17861918,
+      "game_tick": 17861918,
+      "capture_duration_ms": 2.49,
+      "actor_position": {
+        "x": 0.25,
+        "y": 65,
+        "z": -5.63
+      },
+      "collision_status": "captured",
+      "cells": 125,
+      "unsupported": 46,
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "tick_start": 17861918,
+      "tick_end": 17861918
+    },
+    {
+      "i": 2,
+      "elapsed_ms": 6754,
+      "transport_error": false,
+      "status": "completed",
+      "outcome": "succeeded",
+      "evidence_ref": "environment_probe_evidence:1ef6350cb664ee7d0983b8d6e9407cb2f08e70b5",
+      "observed_at": "2026-09-20T16:28:51.930Z",
+      "revision": 17862009,
+      "game_tick": 17862009,
+      "capture_duration_ms": 3.52,
+      "actor_position": {
+        "x": 0.25,
+        "y": 65,
+        "z": -5.63
+      },
+      "collision_status": "captured",
+      "cells": 125,
+      "unsupported": 46,
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "tick_start": 17862009,
+      "tick_end": 17862009
+    },
+    {
+      "i": 3,
+      "elapsed_ms": 7496,
+      "transport_error": false,
+      "status": "completed",
+      "outcome": "succeeded",
+      "evidence_ref": "environment_probe_evidence:1c67f55c45e2bcd53f2ed048405c08429eb2efbf",
+      "observed_at": "2026-09-20T16:29:00.535Z",
+      "revision": 17862184,
+      "game_tick": 17862184,
+      "capture_duration_ms": 3.27,
+      "actor_position": {
+        "x": 0.25,
+        "y": 65,
+        "z": -5.63
+      },
+      "collision_status": "captured",
+      "cells": 125,
+      "unsupported": 46,
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "tick_start": 17862184,
+      "tick_end": 17862184
+    },
+    {
+      "i": 4,
+      "elapsed_ms": 8796,
+      "transport_error": false,
+      "status": "completed",
+      "outcome": "succeeded",
+      "evidence_ref": "environment_probe_evidence:267746c277a74d79eac38d73d844966b651f6674",
+      "observed_at": "2026-09-20T16:29:09.459Z",
+      "revision": 17862368,
+      "game_tick": 17862368,
+      "capture_duration_ms": 10.96,
+      "actor_position": {
+        "x": 0.25,
+        "y": 65,
+        "z": -5.63
+      },
+      "collision_status": "captured",
+      "cells": 125,
+      "unsupported": 46,
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "tick_start": 17862368,
+      "tick_end": 17862368
+    },
+    {
+      "i": 5,
+      "elapsed_ms": 5849,
+      "transport_error": false,
+      "status": "completed",
+      "outcome": "succeeded",
+      "evidence_ref": "environment_probe_evidence:896db4cafd4a2ea41d419fb8383aad34bf960d2e",
+      "observed_at": "2026-09-20T16:29:13.636Z",
+      "revision": 17862446,
+      "game_tick": 17862446,
+      "capture_duration_ms": 4.07,
+      "actor_position": {
+        "x": 0.25,
+        "y": 65,
+        "z": -5.63
+      },
+      "collision_status": "captured",
+      "cells": 125,
+      "unsupported": 46,
+      "subject_native_id": "e6b8e983-b138-3202-9413-336c164cfec8",
+      "tick_start": 17862446,
+      "tick_end": 17862446
+    }
+  ],
+  "summary": {
+    "attempts": 5,
+    "completed_with_captured_collision": 5,
+    "stationary_actor_position": [
+      0.25,
+      65,
+      -5.63
+    ],
+    "same_native_subject": true,
+    "collision_cells_per_capture": 125,
+    "unsupported_cells_per_capture": 46,
+    "mcp_call_elapsed_ms_min": 2566,
+    "mcp_call_elapsed_ms_median": 6754,
+    "mcp_call_elapsed_ms_max": 8796,
+    "native_capture_duration_ms_max": 10.96,
+    "no_gameplay_mutation_requested": true
+  },
+  "claim_ceiling": "Five consecutive stationary 125-cell captures on this installed profile. Does not prove movement-time capture reliability, full NAV1 topology support, NAV-EQ handoff, or release acceptance."
+}

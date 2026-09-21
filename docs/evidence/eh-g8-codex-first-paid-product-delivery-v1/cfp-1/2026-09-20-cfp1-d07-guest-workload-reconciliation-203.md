@@ -1,0 +1,9 @@
+# CFP-1 D07 guest workload reconciliation — 2026-09-20
+
+Source HEAD inspected: `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93`; shared dirty worktree. This is a specification reconciliation, not a controlled provider-cost assay.
+
+The [owner-selected first action](2026-09-20-cfp1-recommended-direction-owner-selection-106.md) is requested by a separately authenticated invited guest. The [guest ingress contract](../../../work-packets/eh-g8-cfp1-hosted-guest-request-ingress-v1.md) recommends a domain browser request as the first-cohort no-guest-model path; the host supplies the signed app and local program connector. The [domain/account plan](../../../architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md) assigns account, hosted eligibility and authenticated browser APIs to the service/database, while payment and model accounts remain separate.
+
+Before this reconciliation, the [D07 assay](../../../work-packets/eh-g8-cfp1-d07-provider-unit-allocation-and-assay-v1.md) defined B/P/T by room and action counts but did not name the guest browser request, account/session, owner approval and result-return path as its primary load. The [pilot assay](../../../work-packets/eh-g8-cfp1-hosted-pilot-price-and-capacity-assay-v1.md) and [unit-economics worksheet](../../../work-packets/eh-g8-cfp1-hosted-unit-economics-worksheet-v1.md) likewise had no explicit ingress comparison. Those packets now require the browser path, its identity/API/notification/history/connector costs and a zero-platform-funded-model-call assertion; any guest-owned MCP case is separately costed if advertised.
+
+No matched B/P/T resource counters or sourced all-input upper bounds were obtained in this reconciliation. The Replit completed-period invoice remains historical mixed workload, the $10/$5 Stripe Prices remain sandbox credit products, and no paid PBT allowance or hosted Price is selected. D07, D11 and D12 remain open; CFP-1 remains active (`specified`).

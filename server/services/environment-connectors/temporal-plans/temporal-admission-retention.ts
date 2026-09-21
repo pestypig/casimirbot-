@@ -1,6 +1,5 @@
 import { TemporalPlanError } from "./temporal-plan-error";
 import type { PoolClient } from "pg";
-import { createHash } from "node:crypto";
 import { helixEnvironmentTemporalPlanSchema, helixEnvironmentTimeSha256 } from "@shared/helix-environment-time";
 import type { preflightTemporalPlan } from "./temporal-plan-preflight";
 import { readTemporalCheckpointEvidence } from "./temporal-checkpoint-evidence";
@@ -16,6 +15,8 @@ export async function retainTemporalAdmission(db: PoolClient, input: {
   preflight: Preflight; actionRequestId: string;
   /** Broker-owned newly inserted, non-executable request. Never a replay. */
   unpublished?: boolean;
+  /** Legacy SQL column names retain both exact room bindings and direct-MCP
+   * context IDs. The disjoint ID prefixes prevent cross-kind lineage reuse. */
   bindingId: string; bindingEpoch: number; continuationRef: string; runId: string;
   checkpoint?: { eventId: string; checkpointId: string };
 }) {
@@ -30,9 +31,9 @@ export async function retainTemporalAdmission(db: PoolClient, input: {
   if (!input.bindingId || !input.continuationRef || !Number.isSafeInteger(input.bindingEpoch) || input.bindingEpoch < 1) {
     throw new TemporalPlanError("temporal_retention_binding_invalid");
   }
-  const binding = input.preflight.binding;
-  if (binding.reasoning_binding_id !== input.bindingId || binding.binding_epoch !== input.bindingEpoch ||
-      binding.run_id !== input.runId || binding.provider_thread_ref_hash !== createHash("sha256").update(input.continuationRef).digest("hex")) {
+  const association = input.preflight.association;
+  if (association.associationId !== input.bindingId || association.associationEpoch !== input.bindingEpoch ||
+      association.runId !== input.runId || association.continuationRef !== input.continuationRef) {
     throw new TemporalPlanError("temporal_retention_task_mismatch");
   }
   // Publisher and pruning also lock this goal row: revision cannot change while
@@ -69,7 +70,7 @@ export async function retainTemporalAdmission(db: PoolClient, input: {
   }
   const grants = await db.query(`SELECT scopes FROM helix_environment_durable_goal_participants
     WHERE goal_id=$1 AND profile_id=$2 AND participant_id=$3 AND status='active' FOR UPDATE`,
-    [plan.identity.goal_id, binding.authenticated_profile_ref, payload.participant_id]);
+    [plan.identity.goal_id, association.profileRef, payload.participant_id]);
   const scopes = json(grants.rows[0]?.scopes ?? []);
   if (!Array.isArray(scopes) || !scopes.includes("steer")) throw new TemporalPlanError("temporal_retention_goal_forbidden");
   const existing = await db.query(`SELECT * FROM helix_environment_temporal_plan_admissions

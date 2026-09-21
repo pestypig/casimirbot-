@@ -1,0 +1,28 @@
+{
+  "schema": "helix.nav_eq_measurement_contract.v1",
+  "recorded_at": "2026-09-21T06:40:21.0023073Z",
+  "status": "draft_pending_live_samples",
+  "frozen": false,
+  "scope": "NAV-EQ external-MCP rolling movement qualification for the exact V21 execution profile",
+  "missing_values_are_zero": false,
+  "single_event_quantiles_allowed": false,
+  "metrics": [
+    { "metric_id": "resident_computation_latency_ms", "unit": "ms", "aggregation": "p50_p95_p99", "minimum_sample_count": 20, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "dispatch_to_first_tick_latency_ms", "unit": "ms", "aggregation": "p50_p95_p99", "minimum_sample_count": 20, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "useful_motion_ratio", "unit": "ratio", "aggregation": "ratio", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "stationary_or_missed_ticks", "unit": "ticks", "aggregation": "count", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "queue_depth", "unit": "plans", "aggregation": "p50_p95_p99", "minimum_sample_count": 20, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "successor_readiness_latency_ms", "unit": "ms", "aggregation": "p50_p95_p99", "minimum_sample_count": 3, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "committed_runway_ticks", "unit": "ticks", "aggregation": "minimum", "minimum_sample_count": 3, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "observation_to_reentry_latency_ms", "unit": "ms", "aggregation": "p50_p95_p99", "minimum_sample_count": 3, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "replan_delay_ms", "unit": "ms", "aggregation": "p50_p95_p99", "minimum_sample_count": 3, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "local_manual_takeover_latency_ms", "unit": "ms", "aggregation": "event_latency", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "direct_user_cancellation_latency_ms", "unit": "ms", "aggregation": "event_latency", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "duplicate_effect_count", "unit": "effects", "aggregation": "count", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "stale_effect_count", "unit": "effects", "aggregation": "count", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "evidence_volume_bytes", "unit": "bytes", "aggregation": "sum", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "evidence_event_count", "unit": "events", "aggregation": "count", "minimum_sample_count": 1, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null },
+    { "metric_id": "progress_per_model_tool_round_trip_blocks", "unit": "blocks_per_round_trip", "aggregation": "ratio", "minimum_sample_count": 3, "status": "pending", "sample_count": 0, "value": null, "clock_origin_id": null, "source_evidence_refs": [], "unavailable_reason": null }
+  ],
+  "claim_ceiling": "Measurement schema only. All values remain pending and NAV-EQ cannot be accepted from this artifact."
+}

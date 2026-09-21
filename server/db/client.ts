@@ -877,11 +877,14 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
     return;
   }
   localPersistenceSuppress = true;
+  let restored = false;
   try {
     let raw = await fs.promises.readFile(localPersistencePath, "utf8");
     const snapshot = JSON.parse(raw) as Partial<LocalSnapshot>;
     raw = "";
-    if (snapshot.schema !== "helix.local_pg_mem_snapshot.v1" || !snapshot.tables) return;
+    if (snapshot.schema !== "helix.local_pg_mem_snapshot.v1" || !snapshot.tables) {
+      throw new Error("local_pg_mem_snapshot_invalid_schema");
+    }
     const compacted = compactLocalEnvironmentTables(snapshot.tables);
     snapshot.tables = compacted.tables;
     if (compacted.changedTables.length > 0) {
@@ -1009,11 +1012,20 @@ async function restoreLocalSnapshot(activePool: PgPool): Promise<void> {
         `[db] local pg-mem restore took ${restoreElapsedMs}ms (restored ${restoredRowCount} rows; discarded ${discardedRowCount} compacted or invalid rows)`,
       );
     }
+    restored = true;
   } catch (err) {
-    console.warn("[db] failed to restore local pg-mem snapshot", err);
+    const failureClass = err instanceof SyntaxError
+      ? "invalid_json"
+      : err instanceof Error && err.message === "local_pg_mem_snapshot_invalid_schema"
+        ? "invalid_schema"
+        : "restore_error";
+    console.warn(`[db] failed to restore local pg-mem snapshot (${failureClass})`);
+    localPersistenceSnapshotCache = null;
+    localPersistenceConfirmedTables.clear();
+    throw new Error("local_pg_mem_snapshot_restore_failed", { cause: err });
   } finally {
     localPersistenceSuppress = false;
-    localPersistenceRestored = true;
+    localPersistenceRestored = restored;
   }
 }
 
@@ -1094,7 +1106,13 @@ export async function ensureDatabase(): Promise<void> {
         }
       }
     }).catch((err) => {
-      migratePromise = null;
+      // An unreadable persisted database is not a transient migration error.
+      // Keep this process fail-closed until an operator repairs the snapshot
+      // and restarts; retrying migrations against the already-created pg-mem
+      // instance can itself fail or make an empty database look usable.
+      if (!(err instanceof Error && err.message === "local_pg_mem_snapshot_restore_failed")) {
+        migratePromise = null;
+      }
       throw err;
     });
   }

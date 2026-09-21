@@ -1,0 +1,19 @@
+{
+  "schema": "eh_g8_nav_eq_plugin_catalog_refresh.v1",
+  "observed_at_utc": "2026-09-20T08:11:28Z",
+  "client": "Codex desktop task 01a03464-1f5e-7f93-bd17-e4ca8a0bec9e",
+  "plugin": "CasimirBot Device Check v2",
+  "observations": [
+    "The connected plugin settings exposed a Refresh control.",
+    "Refreshing populated the plugin settings action list with helix_environment_temporal_plan_submit_direct and its input schema.",
+    "The current already-running Codex task's sampled callable-tool catalog still omitted helix_environment_temporal_plan_submit_direct after that refresh.",
+    "An authenticated helix_room_list call still succeeded after refresh and returned the existing NAV1-O C0 room as owner-visible.",
+    "A later read-only actor-status probe succeeded with valid provenance at 2026-09-20T08:13:21.030Z: DatDamPig remained in Survival at (-2.1, 65, 7.7) with 20/20 health."
+  ],
+  "limits": [
+    "Plugin settings action discovery is not evidence that this already-running task can call the newly listed action.",
+    "The refreshed callable schema must be observed in a subsequent task turn before direct plan submission.",
+    "No run, Player Embodiment authority, temporal plan, or Minecraft movement was created in this checkpoint.",
+    "NAV-EQ remains specified; this is catalog handoff evidence only."
+  ]
+}

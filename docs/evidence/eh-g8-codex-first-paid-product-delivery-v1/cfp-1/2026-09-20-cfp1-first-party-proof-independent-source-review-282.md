@@ -1,0 +1,7 @@
+# CFP-1 first-party proof independent source review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. CFP-1 remains active (`specified`); CFP-2/3 remain blocked.
+
+An independent read-only reviewer checked [source boundary 281](2026-09-20-cfp1-first-party-fresh-proof-source-boundary-281.md) and its D02, D07, owner-queue and work-program backlinks against the current code. Verdict: **PASS after one precision correction**. Password sign-up derives `user:<email hash>` and creates a password credential; verified Google sign-in resolves an exact linked provider subject or `google:<sub>`, with email remaining profile data. The scoped source/package search did not find a first-party server WebAuthn/FIDO2/TOTP verifier; the OTP component found is a UI input. The Auth0 row was narrowed to say that **step-up start** requires developer plus native admission, while later native endpoints have their own intent/receipt checks. No existing password or factor route was promoted to ordinary-user Google-only fresh proof.
+
+The review is a source/document audit, not a security assessment, complete whole-repository absence proof, live factor trace or D07 financial review. The parent ran `npm run helix:environment-harness:docs-audit` with `ok: true` on the initial source/backlink edits; the final correction requires the same documentation audit to be rerun. No source, account, billing, runtime or production setting changed for this CFP-1 review.

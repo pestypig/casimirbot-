@@ -7,7 +7,7 @@ const DEFAULT_STALE_AFTER_MS = 30_000;
 
 export type HostCommitMemorySnapshot = {
   status: "available" | "stale" | "unavailable";
-  source: "windows_wmic" | "linux_proc_meminfo" | "unsupported" | "sample_error";
+  source: "windows_wmic" | "windows_cim" | "linux_proc_meminfo" | "unsupported" | "sample_error";
   platform: NodeJS.Platform;
   committedMiB?: number;
   limitMiB?: number;
@@ -46,7 +46,7 @@ const roundMiB = (value: number): number => Math.round(value * 10) / 10;
 const roundRatio = (value: number): number => Math.round(value * 10_000) / 10_000;
 
 const buildAvailableSnapshot = (input: {
-  source: "windows_wmic" | "linux_proc_meminfo";
+  source: "windows_wmic" | "windows_cim" | "linux_proc_meminfo";
   platform: NodeJS.Platform;
   limitKiB: number;
   freeKiB: number;
@@ -71,6 +71,7 @@ const buildAvailableSnapshot = (input: {
 export const parseWindowsVirtualMemoryOutput = (
   stdout: string,
   sampledAtMs = Date.now(),
+  source: "windows_wmic" | "windows_cim" = "windows_wmic",
 ): HostCommitMemorySnapshot | null => {
   const freeMatch = stdout.match(/(?:^|\r?\n)FreeVirtualMemory=(\d+)/i);
   const limitMatch = stdout.match(/(?:^|\r?\n)TotalVirtualMemorySize=(\d+)/i);
@@ -78,7 +79,7 @@ export const parseWindowsVirtualMemoryOutput = (
   const limitKiB = Number(limitMatch?.[1]);
   if (!Number.isFinite(freeKiB) || !Number.isFinite(limitKiB) || limitKiB <= 0) return null;
   return buildAvailableSnapshot({
-    source: "windows_wmic",
+    source,
     platform: "win32",
     limitKiB,
     freeKiB,
@@ -104,25 +105,63 @@ export const parseLinuxCommitMemory = (
   });
 };
 
-const sampleWindowsCommitMemory = (sampledAtMs: number): Promise<HostCommitMemorySnapshot> =>
+export type WindowsCommitCommandResult = { stdout: string; errorCode?: string };
+export type WindowsCommitCommandRunner = (
+  file: string,
+  args: readonly string[],
+  timeoutMs: number,
+) => Promise<WindowsCommitCommandResult>;
+
+const runWindowsCommitCommand: WindowsCommitCommandRunner = (file, args, timeoutMs) =>
   new Promise((resolve) => {
     execFile(
-      "wmic.exe",
-      ["OS", "get", "FreeVirtualMemory,TotalVirtualMemorySize", "/value"],
-      { timeout: 3_000, windowsHide: true, maxBuffer: 16 * 1024 },
+      file,
+      [...args],
+      { timeout: timeoutMs, windowsHide: true, maxBuffer: 16 * 1024 },
       (error, stdout) => {
-        const parsed = !error ? parseWindowsVirtualMemoryOutput(stdout, sampledAtMs) : null;
-        resolve(
-          parsed ?? {
-            status: "unavailable",
-            source: "sample_error",
-            platform: "win32",
-            errorCode: error && "code" in error ? String(error.code) : "windows_sample_invalid",
-          },
-        );
+        resolve({
+          stdout: String(stdout),
+          ...(error ? { errorCode: "code" in error ? String(error.code) : "windows_command_failed" } : {}),
+        });
       },
     );
   });
+
+const WINDOWS_CIM_COMMAND =
+  "$os=Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop;" +
+  "Write-Output ('FreeVirtualMemory='+$os.FreeVirtualMemory);" +
+  "Write-Output ('TotalVirtualMemorySize='+$os.TotalVirtualMemorySize)";
+
+export const sampleWindowsCommitMemory = async (
+  sampledAtMs: number,
+  runCommand: WindowsCommitCommandRunner = runWindowsCommitCommand,
+): Promise<HostCommitMemorySnapshot> => {
+  const wmic = await runCommand(
+    "wmic.exe",
+    ["OS", "get", "FreeVirtualMemory,TotalVirtualMemorySize", "/value"],
+    3_000,
+  );
+  const wmicSnapshot = !wmic.errorCode ? parseWindowsVirtualMemoryOutput(wmic.stdout, sampledAtMs) : null;
+  if (wmicSnapshot) return wmicSnapshot;
+
+  // WMIC is absent on newer Windows installations. Read the same OS commit
+  // counters through the built-in CIM provider; never substitute physical RAM
+  // for commit headroom or admit a turn when both measurements fail.
+  const cim = await runCommand(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", WINDOWS_CIM_COMMAND],
+    5_000,
+  );
+  const cimSnapshot = !cim.errorCode
+    ? parseWindowsVirtualMemoryOutput(cim.stdout, sampledAtMs, "windows_cim")
+    : null;
+  return cimSnapshot ?? {
+    status: "unavailable",
+    source: "sample_error",
+    platform: "win32",
+    errorCode: cim.errorCode ?? (wmic.errorCode ? "windows_cim_sample_invalid" : "windows_sample_invalid"),
+  };
+};
 
 const sampleLinuxCommitMemory = async (sampledAtMs: number): Promise<HostCommitMemorySnapshot> => {
   try {

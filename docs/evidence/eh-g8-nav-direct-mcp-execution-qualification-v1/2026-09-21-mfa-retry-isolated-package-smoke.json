@@ -1,0 +1,42 @@
+{
+  "schema": "helix.nav_eq_mfa_retry_isolated_package_smoke.v1",
+  "observed_at_utc": "2026-09-21T01:32:00Z",
+  "claim_ceiling": "The source recovery candidate is present in a separately named unsigned development EXE, its packaged runtime tree and disposable-profile launch smoke pass, and the existing isolated profile relaunches on its original private port with a native Register control enabled. No fresh owner MFA challenge, device registration, private MCP transport, Minecraft observation, or NAV-EQ movement has been accepted.",
+  "package": {
+    "path": "apps/desktop/release-nav-eq-mfa-retry-20260921/win-unpacked",
+    "source_commit_marker": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+    "exe_sha256": "10a7892a7304a2f267911df3c57bed02169dd941d898910e20cccb9d5fbc2be1",
+    "asar_sha256": "f86b149094055b2059f8d6a48ac05aa9535b83866b4a4edc50a5356ae0b0d5e8",
+    "runtime_manifest_sha256": "2d95eb8077aa1d7d83ed4ae37db4e9c1462e2703fc2e66f3df593f3b5380a63d",
+    "signature_status": "NotSigned",
+    "compiled_ui_recovery_marker_present": true,
+    "compiled_server_cancel_contract_marker_present": true,
+    "packaged_runtime_tree_verifier": "PASS",
+    "disposable_profile_packaged_launch_smoke": "PASS",
+    "disposable_profile_min_free_physical_gib": 3.82,
+    "disposable_profile_max_commit_percent": 59.2
+  },
+  "isolated_profile_relaunch": {
+    "profile": "C:/Users/dan/AppData/Local/CasimirBotNavEqIsolated20260920",
+    "old_exact_exe_closed_normally": true,
+    "new_exact_exe_running": true,
+    "private_loopback_port": 59664,
+    "healthz_status": 200,
+    "device_status": "unregistered",
+    "native_register_button": "enabled",
+    "old_mfa_intent_carried_as_authority": false,
+    "owner_mfa_challenge_attempted_on_new_package": false
+  },
+  "retention": {
+    "old_verified_nav_package": "retained as immediate rollback",
+    "older_prefix_package": "retained pending safe post-acceptance recycle",
+    "new_package": "running candidate",
+    "unrelated_processes_stopped": false
+  },
+  "verification_limits": [
+    "The source tree was concurrently dirty; sourceCommit alone is not a clean-source provenance claim.",
+    "Packaged smoke exercised a disposable profile, not Auth0 MFA or the Minecraft connector.",
+    "The first launch-smoke attempt was refused by its 4 GiB free-RAM guard; the exact old isolated EXE was then closed normally and the unchanged guard passed."
+  ],
+  "nav_eq_maturity": "specified"
+}

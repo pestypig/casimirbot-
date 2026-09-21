@@ -1,0 +1,7 @@
+# CFP-1 directory-admission handoff independent review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. Independent read-only review of the [non-dispatchable CFP-3 directory-admission packet](../../../work-packets/eh-g8-cfp3-public-connector-directory-admission-v1.md), its [C10 kit backlink](../../../work-packets/eh-g8-cfp3-public-connector-kit-v1.md), [audit 178](2026-09-20-cfp1-public-directory-package-scope-audit-178.md) and the canonical work-program reference in the shared dirty Desktop checkout at source HEAD `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93`.
+
+**Verdict: PASS for bounded implementation handoff quality.** DIR-01–06 cover exact GET inventory, known-ID start and pending approve/claim denial, conditional C10 system-clock probe, P03 bootstrap independence, persisted-row drift and old claimed-credential denial at device/probe admission. D12 per-package and qualified-rights choices remain CFP-1 prerequisites. The packet keeps developer access behind an explicit authenticated surface, not anonymous exposure of evaluation packages, and assigns server admission separately from the C10 archive builder. Relative links resolved.
+
+This is not a policy implementation, installed/probe acceptance, C10 rights disposition, final package allowlist or CFP-1 closure. CFP-1 remains active (`specified`); CFP-2/3 remain blocked and G8 active. No runtime or production setting changed.

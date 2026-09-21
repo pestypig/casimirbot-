@@ -1,0 +1,68 @@
+{
+  "schema": "eh_g8_nav1o_installed_repeatability_checkpoint.v1",
+  "date_utc": "2026-09-20",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+  "source_kind": "minecraft.fabric_mod.v1",
+  "world_id": "minecraft:local:combat-c0",
+  "subject_label": "DatDamPig",
+  "operation": "read-only actor-status compatibility perception snapshot with include_navigation_collision=true",
+  "client_wall_clock_note": "call_ms is Date.now() elapsed around the external MCP call, not a synchronized monotonic latency measurement",
+  "observations": [
+    {
+      "observed_at": "2026-09-20T08:17:24.147Z",
+      "evidence_ref": "environment_probe_evidence:a12eb5609869d2bc40f03a1501aee44f69b7731a",
+      "game_tick": 17272271,
+      "call_ms": 4310,
+      "native_capture_ms": 5.61
+    },
+    {
+      "observed_at": "2026-09-20T08:17:28.211Z",
+      "evidence_ref": "environment_probe_evidence:e9148e12584b0635c5a2a192224bc8cc0fbd4050",
+      "game_tick": 17272351,
+      "call_ms": 4113,
+      "native_capture_ms": 4.76
+    },
+    {
+      "observed_at": "2026-09-20T08:17:32.346Z",
+      "evidence_ref": "environment_probe_evidence:91d2633454366cc00852845292ea8723f38bc221",
+      "game_tick": 17272432,
+      "call_ms": 4136,
+      "native_capture_ms": 4.13
+    },
+    {
+      "observed_at": "2026-09-20T08:17:36.189Z",
+      "evidence_ref": "environment_probe_evidence:6bf546ab2e8055beec80fa148256764be3910616",
+      "game_tick": 17272512,
+      "call_ms": 3825,
+      "native_capture_ms": 3.83
+    }
+  ],
+  "common_result": {
+    "actor_outcome": "succeeded",
+    "snapshot_outcome": "succeeded",
+    "provenance_valid": true,
+    "collision_status": "captured",
+    "dimension": "minecraft:overworld",
+    "minimum": [-5, 63, 5],
+    "maximum": [-1, 67, 9],
+    "cells": 125,
+    "collision_counts": {
+      "empty": 90,
+      "unsupported": 35
+    }
+  },
+  "post_read_actor_check": {
+    "observed_at": "2026-09-20T08:18:48.168Z",
+    "mode": "survival",
+    "dimension": "minecraft:overworld",
+    "position": [-2.1, 65, 7.7],
+    "health": 20,
+    "max_health": 20
+  },
+  "limits": [
+    "Four consecutive captures strengthen repeatability evidence but do not establish a reliability SLO or latency distribution.",
+    "Unsupported cells are not traversable terrain and cannot justify a movement course.",
+    "No Player Embodiment authority, temporal plan, world mutation or movement was admitted."
+  ]
+}

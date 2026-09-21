@@ -1,0 +1,82 @@
+{
+  "schema": "helix.environment_harness.nav_eq.plugin_oauth_persistence_checkpoint.v1",
+  "recorded_at": "2026-09-21T05:27:00.000Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "ChatGPT connector account persistence for the installed CasimirBot MCP tunnel",
+  "lifecycle_stage": "connect and authenticate",
+  "reaction_timescale": "operator setup",
+  "authority_owner": "authenticated ChatGPT user and CasimirBot profile owner",
+  "current_maturity": "diagnostic",
+  "target_maturity": "live accepted prerequisite",
+  "plugin": {
+    "display_name": "CasimirBot Device Check v2",
+    "app_id": "asdk_app_6a91d26fb68481918606bfc290b2ab0d",
+    "version_id": "asdk_app_v_6a91d26fb68c8191b18631d04a7acda5",
+    "listed_in_plugin_settings": true,
+    "full_tool_catalog_visible": true,
+    "authorization_supported": "OAuth",
+    "connected_account_row_visible_after_retry": false,
+    "available_recovery_control": "Connect another account",
+    "exact_authorization_status_before_retry": "not_connected",
+    "exact_authorization_status_after_retry": "not_connected"
+  },
+  "oauth_observation": {
+    "latest_success_login_at": "2026-09-21T05:25:50.230Z",
+    "latest_success_exchange_at": "2026-09-21T05:25:53.270Z",
+    "authorization_resource_classification": "canonical_https_casimirbot_resource",
+    "authorization_resource_contains_loopback": false,
+    "exchange_log_scope_field": null,
+    "scope_field_interpretation": "diagnostic_only; Auth0 may omit scope when the authorization code already carries the grant, so this does not prove a missing-scope token",
+    "bearer_or_raw_claims_captured": false,
+    "oauth_code_or_state_captured": false
+  },
+  "installed_runtime": {
+    "desktop_process_running": true,
+    "desktop_process_id": 29236,
+    "tunnel_client_running": true,
+    "tunnel_client_process_id": 26772,
+    "tunnel_admin_listener": "127.0.0.1:52753",
+    "local_mcp_listener": "127.0.0.1:49304",
+    "commands_enqueued_total_before_retry": 1,
+    "commands_enqueued_total_after_retry": 1,
+    "commands_polled_total_before_retry": 1,
+    "commands_polled_total_after_retry": 1,
+    "new_tunneled_mcp_dispatch_observed": false
+  },
+  "finding": {
+    "first_unresolved_stage": "chatgpt_connector_account_persistence_or_post_exchange_validation",
+    "auth0_login_and_code_exchange_succeeded": true,
+    "plugin_installation_or_catalog_loss": false,
+    "desktop_or_tunnel_process_failure": false,
+    "minecraft_or_environment_runtime_failure": false,
+    "cause_proven": false
+  },
+  "safety_and_scope": {
+    "minecraft_action_attempted": false,
+    "environment_authority_changed": false,
+    "room_or_task_binding_changed": false,
+    "desktop_or_tunnel_restarted": false,
+    "runtime_or_source_files_changed": false,
+    "credentials_included": false,
+    "oauth_callback_values_included": false
+  },
+  "status": {
+    "plugin_v2_present": true,
+    "plugin_v2_connected": false,
+    "ready_for_minecraft_nav_testing_through_v2": false,
+    "nav_eq_maturity": "specified"
+  },
+  "stop_fail_criteria": [
+    "Do not begin NAV-EQ movement while the exact v2 client remains not connected.",
+    "Do not attribute the failure to Minecraft or the installed tunnel without a tunneled MCP dispatch.",
+    "Do not retain or publish OAuth callback values, codes, states, tokens, raw claims, or account identifiers."
+  ],
+  "explicit_non_goals": [
+    "No Minecraft movement or observation claim.",
+    "No NAV-EQ maturity promotion.",
+    "No Auth0 tenant or connector configuration change.",
+    "No inference of the exact ChatGPT post-exchange rejection cause."
+  ],
+  "downstream_gate_unlocked": "None; the connector-account persistence defect must be resolved and the exact v2 authorization-status call must succeed before live NAV work resumes through this path."
+}

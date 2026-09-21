@@ -261,7 +261,7 @@ function PairingControls({ profileId, chatId, environment, onRuntimeBinding }: P
   };
   const deliver = async (value: PairingStatus) => {
     if (!alive.current || value.state !== "pending" || review.invitationDelivery !== "automatic") return;
-    setDeliveryMessage("Delivering the approved invitation…");
+    setDeliveryMessage("Delivering the approved invitationâ€¦");
     try {
       const result = await deliverPairingInvitation(value);
       if (!alive.current) return;
@@ -317,11 +317,30 @@ function PairingControls({ profileId, chatId, environment, onRuntimeBinding }: P
   });
   usePairingRecoveryStorage(profileId, chatId);
   const selected = destinations.find(item => item.registrationId === review.registrationId);
+  useEffect(() => {
+    if (submitted || !review.registrationId || selected || !destinationDigest.current) return;
+    const replacements = destinations.filter(item => item.destinationDigest === destinationDigest.current);
+    if (replacements.length !== 1) return;
+    const replacement = replacements[0];
+    setReview(current => ({ ...current, registrationId: replacement.registrationId, requestId: crypto.randomUUID() }));
+    setApproved(false);
+    setMessage("The same authenticated AI task refreshed its registration. Review it again, then approve pairing when ready.");
+  }, [destinations, review.registrationId, selected, submitted]);
   const runChoice = review.environment ?? environment ?? lastOfferedEnvironment;
   const currentEnvironment = environment ?? lastOfferedEnvironment;
   const differentRunAvailable = review.environment && currentEnvironment &&
     (review.environment.roomId !== currentEnvironment.roomId || review.environment.runId !== currentEnvironment.runId);
   const invitationElapsed = pairing && clock >= Math.min(Date.parse(pairing.invitationExpiresAt), Date.parse(pairing.pairingExpiresAt));
+  const approvalBlocker = submitted || busy ? null
+    : !selected
+      ? review.registrationId
+        ? "The selected registration is no longer current. Refresh registered tasks; a matching refreshed task will be selected for a new review."
+        : "Choose the exact registered AI task first."
+      : !approved
+        ? "Review the task and check the pairing approval box."
+        : Boolean(review.replacement) && (!previousChecked || previous?.pairing.state !== "accepted" || previous.pairing.revision !== review.replacement?.revision)
+          ? "The previous pairing must be checked and still accepted before this replacement can be approved."
+          : null;
   return <section aria-label="Durable task pairing" className="mt-4 rounded border border-cyan-300/20 p-4 text-xs">
     <h3 className="font-semibold">Pair an existing AI task</h3>
     <p>Pairing permits exact-chat steering. Environment action permission is separate. Task registration does not mean the AI is currently active.</p>
@@ -376,8 +395,14 @@ function PairingControls({ profileId, chatId, environment, onRuntimeBinding }: P
       </select>
     </label>}
     <label className="block mt-3"><input type="checkbox" checked={approved} disabled={busy || submitted}
+      data-helix-control-id="workstation.panel.agent-access.durable-task-pairing.approve-exact-task"
+      data-helix-interaction-kind="human_only" data-helix-authority-state="client_local"
       onChange={e => setApproved(e.target.checked)} /> I approve pairing this exact task and chat for the selected duration.</label>
-    {(!pairing || pairing.state === "pending") && <button type="button" className="my-3 inline-flex min-h-11 items-center justify-center rounded-md border border-cyan-200 bg-cyan-300 px-4 py-2 text-left text-sm font-semibold text-slate-950 shadow-sm hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-50" disabled={busy || (!submitted && (!approved || !selected ||
+    {approvalBlocker && <p id="pairing-approval-blocker" className="mt-3 text-amber-100">{approvalBlocker}</p>}
+    {(!pairing || pairing.state === "pending") && <button type="button"
+      data-helix-control-id="workstation.panel.agent-access.durable-task-pairing.issue-invitation"
+      data-helix-interaction-kind="human_only" data-helix-authority-state="client_local"
+      className="my-3 inline-flex min-h-11 items-center justify-center rounded-md border border-cyan-200 bg-cyan-300 px-4 py-2 text-left text-sm font-semibold text-slate-950 shadow-sm hover:bg-cyan-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200 disabled:cursor-not-allowed disabled:opacity-50" aria-describedby={approvalBlocker ? "pairing-approval-blocker" : undefined} disabled={busy || (!submitted && (!approved || !selected ||
       (Boolean(review.replacement) && (!previousChecked || previous?.pairing.state !== "accepted" || previous.pairing.revision !== review.replacement?.revision))))} onClick={() => void issue()}>
       {submitted ? "Reconcile invitation" : "Approve pairing and create invitation"}
     </button>}

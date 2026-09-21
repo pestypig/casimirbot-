@@ -1,0 +1,329 @@
+{
+  "schema": "environment.temporal_action_plan.v1",
+  "plan_id": "nav_eq:arena:v3:root",
+  "previous_plan_id": null,
+  "previous_plan_hash": null,
+  "identity": {
+    "environment_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+    "source_id": "source:room-ingress:fd527d00-c1b9-49b8-9cee-4928577d6bb7",
+    "subject_id": "environment_subject_binding:17f434f8-2267-43cd-a766-651d9cd49ed1",
+    "producer_epoch": "environment_action_epoch:6c08124a-386f-464b-bc55-e1e1ef3894eb",
+    "authority_id": "environment_action_authority:826e7fd6-8a70-4c48-a426-719119dda505",
+    "authority_revision": 2,
+    "goal_id": "environment_durable_goal:0eee1fb7af0f40df751d24b6090c87eeb723bc18445844649eb794efa9cf2a14",
+    "goal_revision": 1,
+    "observation_revision": 17839034,
+    "affordance_revision": 3
+  },
+  "clocks": {
+    "environment": {
+      "kind": "tick",
+      "sequence": 10140,
+      "resolution_unit": "minecraft_tick",
+      "nominal_units_per_second": 20
+    },
+    "monotonic": {
+      "origin_id": "minecraft_monotonic_clock:4bd34a0c-9a21-467d-9f3b-193e1eb9073c",
+      "elapsed_ms": 506934
+    },
+    "audit_at": "2026-09-20T16:09:42.366Z"
+  },
+  "adapter_id": "minecraft.fabric_client",
+  "adapter_version": "1",
+  "compiler_version": "environment_time_minecraft:1",
+  "resident_executor_version": "native_fabric:1",
+  "start_node_id": "settled",
+  "maximum_total_units": 300,
+  "monotonic_deadline_elapsed_ms": 521934,
+  "watermarks": {
+    "decision_unit": 150,
+    "stop_unit": 260,
+    "committed_through_unit": 261,
+    "stabilization_node_id": "settled"
+  },
+  "lanes": [
+    {
+      "lane_id": "locomotion",
+      "priority": 100,
+      "resource_keys": [
+        "resource:locomotion"
+      ]
+    }
+  ],
+  "effect_ceiling": {},
+  "nodes": [
+    {
+      "kind": "checkpoint",
+      "node_id": "settled",
+      "checkpoint_id": "checkpoint:arena-v3-start",
+      "required_evidence_kinds": [
+        "player_pose"
+      ],
+      "condition": {
+        "kind": "adapter_condition",
+        "condition_id": "minecraft.player_grounded",
+        "arguments": {
+          "expected": true
+        }
+      },
+      "wait_up_to_units": 5,
+      "on_satisfied_node_id": "walk-0",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "action",
+      "node_id": "walk-0",
+      "lane_id": "locomotion",
+      "capability_id": "com.casimirbot.minecraft.player.walk",
+      "capability_version": "1",
+      "arguments": {
+        "action_kind": "walk",
+        "direction": "left",
+        "duration_ms": 1000,
+        "sprint": false
+      },
+      "required_resources": [
+        "resource:locomotion"
+      ],
+      "timing": {
+        "earliest_start_unit": 0,
+        "latest_start_unit": 145,
+        "maximum_duration_units": 30
+      },
+      "preconditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "completion_conditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "abort_guards": [],
+      "effect_budget": {},
+      "on_success_node_id": "progress",
+      "on_failure_node_id": "failed",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "checkpoint",
+      "node_id": "progress",
+      "checkpoint_id": "checkpoint:arena-v3-progress",
+      "required_evidence_kinds": [
+        "player_pose"
+      ],
+      "condition": {
+        "kind": "adapter_condition",
+        "condition_id": "minecraft.player_grounded",
+        "arguments": {
+          "expected": true
+        }
+      },
+      "wait_up_to_units": 5,
+      "on_satisfied_node_id": "walk-1",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "action",
+      "node_id": "walk-1",
+      "lane_id": "locomotion",
+      "capability_id": "com.casimirbot.minecraft.player.walk",
+      "capability_version": "1",
+      "arguments": {
+        "action_kind": "walk",
+        "direction": "back",
+        "duration_ms": 2250,
+        "sprint": false
+      },
+      "required_resources": [
+        "resource:locomotion"
+      ],
+      "timing": {
+        "earliest_start_unit": 0,
+        "latest_start_unit": 170,
+        "maximum_duration_units": 55
+      },
+      "preconditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "completion_conditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "abort_guards": [],
+      "effect_budget": {},
+      "on_success_node_id": "walk-2",
+      "on_failure_node_id": "failed",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "action",
+      "node_id": "walk-2",
+      "lane_id": "locomotion",
+      "capability_id": "com.casimirbot.minecraft.player.walk",
+      "capability_version": "1",
+      "arguments": {
+        "action_kind": "walk",
+        "direction": "left",
+        "duration_ms": 750,
+        "sprint": false
+      },
+      "required_resources": [
+        "resource:locomotion"
+      ],
+      "timing": {
+        "earliest_start_unit": 0,
+        "latest_start_unit": 215,
+        "maximum_duration_units": 25
+      },
+      "preconditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "completion_conditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "abort_guards": [],
+      "effect_budget": {},
+      "on_success_node_id": "walk-3",
+      "on_failure_node_id": "failed",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "action",
+      "node_id": "walk-3",
+      "lane_id": "locomotion",
+      "capability_id": "com.casimirbot.minecraft.player.walk",
+      "capability_version": "1",
+      "arguments": {
+        "action_kind": "walk",
+        "direction": "forward",
+        "duration_ms": 2250,
+        "sprint": false
+      },
+      "required_resources": [
+        "resource:locomotion"
+      ],
+      "timing": {
+        "earliest_start_unit": 0,
+        "latest_start_unit": 230,
+        "maximum_duration_units": 55
+      },
+      "preconditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "completion_conditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "abort_guards": [],
+      "effect_budget": {},
+      "on_success_node_id": "walk-4",
+      "on_failure_node_id": "failed",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "action",
+      "node_id": "walk-4",
+      "lane_id": "locomotion",
+      "capability_id": "com.casimirbot.minecraft.player.walk",
+      "capability_version": "1",
+      "arguments": {
+        "action_kind": "walk",
+        "direction": "right",
+        "duration_ms": 1000,
+        "sprint": false
+      },
+      "required_resources": [
+        "resource:locomotion"
+      ],
+      "timing": {
+        "earliest_start_unit": 0,
+        "latest_start_unit": 260,
+        "maximum_duration_units": 30
+      },
+      "preconditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "completion_conditions": [
+        {
+          "kind": "adapter_condition",
+          "condition_id": "minecraft.player_grounded",
+          "arguments": {
+            "expected": true
+          }
+        }
+      ],
+      "abort_guards": [],
+      "effect_budget": {},
+      "on_success_node_id": "success",
+      "on_failure_node_id": "failed",
+      "on_timeout_node_id": "failed"
+    },
+    {
+      "kind": "terminal",
+      "node_id": "success",
+      "outcome": "succeeded",
+      "reason_code": "done"
+    },
+    {
+      "kind": "terminal",
+      "node_id": "failed",
+      "outcome": "failed",
+      "reason_code": "failed"
+    }
+  ],
+  "automatic_replay": false,
+  "adapter_strategy_authority": false,
+  "answer_authority": false,
+  "assistant_answer": false,
+  "terminal_eligible": false
+}

@@ -1,0 +1,9 @@
+# Independent CFP-1 resource-token contract review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`), CFP-2/3 blocked. An independent read-only reviewer checked the [owner resource-token direction 154](2026-09-20-cfp1-owner-resource-token-direction-154.md), the [internal PBT contract](../../../work-packets/eh-g8-cfp1-hosted-resource-budget-token-contract-v1.md), and its product-goal, offer, D07 worksheet/assay/queue, trial, CFP-3.COMMERCE and canonical work-program backlinks.
+
+The reviewer returned **PASS**. The packet treats the owner's suggestion as a provisional internal cost/admission model under the already selected subscription. Its illustrative USD $0.001/PBT denomination is not a customer price. The text does not sell GPT/Codex tokens, credits, top-ups or usage charges. Delayed provider detail requires conservative pre-reservation, separate hard resource ceilings and later reconciliation; this remains conditional on actual measurement or sourced bounds. The seven-day trial calendar, native verified-effect quota, owner grants, stop/revoke and free personal access remain separate. Local links resolve.
+
+A follow-up review also returned **PASS** on the [domain/account plan's proposed hosted-budget row](../../../architecture/casimirbot-domain-accounts-and-delivery-plan-v1.md). That row remains conditional on D07 and defines a logical sponsor-term responsibility without requiring a new physical table, Stripe credit, native-effect authority or transferable handoff balance.
+
+The review does not set a paid/trial PBT allowance, verify account prices or fees, prove useful hosted action, clear commercial rights or establish an implemented meter. D07 final price/limits, D11 qualified returns and D12 integrated freeze remain open; CFP-1 stays active (`specified`), CFP-2/3 blocked and G8 active.

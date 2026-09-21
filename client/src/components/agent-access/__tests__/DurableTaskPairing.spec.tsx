@@ -56,6 +56,30 @@ it("O4 preserves selected run when presence-derived props disappear and requires
   expect(fetch).toHaveBeenCalledTimes(1);
 });
 
+it("recovers a refreshed registration for the same exact task without carrying approval", async () => {
+  const storageKey = `helix.pairing.review.v1:${JSON.stringify([props.profileId, props.chatId])}`;
+  localStorage.setItem(`${storageKey}:draft`, JSON.stringify({
+    requestId: "request:stale",
+    registrationId: "registration:stale",
+    chatId: props.chatId,
+    environment: null,
+    invitationSeconds: 900,
+    pairingSeconds: 28800,
+  }));
+  localStorage.setItem(`${storageKey}:destination`, destination.destinationDigest);
+  vi.stubGlobal("fetch", vi.fn(async () => response(listed)));
+
+  render(<DurableTaskPairing {...props} />);
+
+  await waitFor(() => expect((screen.getByLabelText("Registered AI task") as HTMLSelectElement).value)
+    .toBe(destination.registrationId));
+  expect(screen.getByText(/same authenticated AI task refreshed its registration/i)).toBeTruthy();
+  expect((screen.getByLabelText(/I approve pairing/) as HTMLInputElement).checked).toBe(false);
+  expect(screen.getByText(/check the pairing approval box/i)).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Approve pairing and create invitation" }) as HTMLButtonElement).disabled)
+    .toBe(true);
+});
+
 it("retains an unselected run candidate through idle presence without granting consent or leaking across chats", async () => {
   const fetch = vi.fn(async () => response(listed)); vi.stubGlobal("fetch", fetch);
   const view = render(<DurableTaskPairing {...props} />);

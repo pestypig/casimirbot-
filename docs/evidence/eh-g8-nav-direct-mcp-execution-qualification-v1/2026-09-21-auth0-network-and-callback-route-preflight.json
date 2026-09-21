@@ -1,0 +1,59 @@
+{
+  "schema": "helix.nav_eq_auth0_network_callback_preflight.v1",
+  "observed_at_utc": "2026-09-21T01:46:53Z",
+  "followup_at_utc": "2026-09-21T01:58:03Z",
+  "claim_ceiling": "Basic Auth0 network reachability and desktop callback-route mismatch are verified. The newest browser MFA submission and its Auth0 tenant-side cause remain unverified; this is not device-registration, MCP, Minecraft, NAV1-O live-observation, or NAV-EQ acceptance.",
+  "network": {
+    "auth0_dns_a_records": 2,
+    "openid_configuration_get_http": 200,
+    "openid_configuration_head_http": 200,
+    "local_minus_auth0_http_date_seconds": -1.3,
+    "mfa_post_status_for_latest_attempt": "not_observed",
+    "auth0_dashboard_logs": "not_inspected_dashboard_login_required"
+  },
+  "native_runtime": {
+    "new_candidate_process_count": 6,
+    "new_candidate_private_health_http": 200,
+    "free_physical_gib_at_followup": 2.94,
+    "package_smoke_min_free_physical_gib": 4,
+    "isolated_user_data_switch": true,
+    "windows_protocol_handler_targets_new_candidate": false,
+    "windows_protocol_handler_targets_previous_package": true,
+    "new_candidate_received_oauth_callback_by_prior_checkpoint": false,
+    "callback_route_failure_is_current_mfa_post_cause": false,
+    "sanitized_native_ui": {
+      "device_status": "unregistered",
+      "waiting_for_mfa": true,
+      "stop_waiting_available": true,
+      "register_button_enabled": false
+    }
+  },
+  "client_transport": {
+    "codex_device_check_v2": "McpServerError: Session terminated",
+    "keyed_harness_port_1522_listening": false,
+    "candidate_private_port_59664_listening": true,
+    "fabric_server_port_25566_listening": false,
+    "direct_minecraft_observation_performed": false
+  },
+  "source_repair": {
+    "scope": "Before either native Auth0 browser handoff, require the non-isolated current EXE to own the custom-protocol callback. A failed preflight leaves the browser unopened; the step-up UI cancels its pending exact intent and both UI surfaces show a specific callback-route message.",
+    "files": [
+      "apps/desktop/src/auth0-account-link.ts",
+      "apps/desktop/src/main.ts",
+      "client/src/components/agent-access/AgentAccountBindingReadiness.tsx",
+      "client/src/components/workstation/InstalledServicesPanel.tsx",
+      "tests/desktop-auth0-account-link.spec.ts",
+      "client/src/components/agent-access/__tests__/AgentAccountBindingReadiness.spec.tsx",
+      "client/src/components/workstation/__tests__/InstalledServicesPanel.spec.tsx"
+    ],
+    "focused_tests": "32/32 passed across three files",
+    "desktop_typecheck": "passed",
+    "packaged_or_live_accepted": false
+  },
+  "next": [
+    "Obtain a non-secret Auth0 tenant failure event or the HTTP status for the latest MFA submission before interpreting the upstream challenge.",
+    "Use a callback transport owned by the exact test instance; do not redirect a successful callback into another profile or take over the global handler silently.",
+    "Reestablish authenticated full MCP and live Minecraft identities before NAV1-O matched-runtime observation or NAV-EQ effects."
+  ],
+  "nav_eq_maturity": "specified"
+}

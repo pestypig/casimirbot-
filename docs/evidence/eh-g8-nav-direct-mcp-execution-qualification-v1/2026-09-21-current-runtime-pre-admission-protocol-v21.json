@@ -1,0 +1,189 @@
+{
+  "schema": "helix.nav_eq_pre_admission_protocol.v21",
+  "protocol_version": "v21",
+  "status": "draft_pending_authenticated_direct_tool_and_fresh_geometry",
+  "scope": "Current-runtime NAV-EQ preparation only; this draft cannot authorize or dispatch Minecraft movement",
+  "motion_authorized": false,
+  "runtime": {
+    "desktop_package": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/CasimirBot.exe",
+    "desktop_executable_sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+    "desktop_app_asar": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/resources/app.asar",
+    "desktop_app_asar_sha256": "569FF6A1DDD01507C4B2C969BA6824B890556A44457BAB99B87D532BD1778CD5",
+    "fabric_jar": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/HelixFabricPlayerAgent-0.4.12.jar",
+    "fabric_jar_sha256": "9DE77E3309F7F9DD1533D4BDCF1794475D259A63D87C01CADF57A3B02BB56F47",
+    "runtime_manifest": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/resources/runtime/runtime-manifest.json",
+    "runtime_manifest_sha256": "4A3F5EC60E1DC2E29A94A49C94A659EE0750583BA73D8F4C08CEB2886BF6DBB1",
+    "runtime_manifest_schema": "casimir_desktop_runtime_manifest/2",
+    "runtime_manifest_source_commit": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+    "runtime_manifest_server_sha256": "a036a3159cfc7b27ef8c1499b1ea7076a3b9906f26d855a904aeb225c933630a"
+  },
+  "execution_context": {
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+    "producer_epoch": "adapter_epoch:f855c8c9bc8df139baa97fc96dce5847074a1d15",
+    "world_id": "minecraft:minehut:8fc80440-6fe",
+    "adapter": "minecraft.fabric_mod.v1",
+    "subject_id": "environment_subject:4ae0191f0ac6b5fcf5aa554bf7f2aecdbfbc274e2513e2b4",
+    "player": "DatDamPig",
+    "run_id": null,
+    "goal_id": null
+  },
+  "direct_tool": {
+    "required_tool": "helix_environment_temporal_plan_submit_direct",
+    "authenticated_namespace": null,
+    "authenticated_callable": false,
+    "capability_profile": "g2-action",
+    "connected_v1_ready": true,
+    "unconnected_v2_must_not_be_used": true,
+    "full_agent_transition_request_ref": "desktop_tunnel_request:6cbe1aa3-c477-4ec3-afa9-e2acc45078f2",
+    "full_agent_transition_status": "transition_accepted",
+    "catalog_refresh_required": true
+  },
+  "movement_authority": {
+    "authority_id": null,
+    "status": null,
+    "expires_at": null,
+    "domain_adapter": "minecraft.fabric_client.v1",
+    "allowed_capability_ids": [
+      "com.casimirbot.minecraft.player.walk",
+      "com.casimirbot.minecraft.player.sequence.execute"
+    ],
+    "autonomy_mode": "approved_capabilities",
+    "manual_override_policy": "cancel"
+  },
+  "last_read_only_observation": {
+    "classification": "current-runtime preflight evidence; must be refreshed before protocol freeze",
+    "actor_evidence_ref": "environment_probe_evidence:a8fda8105ffbf71eb5e6bad149dca1e2ac73e8ca",
+    "perception_evidence_ref": "environment_probe_evidence:283eb35c49008b12c97b7ad7887a8c3255201a36",
+    "observed_at": "2026-09-21T06:31:13.126Z",
+    "game_tick": 18464884,
+    "position": {
+      "x": 0.56,
+      "y": 65,
+      "z": 2.37
+    },
+    "yaw": -178.65,
+    "pitch": 3.45,
+    "health": 20,
+    "food_level": 20,
+    "stationary": true,
+    "safe_immediate_movement_candidates": 4,
+    "reachable_footholds": 181,
+    "capture_duration_ms": 6.88,
+    "semantic_fingerprint": "sha256:c6265f617ac526088744bc9a7bddede0117227b1e688a4ff7af63b1456d27b1e"
+  },
+  "course": {
+    "geometry_evidence_ref": "environment_probe_evidence:283eb35c49008b12c97b7ad7887a8c3255201a36",
+    "geometry_observed_at": "2026-09-21T06:31:13.126Z",
+    "geometry_semantic_fingerprint": "sha256:c6265f617ac526088744bc9a7bddede0117227b1e688a4ff7af63b1456d27b1e",
+    "geometry_current_for_freeze": false,
+    "course_envelope_for_player_center": null,
+    "root_actions": null,
+    "root_end_postcondition": null,
+    "historical_candidate_only": {
+      "source_protocol": "2026-09-20-south-floor-sweep-protocol-v20.json",
+      "reusable_without_fresh_probe": false,
+      "course_envelope_for_player_center": {
+        "x_min": -6.3,
+        "x_max": 7.0,
+        "z_min": -2.55,
+        "z_max": 3.3,
+        "y": 65
+      },
+      "root_actions": [
+        { "direction": "left", "duration_ms": 1400 },
+        { "direction": "forward", "duration_ms": 250 },
+        { "direction": "right", "duration_ms": 2800 },
+        { "direction": "forward", "duration_ms": 250 },
+        { "direction": "left", "duration_ms": 2800 },
+        { "direction": "forward", "duration_ms": 250 },
+        { "direction": "right", "duration_ms": 2800 },
+        { "direction": "forward", "duration_ms": 250 },
+        { "direction": "left", "duration_ms": 2800 },
+        { "direction": "forward", "duration_ms": 80 },
+        { "direction": "right", "duration_ms": 2800 }
+      ]
+    }
+  },
+  "clocks": {
+    "frontier_ref": null,
+    "environment_tick_sequence": null,
+    "monotonic_origin_id": null,
+    "monotonic_elapsed_ms": null,
+    "audit_at": null
+  },
+  "lineage": {
+    "root_plan_id": null,
+    "root_plan_hash": null,
+    "successor_plan_ids": [],
+    "required_rolling_successor_count": 3
+  },
+  "measurement_limits": {
+    "frozen": false,
+    "geometry_freeze_max_age_ms": null,
+    "root_max_total_ticks": null,
+    "decision_tick": null,
+    "stop_tick": null,
+    "monotonic_deadline_ms_after_frontier": null,
+    "evidence_drain_runway_ms": null,
+    "direct_user_cancel_limit_ms": null,
+    "manual_takeover_release_limit_ms": null,
+    "required_metrics": [
+      "resident computation and dispatch-to-first-tick p50/p95/p99",
+      "useful motion ratio and stationary/missed ticks",
+      "queue depth, successor readiness and committed runway",
+      "observation-to-re-entry and replan delay",
+      "local/manual and direct-user cancellation latency",
+      "duplicate and stale effects",
+      "evidence volume and progress per model/tool round trip"
+    ]
+  },
+  "required_live_fields_before_freeze": [
+    "runtime.runtime_manifest_sha256",
+    "runtime.runtime_manifest_source_commit",
+    "runtime.runtime_manifest_server_sha256",
+    "execution_context.producer_epoch",
+    "execution_context.run_id",
+    "execution_context.goal_id",
+    "direct_tool.authenticated_namespace",
+    "direct_tool.authenticated_callable",
+    "movement_authority.authority_id",
+    "movement_authority.status",
+    "movement_authority.expires_at",
+    "course.geometry_evidence_ref",
+    "course.geometry_observed_at",
+    "course.geometry_semantic_fingerprint",
+    "course.geometry_current_for_freeze",
+    "course.course_envelope_for_player_center",
+    "course.root_actions",
+    "course.root_end_postcondition",
+    "clocks.frontier_ref",
+    "clocks.environment_tick_sequence",
+    "clocks.monotonic_origin_id",
+    "clocks.monotonic_elapsed_ms",
+    "clocks.audit_at",
+    "lineage.root_plan_id",
+    "lineage.root_plan_hash",
+    "measurement_limits.frozen",
+    "measurement_limits.geometry_freeze_max_age_ms",
+    "measurement_limits.root_max_total_ticks",
+    "measurement_limits.decision_tick",
+    "measurement_limits.stop_tick",
+    "measurement_limits.monotonic_deadline_ms_after_frontier",
+    "measurement_limits.evidence_drain_runway_ms",
+    "measurement_limits.direct_user_cancel_limit_ms",
+    "measurement_limits.manual_takeover_release_limit_ms"
+  ],
+  "stop_criteria": [
+    "Any identity, world, source or producer epoch change",
+    "Direct temporal submit is unavailable or unauthenticated",
+    "Fresh course geometry is missing, stale or incomplete",
+    "Movement-only authority is absent, expired, revoked or capability-divergent",
+    "Any required clock, numeric limit, lineage field or evidence-drain runway is missing",
+    "Entity, projectile, hazard, health loss or manual input appears before admission",
+    "Any attempt to reuse the historical V20 authority, run, goal, clocks or geometry as current evidence"
+  ],
+  "claim_ceiling": "Fail-closed pre-admission preparation only; NAV-EQ remains specified and no Minecraft motion is authorized"
+}

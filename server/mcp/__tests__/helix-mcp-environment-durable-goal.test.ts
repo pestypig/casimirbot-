@@ -132,7 +132,7 @@ const projection: HelixEnvironmentDurableGoalProjection = {
   raw_content_included: false,
 };
 
-const connect = async (scopes: readonly string[], exactTask = false) => {
+const connect = async (scopes: readonly string[], exactTask = false, includeBindingStore = true) => {
   const goalStore = {
     create: vi.fn(async () => projection),
     inspect: vi.fn(async () => projection),
@@ -141,15 +141,19 @@ const connect = async (scopes: readonly string[], exactTask = false) => {
   const inspectRoom = vi.fn(async () => ({ room: { self_participant_id: PARTICIPANT_ID } }));
   const authenticateClient = vi.fn();
   const verifyTaskAssociation = vi.fn();
+  const listRunPreparationCandidates = vi.fn(async (_input: { runId?: string }) => [
+    { runId: "test:run_id" },
+  ]);
   const server = createHelixMcpServer({
     principal: { ...principal(scopes), mcpClientRef: "mcp_client:test" },
     ...(exactTask ? {
       localSupervisorCoordinationStore: { serviceInstanceRef: "service:test", authenticateClient } as never,
-      reasoningTaskBindingStore: { verifyTaskAssociation } as never,
+      ...(includeBindingStore ? { reasoningTaskBindingStore: { verifyTaskAssociation,
+        resolveDurableBindingContext: vi.fn().mockReturnValue(null) } as never } : {}),
     } : {}),
     service: {} as HelixAgentApiService,
     roomControlService: { inspectRoom } as unknown as SharedLiveRoomControlService,
-    roomBindingStore: {} as Pick<SharedLiveRoomBindingStore, "bindRunToRoom" | "claimPendingChatBinding" | "revokeRunRoomBindingForOwner" | "revokeClaimedRunChatBindingForOwner">,
+    roomBindingStore: { listRunPreparationCandidates } as unknown as Pick<SharedLiveRoomBindingStore, "bindRunToRoom" | "claimPendingChatBinding" | "revokeRunRoomBindingForOwner" | "revokeClaimedRunChatBindingForOwner">,
     deviceCheckService: vi.fn(),
     environmentDurableGoalService: goalStore,
   });
@@ -157,7 +161,8 @@ const connect = async (scopes: readonly string[], exactTask = false) => {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
   await client.connect(clientTransport);
-  return { client, goalStore, inspectRoom, authenticateClient, verifyTaskAssociation, close: async () => { await client.close(); await server.close(); } };
+  return { client, goalStore, inspectRoom, authenticateClient, verifyTaskAssociation,
+    listRunPreparationCandidates, close: async () => { await client.close(); await server.close(); } };
 };
 
 const temporalArgs = () => ({
@@ -202,13 +207,70 @@ const temporalArgs = () => ({
 });
 
 describe("Helix MCP durable environment goal", () => {
+  it("admits a direct MCP client context without claiming a chat binding", async () => {
+    const admit = vi.spyOn(temporalAdmission, "admitDirectTemporalPlan")
+      .mockResolvedValue({ action_request_id: "direct-admitted:test" } as never);
+    const connection = await connect([HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE], true, false);
+    try {
+      expect((await connection.client.listTools()).tools.map(tool => tool.name))
+        .toContain("helix_environment_temporal_plan_submit_direct");
+      const { client_continuation_ref: _continuation, reasoning_binding_id: _binding,
+        binding_epoch: _epoch, helix_conversation_id: _chat,
+        mission_id: _mission, ...argumentsForDirect } = temporalArgs();
+      const result = await connection.client.callTool({
+        name: "helix_environment_temporal_plan_submit_direct", arguments: argumentsForDirect,
+      });
+      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        execution_context_kind: "authenticated_mcp_client_session",
+        provider_task_verified: false, room_steering_authority: false,
+        admission_not_execution_proof: true,
+      });
+      expect(connection.verifyTaskAssociation).not.toHaveBeenCalled();
+      expect(admit).toHaveBeenCalledOnce();
+      expect(admit.mock.calls[0][0].preflight.association).toMatchObject({
+        kind: "direct_mcp_client", profileRef: "profile:durable-goal-mcp",
+        roomId: ROOM_ID, runId: "test:run_id", participantId: PARTICIPANT_ID,
+        associationId: expect.stringMatching(/^direct_mcp_context:/),
+        continuationRef: expect.stringMatching(/^direct_mcp_session:/),
+      });
+      admit.mockClear();
+      connection.listRunPreparationCandidates.mockResolvedValueOnce([]);
+      const stale = await connection.client.callTool({
+        name: "helix_environment_temporal_plan_submit_direct", arguments: argumentsForDirect,
+      });
+      expect(stale.isError).toBe(true);
+      expect(JSON.stringify(stale)).toContain("direct_mcp_run_unverified");
+      expect(admit).not.toHaveBeenCalled();
+    } finally { admit.mockRestore(); await connection.close(); }
+  });
+
+  it("rejects direct temporal submission without the action scope", async () => {
+    const admit = vi.spyOn(temporalAdmission, "admitDirectTemporalPlan");
+    const connection = await connect([HELIX_SHARED_LIVE_ROOM_READ_SCOPE], true, false);
+    try {
+      const { client_continuation_ref: _continuation, reasoning_binding_id: _binding,
+        binding_epoch: _epoch, helix_conversation_id: _chat,
+        mission_id: _mission, ...argumentsForDirect } = temporalArgs();
+      const denied = await connection.client.callTool({
+        name: "helix_environment_temporal_plan_submit_direct", arguments: argumentsForDirect,
+      });
+      expect(denied.isError).toBe(true);
+      expect(JSON.stringify(denied)).toContain("insufficient_scope");
+      expect(admit).not.toHaveBeenCalled();
+    } finally { admit.mockRestore(); await connection.close(); }
+  });
+
   it("submits serial plans with authenticated exact-task identity and refuses a rejected binding", async () => {
     const admit = vi.spyOn(temporalAdmission, "admitTemporalPlan").mockResolvedValue({ action_request_id: "admitted:test" } as never);
     const connection = await connect([HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_ENVIRONMENT_ACTION_WRITE_SCOPE], true);
     try {
       expect((await connection.client.listTools()).tools.map(tool => tool.name)).toContain("helix_environment_temporal_plan_submit");
       const result = await connection.client.callTool({ name: "helix_environment_temporal_plan_submit", arguments: temporalArgs() });
-      expect(result.isError, JSON.stringify(result)).not.toBe(true);
+      expect(result.isError, JSON.stringify({ result,
+        authenticated: connection.authenticateClient.mock.calls.length,
+        bindingVerified: connection.verifyTaskAssociation.mock.calls.length,
+        admitted: admit.mock.calls.length })).not.toBe(true);
       expect(connection.authenticateClient).toHaveBeenCalledOnce();
       expect(admit).toHaveBeenCalledOnce();
       expect(admit.mock.calls[0][0]).toMatchObject({ preflight: {

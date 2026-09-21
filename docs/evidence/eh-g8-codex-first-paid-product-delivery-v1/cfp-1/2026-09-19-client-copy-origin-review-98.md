@@ -1,0 +1,7 @@
+# CFP-1 client copy-origin review — 2026-09-19
+
+The [C03 local client inventory](2026-09-19-client-public-copy-origin-candidate-97.md) now supplies a [636-file output/staging manifest](2026-09-19-client-public-local-tree-candidate-95.csv) and a [109-file explicit Vite vendor/WASM source map](2026-09-19-client-explicit-vendor-copy-candidate-96.csv). It separates 50 same-path `client/public` byte matches from 109 exact npm-source copies, leaving 477 local output files for bundle/source-origin reconciliation, with the earlier media crosswalk covering some of them.
+
+An independent read-only reviewer recomputed **all 636** output sizes/hashes and staged-runtime matches, **all 109** package-source/staged hashes, package metadata and root LICENSE hashes, and the direct-static/media overlap. It checked `vite.config.ts` targets, extension totals, links, C03 submission backlink and the local-candidate versus signed-release caveat. The bounded review returned **PASS**. It did not determine rights obligations or produce a signed release SBOM.
+
+The environment documentation audit returned `ok: true`, local links resolved and `git diff --check` passed on affected tracked packets. Qualified C03 rights review, bundled-module origin mapping and CFP-3 signed-byte extraction remain open. CFP-1 stays active (`specified`), CFP-2/3 blocked and G8 active under the [work program](../../../helix-environment-harness-work-program-v1.md).

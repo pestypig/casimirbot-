@@ -1,0 +1,131 @@
+{
+  "capturedAt": "2026-09-21T19:14:48.970Z",
+  "liveHead": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+  "g0Snapshot": "3606fa7b1403bf1b42b3c3dfddda1ec504e39681",
+  "notes": [
+    "Hashes identify inspected working files; no runtime tests or released bytes inferred.",
+    "Drift reads untracked working files directly; git diff against snapshot would misleadingly show untracked additions as deletions.",
+    "No NAV/account changes modified by G1."
+  ],
+  "sources": [
+    {
+      "path": ".github/workflows/desktop-release.yml",
+      "sha256": "c60ac703e524fab98df6a9943a9464094fd6f0ecd6db20b6a77332f7e8adacd5"
+    },
+    {
+      "path": ".replit",
+      "sha256": "bb03854e0ef43c9f589ed8036cc7d1902268301f691bb6c55a7a84a304f3ac30"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "sha256": "8a088663bfc3b2da2436ca3762f9d605004e69a82bc55296d0ba851f683a645d"
+    },
+    {
+      "path": "apps/desktop/src/main.ts",
+      "sha256": "90840bcf957b9d85e20277a75734cf51c1364a0066e46f30c3d40bbf52240b18"
+    },
+    {
+      "path": "docs/replit-parity-contract.md",
+      "sha256": "a9465307ae62262706443321f2cddaa2df552e20e4c404de9c59e8a9649c5092"
+    },
+    {
+      "path": "server/__tests__/environment-adapter-registry.test.ts",
+      "sha256": "9172ac0988cba173f8b35d69f1e76ee1f5177c1efa1d007a1a092ca9865f872b"
+    },
+    {
+      "path": "server/mcp/helix-mcp-server.ts",
+      "sha256": "3ef75f150c797888a7b3984cd6b85289823abaaefdde632ad68d6ca02658965e"
+    },
+    {
+      "path": "server/routes/__tests__/stripe-sandbox-webhook.test.ts",
+      "sha256": "bda44e7da038737268045fcc0e2077289a09fc6b40ee46d04dea17bb2f75a577"
+    },
+    {
+      "path": "server/routes/agi.realtime-room/index.ts",
+      "sha256": "39560b23c770c6f598e82468057bf92a175b8fed8efa37a31937cbdb3a1b5ee2"
+    },
+    {
+      "path": "server/routes/agi.workstation-tool-gateway.ts",
+      "sha256": "ced84d86d8db5e99cee468fc7e7050d2f64bd5cb64d414e20538703a33f27471"
+    },
+    {
+      "path": "server/routes/helix-mcp.ts",
+      "sha256": "857c6a091a750c52af983abbbf264dd685e6f6ce9dfa3598b390e8641ad24bb0"
+    },
+    {
+      "path": "server/routes/stripe-sandbox-webhook.ts",
+      "sha256": "f70d2171f663907e08362ce22af824ad930b526ea1c1e4454122b3930f64e3ff"
+    },
+    {
+      "path": "server/services/environment-connectors/actions/action-broker.ts",
+      "sha256": "8f59c420cbb813fb52532b9c11384c908b38a20cec8c0f72812cb5dd7c0c93ba"
+    },
+    {
+      "path": "server/services/environment-connectors/actions/authority-store.ts",
+      "sha256": "7bbd742714a6c3e17f23691473c9a7190c9311e3b3f9f63c5c3392b312164411"
+    },
+    {
+      "path": "server/services/environment-connectors/catalog/index.ts",
+      "sha256": "eac21073722d3dbec0174fb38b3588a5e0cde71707b8ab6bdf3286d0cef2dfad"
+    },
+    {
+      "path": "server/services/environment-connectors/directory/index.ts",
+      "sha256": "858b4cc50f99c21cf22cd88de35e80898d1a831d854109aa964ad7f06352aefb"
+    },
+    {
+      "path": "server/services/helix-account/auth0-step-up.ts",
+      "sha256": "dbd6e7b9de29eb85edd1a24a9c74f1bf80e2ceef941ad5c41909feb28a3cc5d1"
+    },
+    {
+      "path": "server/services/helix-account/billing-entitlement-store.ts",
+      "sha256": "82ecd2751826e9f0f5fb4ce457d9e0608ab8ec205ba0f6ec955c7cca3886e9db"
+    },
+    {
+      "path": "server/services/helix-account/stripe-sandbox-client.ts",
+      "sha256": "06d8ac64855150e324b8e0860ea9eea93ad0304db89523277cd572b0ffce8526"
+    },
+    {
+      "path": "server/services/situation-room/environment-action-adapter-registry.ts",
+      "sha256": "150f31d379594357f6b83d8e1698bd5db535edbf8f2293a81fc4e9ee7faa27b0"
+    },
+    {
+      "path": "server/services/situation-room/environment-adapter-registry.ts",
+      "sha256": "63afff6d89c6e6f520cc772b04694e8aad67fd8f75342fe35fb335401ca751f0"
+    },
+    {
+      "path": "shared/contracts/helix-shared-live-room-agent.v1.ts",
+      "sha256": "baf06bf90d58583cfba15e0f0c665143ac6f796be97700cfb85c70f1a58dc9fe"
+    },
+    {
+      "path": "shared/desktop-auth0-account-link.ts",
+      "sha256": "4a4c1c8225e95328c368549a97b44d254814a29e4fa7ef887887d09572097549"
+    },
+    {
+      "path": "shared/helix-account-session.ts",
+      "sha256": "b11ed6a8e419af3a8b55f15586e45fd0f1839ddffb261524bcbcf2174694dee4"
+    },
+    {
+      "path": "shared/helix-billing-entitlement.ts",
+      "sha256": "4d6c41e756d6f433fedacec5f25504c426e25cf2e8cfce9126c5b6f98cf55185"
+    },
+    {
+      "path": "shared/helix-minecraft-player-capabilities.ts",
+      "sha256": "191701a475e4cfe516835f91037004da11a2e29016212d69b1d2c03ddf02e2d7"
+    },
+    {
+      "path": "tests/desktop-auth0-account-link.spec.ts",
+      "sha256": "16205dddede568eb61a0729906de173de2a9560fdb59940156c74a3c0341a551"
+    },
+    {
+      "path": "tests/desktop-release-signing.spec.ts",
+      "sha256": "7e9e79098bfd8f02be6fc03397bc024c3b69e6abe124f23d67c96ad16df90c7e"
+    }
+  ],
+  "postG0Drift": [
+    {
+      "path": "docs/work-packets/eh-g8-casimirbot-platform-market-launch-execution-v1.md",
+      "before": "50b7fe0da5a6285a7cd13e4ebdd949c0d4f6c58907409b421f38b4ae83c3ec55",
+      "after": "e5f24667ec614b0dd61bb29fbca5964cfea2c1f40bcb937c9bb7c4bda2bc7d42"
+    }
+  ]
+}

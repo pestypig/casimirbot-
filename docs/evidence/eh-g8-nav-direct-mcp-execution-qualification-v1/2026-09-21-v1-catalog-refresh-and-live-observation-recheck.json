@@ -1,0 +1,134 @@
+{
+  "schema": "helix.environment_harness.nav_eq.v1_catalog_and_observation_recheck.v1",
+  "recorded_at": "2026-09-21T06:32:25.6696142Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "Connected-v1 catalog refresh, current supervisor identity, and matched-runtime Minecraft observation",
+  "lifecycle_stage": "source admission, evidence normalization, and direct-tool catalog preflight",
+  "reaction_timescale": "one finite presence refresh, one read-only actor/perception pair, and one browser catalog refresh",
+  "authority_owner": "the user owns connector authorization and finite player authority; Runtime Codex selects a later plan; Helix owns identity, admission, provenance and serialized effects",
+  "current_maturity": "diagnostic execution-preflight checkpoint",
+  "target_maturity": "live accepted NAV-EQ execution profile",
+  "authorization": {
+    "plugin": "CasimirBot Device Check",
+    "capability_profile": "g2-action",
+    "ready": true,
+    "required_scopes": [
+      "helix.rooms.read",
+      "helix.environment_actions.read",
+      "helix.environment_actions.write"
+    ],
+    "missing_scopes": [],
+    "authorization_expires_at": "2026-09-21T07:30:40.331Z",
+    "credential_included": false
+  },
+  "supervisor_presence": {
+    "service_instance_ref": "service_instance:cc1ce32b3137b56abfa709b0280123ed",
+    "client_session_ref": "supervisor_client:c237c632e6aef605ba98876ae4ba405c",
+    "client_continuation_ref": "codex:nav-eq:2026-09-21:v21",
+    "lifecycle_state": "active",
+    "room_membership_server_verified": true,
+    "connector_source_epoch_server_verified": true,
+    "producer_epoch_ref": "adapter_epoch:f855c8c9bc8df139baa97fc96dce5847074a1d15",
+    "heartbeat_expires_at": "2026-09-21T06:34:02.274Z",
+    "mutation_lease_claimed": false
+  },
+  "prior_tunnel_transition": {
+    "transition_request_ref": "desktop_tunnel_request:6cbe1aa3-c477-4ec3-afa9-e2acc45078f2",
+    "accepted_receipt_ref": "desktop_tunnel_receipt:c1fd0970-0b90-4de0-adfe-1861bdff12ab",
+    "accepted_at": "2026-09-21T06:18:07.983Z",
+    "current_status": "expired",
+    "expired_receipt_ref": "desktop_tunnel_receipt:2d2b9013-3987-4ec2-a9c8-6ba84b69fda0",
+    "expired_at": "2026-09-21T06:19:58.199Z",
+    "expiry_reason": "delegation_expired",
+    "reconnect_required": false,
+    "catalog_refresh_required": true,
+    "tool_list_changed_supported": false,
+    "environment_authority_granted": false
+  },
+  "browser_catalog_refresh": {
+    "surface": "ChatGPT in-app browser Plugins settings",
+    "connected_v1_account_row_visible": true,
+    "refresh_control_invoked": true,
+    "v1_temporal_frontier_publish_visible_after_refresh": true,
+    "v1_temporal_plan_submit_direct_visible_after_refresh": true,
+    "connected_v1_account_disconnected": false
+  },
+  "current_task_catalog": {
+    "connected_v1_temporal_frontier_publish_callable": false,
+    "connected_v1_temporal_plan_submit_direct_callable": false,
+    "v2_temporal_frontier_publish_callable": true,
+    "v2_temporal_plan_submit_direct_callable": true,
+    "v2_authenticated": false,
+    "authenticated_direct_temporal_route_callable_now": false
+  },
+  "actor_observation": {
+    "outcome": "succeeded",
+    "evidence_ref": "environment_probe_evidence:a8fda8105ffbf71eb5e6bad149dca1e2ac73e8ca",
+    "observation_revision": 1789972273407,
+    "observed_at": "2026-09-21T06:31:13.407Z",
+    "freshness_age_ms": 364,
+    "provenance_valid": true,
+    "position": { "x": 0.56, "y": 65, "z": 2.37 },
+    "yaw": -178.65,
+    "pitch": 3.45,
+    "health": 20,
+    "max_health": 20,
+    "food_level": 20,
+    "saturation": 19,
+    "game_mode": "survival"
+  },
+  "perception_observation": {
+    "outcome": "succeeded",
+    "evidence_ref": "environment_probe_evidence:283eb35c49008b12c97b7ad7887a8c3255201a36",
+    "observation_revision": 1789972273126,
+    "observed_at": "2026-09-21T06:31:13.126Z",
+    "freshness_age_ms": 88,
+    "provenance_valid": true,
+    "game_tick": 18464884,
+    "capture_duration_ms": 6.88,
+    "semantic_fingerprint": "sha256:c6265f617ac526088744bc9a7bddede0117227b1e688a4ff7af63b1456d27b1e",
+    "movement_candidate_count": 4,
+    "entity_count": 0,
+    "projectile_count": 0,
+    "hazard_count": 0,
+    "navigation_frontier": {
+      "planner": "casimirbot_native_bounded_dijkstra",
+      "origin": { "x": 0, "y": 65, "z": 2 },
+      "horizontal_radius": 7,
+      "vertical_radius": 6,
+      "reachable_foothold_count": 181,
+      "ranked_frontier_count": 8,
+      "coverage_boundary_reached": true,
+      "route_step_limit_reached": false,
+      "evidence_complete": true,
+      "selection_authority": "runtime_codex"
+    }
+  },
+  "finding": {
+    "matched_runtime_observation_repeatable": true,
+    "player_pose_changed": false,
+    "v1_browser_catalog_contains_direct_temporal_tools": true,
+    "current_task_callable_schema_refreshed": false,
+    "prior_transport_delegation_still_active": false,
+    "first_unresolved_stage": "fresh full-agent transport delegation plus current-task callable-schema refresh",
+    "nav_eq_maturity": "specified"
+  },
+  "safety_and_scope": {
+    "minecraft_action_attempted": false,
+    "player_motion_observed": false,
+    "environment_authority_changed": false,
+    "durable_run_or_goal_created": false,
+    "temporal_plan_submitted": false,
+    "connected_v1_disconnected": false,
+    "credentials_included": false
+  },
+  "stop_fail_criteria": [
+    "Do not treat a browser catalog refresh as a refreshed callable schema in the current task.",
+    "Do not reuse an expired tunnel delegation.",
+    "Do not invoke the unauthenticated v2 direct temporal tools.",
+    "Do not freeze execution geometry from this preflight; reobserve immediately before admission.",
+    "Do not promote NAV-EQ from this read-only checkpoint."
+  ],
+  "downstream_gate_unlocked": "The exact current source and course remain repeatably observable, and v1 visibly advertises the required direct tools. A fresh native transport delegation and a subsequent task catalog load can now be tested without reconnecting or changing Minecraft authority."
+}

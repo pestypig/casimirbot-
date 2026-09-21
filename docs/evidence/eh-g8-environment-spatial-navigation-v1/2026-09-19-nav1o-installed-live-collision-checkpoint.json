@@ -1,0 +1,92 @@
+{
+  "schema": "eh.g8.nav1o.installed_live_collision_checkpoint.v1",
+  "recorded_at": "2026-09-19T21:42:39Z",
+  "capability": "NAV1-O admitted read-only collision observation",
+  "runtime": {
+    "profile": "installed unsigned developer EXE with dedicated Fabric combat-c0 server and selected player",
+    "exe_path": "apps/desktop/release-nav1o-catalog-20260919/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "13F73C907348713F5B1BD4879817B17AB9017080F4F5585479F7643FE4A356C4",
+    "asar_sha256": "812B24B3EB986FE27BA2DFE1705F035CE771D0628D0269BB8F18F44B3504F420",
+    "fabric_sensor_path": "minecraft/helix-fabric-sensor/run/combat-c0-server/mods/HelixFabricSensor-0.3.0.jar",
+    "fabric_sensor_sha256": "CEE33C4BC25E4AC61870E84535E7F43D77A8D0DA83EEFEBDE90EB40204624298",
+    "hashes_rechecked_after_capture": true
+  },
+  "connection": {
+    "plugin": "CasimirBot Device Check v2",
+    "saved_action_name_count_after_owner_refresh": 48,
+    "actor_status_input_after_owner_refresh": "include_navigation_collision?: boolean",
+    "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "environment": "minecraft:local:combat-c0",
+    "selected_player": "DatDamPig",
+    "device_check": "online, fresh, probe_ready, no blocking reasons",
+    "coordination_only_shadow_read": "full_mcp_transition_required",
+    "governed_transport_transition_request": "desktop_tunnel_request:4e905d54-e965-4148-a84c-adb98e99edb9",
+    "governed_transport_transition_accepted": true,
+    "transition_catalog_refresh_required": true,
+    "transition_tool_list_changed_supported": false,
+    "environment_action_authority_granted_by_transition": false
+  },
+  "read_only_opt_in_observations": [
+    {
+      "sequence": 1,
+      "status": "unavailable",
+      "reason": "elapsed_budget_exceeded",
+      "game_tick": 16503710,
+      "overall_snapshot_capture_ms": 78.99,
+      "interpretation": "The cooperative native collision capture budget was exceeded; this is a real unavailable result, not a successful replay."
+    },
+    {
+      "sequence": 2,
+      "status": "captured",
+      "cell_count": 125,
+      "unknown_count": 0,
+      "native_collision_capture_ms": 6.31,
+      "provenance_valid": true,
+      "selected_player_position": { "x": -2.1, "y": 65, "z": 7.7 },
+      "selected_player_health": 20
+    },
+    {
+      "sequence": 3,
+      "status": "captured",
+      "actor_evidence_ref": "environment_probe_evidence:82e987b59d606afc2f21dc504ae68efab4e98ce7",
+      "actor_observation_revision": 1789853972405,
+      "snapshot_evidence_ref": "environment_probe_evidence:aa40c5e98d3d12e26ff269252f25d5776806f372",
+      "snapshot_observation_revision": 1789853974380,
+      "observed_at": "2026-09-19T21:39:34.380Z",
+      "game_tick_start": 16506909,
+      "game_tick_end": 16506909,
+      "native_collision_capture_ms": 5.16,
+      "replay_schema": "minecraft.native_collision_replay.v1",
+      "dimension": "minecraft:overworld",
+      "minimum_cell": [-5, 63, 5],
+      "maximum_cell": [-1, 67, 9],
+      "cell_count": 125,
+      "unknown_count": 0,
+      "unsupported_count": 35,
+      "coverage": {
+        "entities_complete": true,
+        "hazards_complete": true,
+        "loaded_region_complete": true,
+        "unknown_cell_count": 0,
+        "omitted_categories": ["client_screen", "manual_input_attribution"]
+      },
+      "provenance_valid": true,
+      "semantic_fingerprint": "sha256:303061cd30eb6864647908668ca14d9ce5dfb2c5ce49dffe65c089f39ceb19b7",
+      "selected_player_position": { "x": -2.1, "y": 65, "z": 7.7 },
+      "selected_player_health": 20
+    }
+  ],
+  "limits": {
+    "native_capture_budget_ms": 20,
+    "budget_kind": "cooperative, not hard real-time",
+    "sample_count": 3,
+    "capture_success_count": 2,
+    "capture_budget_miss_count": 1,
+    "latency_distribution_or_slo_established": false,
+    "unsupported_cells_not_treated_as_known_traversable": true,
+    "full_nav1_or_route_planning_accepted": false,
+    "nav_eq_rolling_execution_started": false,
+    "movement_or_world_mutation_performed": false
+  },
+  "conclusion": "The exact installed read-only NAV1-O opt-in path produced two fresh, provenance-valid 125-cell native collision replays for the selected player. One preceding budget miss must remain visible. This qualifies this narrow live sensing path, not full NAV1, latency reliability, NAV-EQ execution, room steering, or release readiness."
+}

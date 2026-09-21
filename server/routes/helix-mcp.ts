@@ -343,6 +343,9 @@ export const createHelixMcpRouter = (
         server = createServer({
           principal,
           service,
+          // This request owns a stateless JSON transport that closes after
+          // the response; unscoped tool-list notifications cannot reach it.
+          toolListChangedNotificationsDeliverable: false,
           localSupervisorCoordinationStore:
             dependencies.localSupervisorCoordinationStore,
           reasoningTaskBindingStore:

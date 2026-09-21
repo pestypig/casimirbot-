@@ -1,0 +1,7 @@
+# Independent CFP-1 D07 feasibility comparison review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`), CFP-2/3 blocked. An independent read-only reviewer checked [public comparison 152](2026-09-20-cfp1-room-hour-feasibility-comparison-152.md), its access-controlled calculation, the linked [saturation stress 146](2026-09-20-cfp1-autoscale-saturation-cost-stress-146.md), and the living assay, unit-economics worksheet, decision queue and canonical work-program handoffs.
+
+The reviewer returned **PASS**. The private calculation's SHA-256 matches evidence 152. The reviewer recomputed compute units per hour, cohort hours, the five-minute database tail, 30-day deployment base, modeled Stripe fee-net receipts and 20%-of-gross holdback for the 10/1 and 20/2 cases without finding an arithmetic discrepancy. Public files expose neither the account rate nor derived private dollar amounts, and local links resolve.
+
+The comparison correctly keeps full utilization and nonoverlap as adverse assumptions, 10 paid/one trial active room-hour as a *measurement comparator*, and the seven-day/ten-effect trial target unchanged. It makes no all-in margin, selected price/limit, qualified financial-review or installed acceptance claim. D07 costed amount/final limits, D11 qualified returns and D12 integrated freeze remain open; CFP-1 stays active (`specified`), CFP-2/3 blocked and G8 active.

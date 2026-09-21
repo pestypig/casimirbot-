@@ -47,6 +47,23 @@ describe("local pg-mem persistence", () => {
     if (fs.existsSync(snapshotPath)) fs.unlinkSync(snapshotPath);
   });
 
+  it("fails closed on a zeroed snapshot without replacing it with an empty database", async () => {
+    const zeroedSnapshot = Buffer.alloc(4096);
+    fs.writeFileSync(snapshotPath, zeroedSnapshot);
+
+    await expect(ensureDatabase()).rejects.toThrow("local_pg_mem_snapshot_restore_failed");
+    await expect(ensureDatabase()).rejects.toThrow("local_pg_mem_snapshot_restore_failed");
+    expect(fs.readFileSync(snapshotPath)).toEqual(zeroedSnapshot);
+  });
+
+  it("fails closed on an unsupported snapshot schema without replacing it", async () => {
+    const unsupportedSnapshot = JSON.stringify({ schema: "other.snapshot.v1", tables: {} });
+    fs.writeFileSync(snapshotPath, unsupportedSnapshot, "utf8");
+
+    await expect(ensureDatabase()).rejects.toThrow("local_pg_mem_snapshot_restore_failed");
+    expect(fs.readFileSync(snapshotPath, "utf8")).toBe(unsupportedSnapshot);
+  });
+
   it("restores password accounts and profile saves after a local server restart", async () => {
     const email = "persisted-local-profile@example.com";
     const password = "CorrectHorseBattery123!";

@@ -1,0 +1,36 @@
+{
+  "schema": "helix.nav_eq_auth0_mfa_callback_divergence.v1",
+  "observed_at_utc": "2026-09-21T02:05:38Z",
+  "claim_ceiling": "Auth0 tenant logs prove the exact latest desktop-link OTP authentication and login succeeded. They do not prove browser redirect, desktop callback delivery, device registration, MCP connection, Minecraft observation, or NAV-EQ execution.",
+  "auth0_tenant_log": {
+    "tenant": "dev-pfgv4lwpqy3soxoy",
+    "application": "CasimirBot Desktop Account Link",
+    "second_factor_started_at_utc": "2026-09-21T01:34:37.298Z",
+    "otp_auth_succeed_at_utc": "2026-09-21T01:34:47.222Z",
+    "success_login_at_utc": "2026-09-21T01:34:47.391Z",
+    "success_exchange_after_login_visible_in_current_log_page": false,
+    "event_detail_or_secret_fields_inspected": false,
+    "dashboard_quota_banner": "Pro MFA exceeded monthly plan limit; its causal relationship to this already-successful OTP event is unproved"
+  },
+  "native_handoff": {
+    "isolated_profile": "CasimirBotNavEqIsolated20260920",
+    "isolated_runtime_received_callback_by_013712_utc": false,
+    "windows_casimirbot_protocol_handler": "previous NAV-EQ EXE, not the currently running isolated EXE",
+    "previous_default_profile_oauth_diagnostic_last_modified_utc": "2026-09-20T23:13:18.3836670Z",
+    "first_unproven_stage": "post-Auth0-login browser redirect or custom-protocol dispatch to the intended isolated profile",
+    "handler_mismatch_is_independent_downstream_blocker": true,
+    "handler_or_auth_configuration_changed": false
+  },
+  "runtime_effects": {
+    "device_registration_after_dashboard_login": "not_rechecked; prior native panel reported unregistered",
+    "mcp_connected": "not_rechecked; prior direct and plugin MCP calls failed before device health",
+    "minecraft_observation_performed": false,
+    "nav_eq_action_performed": false
+  },
+  "next": [
+    "Diagnose browser external-protocol dispatch without re-submitting an OTP or exposing a callback code.",
+    "Define and verify an exact-instance callback route for isolated installed-profile testing before asking for another owner MFA attempt.",
+    "Revalidate device, tunnel, source and player identity before any new Minecraft read or NAV-EQ action."
+  ],
+  "nav_eq_maturity": "specified"
+}

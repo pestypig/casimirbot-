@@ -1,0 +1,7 @@
+# CFP-1 D02/D04 cross-clock technical review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`); CFP-2/3 blocked.
+
+An independent read-only agent reviewed the [cross-clock contract](2026-09-20-cfp1-session-trial-cross-clock-contract-226.md) against the D02 public-session, D04 trial, first-customer-claim, privacy/financial, D07 resource assay and CFP-3 license/commerce/shared-action handoffs. It reported **technical PASS with no defects**: the proposed seven-day server session, selected continuous seven-day trial, proposed 30-day P1 grant, sponsor-term PBT/effect ledgers and finite native action lease stay separate. Expired actor sessions deny new or unreleased effects; released work settles from original native evidence without replay. Host and guest sessions are independent; the owner-presence policy is explicitly unresolved. The packets claim neither current implementation nor rights clearance, and the reviewed relative links resolve.
+
+Local verification also ran `npm run helix:environment-harness:docs-audit` with `ok: true` and zero failures, a targeted nine-document relative-link check with zero missing links, and `git diff --check` with no whitespace error. This review accepts a **specification fixture only**. It is not the qualified D02 account/security review, D11 rights/privacy/financial disposition, D07 numeric cost/limit freeze or D12 integrated customer-claim review. It does not unlock CFP-2/3, approve a Stripe Price or make the trial/action available.

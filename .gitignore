@@ -171,6 +171,7 @@ external/openai-codex-compare/
 # Packaged Electron builds are reproducible release artifacts.
 # Keep them local (or publish them as release assets), not in Git history.
 /apps/desktop/release-*/
+/apps/desktop/archived-development-packages/
 /apps/desktop/.tmp/
 /.codex-tmp/
 /.tmp-*.json

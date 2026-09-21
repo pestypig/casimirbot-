@@ -100,14 +100,25 @@ export async function readTemporalCheckpointEvidence(db: Pick<PoolClient, "query
     throw new TemporalPlanError("temporal_checkpoint_action_event_hash_mismatch");
   }
   const latestActionEvent = helixEnvironmentActionWorkflowEventSchema.parse(latestActionRaw);
+  const pairedSettlements = actionEvent.measurements.checkpoint_settlements;
+  const latestSettlements = latestActionEvent.measurements.checkpoint_settlements;
+  // The critical action lane can append newly measured checkpoints before the
+  // environment projection catches up. Keep the projected event as the exact
+  // checkpoint anchor, but require every paired settlement to remain identical
+  // in the newest running safety state. Reordering, truncation or revision
+  // still fails closed.
+  const checkpointPrefixUnchanged = Array.isArray(pairedSettlements) &&
+    Array.isArray(latestSettlements) && latestSettlements.length <= 256 &&
+    latestSettlements.length >= pairedSettlements.length &&
+    pairedSettlements.every((settlement, index) =>
+      environmentConnectorSha256(settlement) === environmentConnectorSha256(latestSettlements[index]));
   if (latestActionEvent.event_id !== latestActionRow.event_id ||
       latestActionEvent.action_request_id !== residentActionId || latestActionEvent.workflow_id !== action.workflow_id ||
       latestActionEvent.workflow_state !== "running" || latestActionEvent.manual_override_detected ||
       latestActionEvent.sequence < actionEvent.sequence ||
       (latestActionEvent.event_id !== actionEvent.event_id && latestActionEvent.sequence === actionEvent.sequence) ||
       latestActionEvent.measurements[planIdentityField] !== nativePlanId ||
-      environmentConnectorSha256(latestActionEvent.measurements.checkpoint_settlements) !==
-        environmentConnectorSha256(actionEvent.measurements.checkpoint_settlements)) {
+      !checkpointPrefixUnchanged) {
     throw new TemporalPlanError("temporal_checkpoint_action_event_mismatch");
   }
   if (latestActionEvent.clock?.monotonic?.origin_id !== actionEvent.clock?.monotonic?.origin_id ||

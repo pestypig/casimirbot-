@@ -1,5 +1,6 @@
 import {
   DESKTOP_AUTH0_ACCOUNT_LINK_REDIRECT_URI,
+  DESKTOP_AUTH0_LEGACY_PROTOCOL_CALLBACK_URI,
 } from "../../../shared/desktop-auth0-account-link";
 import {
   AUTH0_MFA_ACR,
@@ -7,11 +8,25 @@ import {
   AUTH0_STEP_UP_MINIMUM_MAX_AGE_SECONDS,
 } from "../../../shared/desktop-auth0-step-up";
 
-const CALLBACK_PREFIX = `${DESKTOP_AUTH0_ACCOUNT_LINK_REDIRECT_URI}?`;
+const CALLBACK_PREFIX = `${DESKTOP_AUTH0_LEGACY_PROTOCOL_CALLBACK_URI}?`;
 
 export const shouldRegisterDesktopProtocol = (
   hasIsolatedUserDataSwitch: boolean,
 ): boolean => !hasIsolatedUserDataSwitch;
+
+export const desktopAuth0ProtocolClientArgs = (input: Readonly<{
+  defaultAppEntryScript: string | null;
+  isolatedUserDataPath: string | null;
+}>): string[] => [
+  ...(input.defaultAppEntryScript ? [input.defaultAppEntryScript] : []),
+  ...(input.isolatedUserDataPath
+    ? [`--user-data-dir=${input.isolatedUserDataPath}`]
+    : []),
+];
+
+export const canReceiveDesktopAuth0Callback = (input: Readonly<{
+  exactCurrentProfileRouteOwned: boolean;
+}>): boolean => input.exactCurrentProfileRouteOwned;
 
 const exactIssuerAuthorizeUrl = (issuer: string): URL | null => {
   try {

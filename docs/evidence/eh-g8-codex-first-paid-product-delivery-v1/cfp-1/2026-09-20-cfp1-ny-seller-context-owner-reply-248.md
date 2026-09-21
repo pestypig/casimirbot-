@@ -1,0 +1,7 @@
+# CFP-1 New York seller-context owner reply — 2026-09-20
+
+The owner supplied a more specific first-seller scenario: they would sell as an **individual**, have **no LLC**, and are located in **New York City**. They also supplied a low annual-revenue forecast, retained only in operator-private `~/.codex/private-evidence/cfp1/2026-09-20-cfp1-nyc-individual-seller-owner-reply.md`, SHA-256 `FA3EC8BE3438D0CD6105298352E845ED326293A7D16C144D20EAE434EF38B8FF`. The exact forecast is omitted from this public source repository.
+
+This replaces the generic seller-entity-unknown assumption **for reviewer scoping**, not the need to verify the legal seller name, business or assumed-name registration, tax registration/taxability, Stripe activation fields, payout identity, customer market and applicable New York State/City and other-jurisdiction obligations. Expected revenue alone is not treated as an exemption or an economically viable subscription case. The initial U.S.-customer scenario is still provisional; a wider market requires its own review.
+
+The [privacy/financial submission](../../../work-packets/eh-g8-cfp1-privacy-and-financial-review-submission-v1.md) and [reviewer-sourcing brief](../../../work-packets/eh-g8-cfp1-qualified-reviewer-sourcing-brief-v1.md) should use this context when requesting qualified returns. D07 amount and limits, D11 qualified returns and D12 integrated freeze remain open. No account, billing, payment, tax, runtime or production setting changed.

@@ -1,0 +1,30 @@
+{
+  "goal": "launch-ledger G0",
+  "date": "2026-09-21",
+  "requestedModel": "gpt-6-astra",
+  "requestedReasoningEffort": "medium",
+  "runtimeEffortIndependentlyVerified": false,
+  "separateVerifierDispatched": false,
+  "creditCeiling": 200,
+  "startAccountBalance": 1562.53398,
+  "latestAccountBalance": 1483.73364,
+  "observedAccountWideDelta": 78.80034,
+  "attributableGoalSpend": null,
+  "note": "Shared account has concurrent work; balance difference is not exact G0 billing. Final response and later work are outside this measurement.",
+  "sourceCommit": "3606fa7b1403bf1b42b3c3dfddda1ec504e39681",
+  "results": {
+    "G0.1": "PASS",
+    "G0.2": "PASS",
+    "G0.3": "PASS",
+    "G0.4": "BLOCKED",
+    "G0.5": "PASS"
+  },
+  "finalVerification": {
+    "manifestHash": "PASS",
+    "localLinks": "PASS",
+    "docsAudit": "PASS",
+    "liveHeadUnchanged": true,
+    "liveStagingAreaEmpty": true
+  },
+  "nextAction": "Resolve memory headroom and identify a usable approved signing route for G0.4; no blocked CFP stage is admitted."
+}

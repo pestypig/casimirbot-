@@ -1,0 +1,76 @@
+{
+  "schema": "helix.nav_eq_prefix_exe_v14_root_and_swept_clearance_failure.v1",
+  "date": "2026-09-20",
+  "claim_ceiling": "Matched packaged root and spatial diagnosis only; no in-motion prefix-verifier result, admitted child or NAV-EQ acceptance",
+  "runtime": {
+    "package": "apps/desktop/release-nav-eq-prefix-20260920/win-unpacked",
+    "runtime_manifest_sha256": "ef9cc2c34faa1496b5af86b7a9102c2cdcc9cea0846f2bb81a59e3b356997e0c",
+    "service_instance_ref": "service_instance:268374d1aa8284ea9be46b1dbfa759a4"
+  },
+  "identity": {
+    "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "world_id": "minecraft:local:combat-c0",
+    "player": "DatDamPig",
+    "subject_binding_id": "environment_subject_binding:66953a7d-c7fc-4620-9be5-28412347b01d",
+    "run_id": "run_d083a59d-2d9e-45f2-98e4-c044f203a181",
+    "goal_id": "environment_durable_goal:2b579062352b61857917a7f00b2499199e79bd3f25a1dc7de169d0b1ac9ecb04",
+    "action_authority_id": "environment_action_authority:9b751624-50d3-42be-9da7-765f3eed211a",
+    "authority_expires_at": "2026-09-20T19:15:00.000Z"
+  },
+  "setup": {
+    "source_privately_repaired": true,
+    "player_privately_repaired": true,
+    "selected_subject_reverified_after_epoch_change": true,
+    "bounded_back_walk_evidence_ref": "environment_action_evidence:0ad56b54141dda8abb384d12e6a62f1ae9fa5202f",
+    "measured_start_pose": [0.58, 65, 2.31],
+    "start_health": 20,
+    "start_snapshot_entities": 0,
+    "start_snapshot_hazards": 0,
+    "protocol": "2026-09-20-south-floor-sweep-protocol-v14.json"
+  },
+  "root": {
+    "fresh_preflight_probe_ref": "environment_probe_evidence:8cb1e290b14e98e27135e7ea3713a4b9ae2b0d18",
+    "frontier_id": "environment_frontier:6dca026f-5843-4476-820e-eddb53913f52",
+    "plan_id": "nav_eq:south_sweep:v14:root:1",
+    "plan_hash": "sha256:c8f9f98f18bb64cece0d0d7775f9563fa3bf9eacea2829a2031cbce229ee61d6",
+    "native_node_count": 46,
+    "action_request_id": "nav-eq-v14-root-action-1",
+    "action_result_id": "environment_action_result:bc866b86-5610-4014-9847-10edb20c675c",
+    "retained_outcome": "succeeded",
+    "started_at": "2026-09-20T19:04:51.302727500Z",
+    "completed_at": "2026-09-20T19:05:08.452006100Z",
+    "result_received_at": "2026-09-20T19:05:20.239Z",
+    "duration_ticks": 333,
+    "required_checkpoints_satisfied": 11,
+    "dispatch_to_first_tick_ms": 52,
+    "resident_computation_ms": 92,
+    "missed_ticks": 34,
+    "world_mutation_performed": false,
+    "inventory_mutation_performed": false,
+    "controls_released_in_retained_result": true,
+    "manual_override_detected": false
+  },
+  "post_run": {
+    "fresh_actor_status_evidence_ref": "environment_probe_evidence:de2c3861cf1ccf562c10938e6b6574452cec538a",
+    "observed_at": "2026-09-20T19:15:23.111Z",
+    "position": [0.7, 65, -3.02],
+    "health": 20,
+    "predicted_end_approx": [6.6, 65, -3.05],
+    "predicted_vs_observed_x_shortfall_approx_blocks": 5.9,
+    "post_completion_frontier_diagnostic": "no_recent_player_workflow_event",
+    "child_submitted": false,
+    "authority_status_after_expiry": "expired",
+    "active_workflow_count_after_expiry": 0,
+    "controls_asserted_after_expiry": false
+  },
+  "spatial_diagnosis": {
+    "evidence_ref": "environment_probe_evidence:f5b65f0b331f2ea0fda79defe94cc2a945a2f8c7",
+    "spatial_read_complete": true,
+    "center_cell_row_z_minus_3_x_1_to_7_at_y_65_66": "air",
+    "adjacent_row_z_minus_4_x_1_to_7_at_y_65_66": "polished_deepslate_solid",
+    "interpretation": "The body corridor at center z=-3.02 is not proven traversable by an air center-cell row; solid blocks immediately across its northern footprint are consistent with the observed lateral stop near x=0.7. This is a geometric inference, not a native collision-contact trace.",
+    "next_course_requirement": "Inflate obstacles by the player collision footprint, shorten the final forward step to keep the full body corridor clear, and require an exact end-pose checkpoint."
+  },
+  "observation_caveat": "A retained status read succeeded before authority expiry; two later status calls timed out, and a later read after expiry was denied. Device Check and actor status remained fresh. Timeout was not treated as terminal or replayed.",
+  "maturity": "specified"
+}

@@ -1,0 +1,169 @@
+{
+  "schema": "helix.environment_harness.nav_eq.live_observation_recovery.v1",
+  "recorded_at": "2026-09-21T05:52:37.0897248Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "Connected CasimirBot MCP route, Fabric source recovery, and current-runtime Minecraft perception",
+  "lifecycle_stage": "source admission, evidence normalization, and execution preflight",
+  "reaction_timescale": "read-only MCP round trip and single Fabric perception capture",
+  "authority_owner": "operator for finite player authority; Runtime Codex for later plan selection; Helix for identity, admission, provenance, and effect serialization",
+  "current_maturity": "diagnostic recovery checkpoint",
+  "target_maturity": "live accepted NAV-EQ execution profile",
+  "plugin_state": {
+    "plugin_list_verified_in_in_app_browser": true,
+    "connected_plugin_display_name": "CasimirBot Device Check",
+    "connected_plugin_app_id": "asdk_app_6a91c15c1e1c81918078ea5ae6028ec4",
+    "connected_account_row_visible": true,
+    "plugin_v2_display_name": "CasimirBot Device Check v2",
+    "plugin_v2_app_id": "asdk_app_6a91d26fb68481918606bfc290b2ab0d",
+    "plugin_v2_listed": true,
+    "plugin_v2_connected": false,
+    "connected_plugin_catalog_refreshed": true,
+    "direct_temporal_plan_submit_visible_after_refresh": true,
+    "temporal_frontier_publish_visible_after_refresh": true,
+    "current_task_schema_has_connected_v1_direct_tools": false,
+    "current_task_schema_has_unconnected_v2_direct_tools": true,
+    "current_task_schema_refresh_pending": true
+  },
+  "authorization": {
+    "capability_profile": "g2-action",
+    "ready": true,
+    "required_scopes": [
+      "helix.rooms.read",
+      "helix.environment_actions.read",
+      "helix.environment_actions.write"
+    ],
+    "granted_required_scopes": [
+      "helix.rooms.read",
+      "helix.environment_actions.read",
+      "helix.environment_actions.write"
+    ],
+    "missing_scopes": [],
+    "recovery_action": "none"
+  },
+  "environment_identity": {
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "room_source_binding_id": "room_source_binding:96064865-879e-4c39-b7c7-35b7abe9536c",
+    "environment_binding_id": "environment_binding:legacy:1e487db5900a2a10de1db2ca92fa61ef7d3174b7",
+    "source_id": "source:room-ingress:17ff5685-c3a1-49a8-ab00-4c1cb6a87e2d",
+    "world_id": "minecraft:minehut:8fc80440-6fe",
+    "adapter": "minecraft.fabric_mod.v1",
+    "selected_subject_id": "environment_subject:4ae0191f0ac6b5fcf5aa554bf7f2aecdbfbc274e2513e2b4",
+    "selected_actor_label": "DatDamPig",
+    "source_health": "online",
+    "source_freshness": "fresh",
+    "credential_status": "active",
+    "adapter_admission": "active",
+    "probe_ready": true,
+    "subject_epoch_reverified": true
+  },
+  "pairing_recovery": {
+    "first_attempt_result": "connector_pairing_not_found",
+    "first_attempt_reason": "environment binding identifier was supplied where an exact room-source binding was required",
+    "second_attempt_used_exact_room_source_binding": true,
+    "private_server_inbox_staged": true,
+    "credential_or_pairing_material_exposed": false,
+    "command_or_player_authority_granted_by_pairing": false
+  },
+  "actor_observation": {
+    "outcome": "succeeded",
+    "evidence_ref": "environment_probe_evidence:9dc200cfcebad2f14c87ac36122a132d141714e1",
+    "observation_revision": 1789969917067,
+    "observed_at": "2026-09-21T05:51:57.067Z",
+    "freshness_age_ms": 67,
+    "game_mode": "survival",
+    "dimension": "minecraft:overworld",
+    "position": {
+      "x": 0.56,
+      "y": 65,
+      "z": 2.37
+    },
+    "health": 20,
+    "max_health": 20,
+    "food_level": 20,
+    "saturation": 19,
+    "yaw": -178.65,
+    "pitch": 3.45,
+    "stationary": true,
+    "active_effect_count": 0
+  },
+  "perception_observation": {
+    "outcome": "succeeded",
+    "evidence_ref": "environment_probe_evidence:35c6fcf3fe39c6a4bc498b00e0a3a4f0df6f565a",
+    "transport_observation_revision": 1789969919060,
+    "snapshot_observation_revision": 18417803,
+    "game_tick": 18417803,
+    "observed_at": "2026-09-21T05:51:59.060Z",
+    "freshness_age_ms": 67,
+    "capture_duration_ms": 4.15,
+    "semantic_fingerprint": "sha256:4d1b60d5d790793c5e037fedf9a60d6f92230db94f4ac93615a9184b777caefc",
+    "immediate_movement_candidate_count": 4,
+    "safe_immediate_movement_candidate_count": 4,
+    "support_block": "minecraft:polished_deepslate",
+    "entity_count": 0,
+    "projectile_count": 0,
+    "hazard_count": 0,
+    "inventory": [
+      { "slot": 0, "item": "minecraft:iron_sword", "count": 1 },
+      { "slot": 1, "item": "minecraft:golden_apple", "count": 1 },
+      { "slot": 2, "item": "minecraft:rotten_flesh", "count": 4 }
+    ],
+    "navigation_frontier": {
+      "schema": "helix.minecraft_navigation_frontier.v1",
+      "planner": "casimirbot_native_bounded_dijkstra",
+      "horizontal_radius": 7,
+      "vertical_radius": 6,
+      "reachable_foothold_count": 181,
+      "ranked_frontier_count": 8,
+      "coverage_boundary_reached": true,
+      "route_step_limit_reached": false,
+      "evidence_complete": true,
+      "selection_authority": "runtime_codex"
+    },
+    "keep_inventory": true,
+    "client_screen_state": "unobserved",
+    "manual_input_attribution": "unobserved"
+  },
+  "action_authority_preflight": {
+    "visible_authority_id": "environment_action_authority:17278fb9-8a11-4767-9b01-ff8a4bd4d8fe",
+    "status": "expired",
+    "policy_version": 2,
+    "manual_override_policy": "cancel",
+    "connector_state": "authority_inactive",
+    "ready_for_actions": false,
+    "active_workflow_count": 0,
+    "controls_asserted": false,
+    "fresh_authority_created": false
+  },
+  "safety_and_scope": {
+    "minecraft_action_attempted": false,
+    "player_motion_observed": false,
+    "world_or_inventory_mutation_attempted": false,
+    "environment_authority_changed": false,
+    "durable_run_or_goal_created": false,
+    "temporal_plan_submitted": false,
+    "credentials_included": false,
+    "oauth_callback_values_included": false
+  },
+  "finding": {
+    "connected_route_supports_live_minecraft_read_path": true,
+    "current_runtime_observation_repeatability_recovered": true,
+    "browser_plugin_catalog_contains_direct_nav_tools": true,
+    "direct_nav_tools_callable_from_connected_v1_in_this_task": false,
+    "next_boundary": "receive refreshed connected-v1 tool schema, then freeze a new current-runtime protocol and finite movement-only authority before any NAV-EQ action",
+    "nav_eq_maturity": "specified"
+  },
+  "stop_fail_criteria": [
+    "Do not submit a temporal plan through the unconnected v2 OAuth client.",
+    "Do not reuse the expired Player Embodiment authority.",
+    "Do not move the player before freezing the exact runtime identities, numeric limits, clocks, course, cancellation protocol, and evidence-drain runway.",
+    "Do not promote NAV-EQ from this read-only recovery checkpoint."
+  ],
+  "explicit_non_goals": [
+    "No NAV-EQ movement acceptance.",
+    "No ET6 or room-steering acceptance.",
+    "No plugin-v2 OAuth persistence claim.",
+    "No benchmark or pathfinding superiority claim."
+  ],
+  "downstream_gate_unlocked": "The connected current-source route and matched-runtime perception prerequisite are revalidated. Direct execution remains gated on the refreshed connected-v1 task catalog and a new frozen movement-only protocol."
+}

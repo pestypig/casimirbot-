@@ -1,0 +1,7 @@
+# CFP-1 hosted browser identity independent review — 2026-09-20
+
+Independent read-only reviewer: `/root/cfp1_closure_review`. Final verdict: **PASS after one source-attribution correction**.
+
+The reviewer checked [source audit 206](2026-09-20-cfp1-hosted-browser-identity-source-boundary-206.md) against `account-session-store.ts`, `session-cookie.ts`, `google-auth.ts`, `http-context.ts`, current room lifecycle and `shared-live-room-control/service.ts`; then reviewed the D02 session/grant, hosted guest ingress, participant lifecycle, CFP-3 handoff, domain/landing copy, owner queue and work-program links. The first pass found that audit 206 had attributed the active temporary-guest room-create restriction to an unused helper in `http-context.ts`. The audit now cites the active `SharedLiveRoomControlService.createRoom` check; the reviewer rechecked that exact correction and returned PASS.
+
+The reviewed contract requires a verified guest account and current finite browser session for the **future** paid/trial room, distinct from the temporary experimental-room guest, the host's P1 installation grant and any GPT account. Server-side expiry, sign-out and return cases are specifications for account/security review and CFP-3/4 acceptance, not current enforcement. Local links and D02/D07/D11/D12 stage holds were preserved. This review does not appoint a qualified reviewer, set final account terms or advance CFP-1 beyond `specified`.

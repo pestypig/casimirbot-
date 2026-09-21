@@ -1,0 +1,7 @@
+# CFP-1 owner decision queue review — 2026-09-19
+
+The [current owner decision and review queue](../../../work-packets/eh-g8-cfp1-owner-decision-and-review-queue-v1.md) consolidates twelve still-open answer/review rows. It carries the already selected free personal and hosted-subscription boundaries forward without treating a recommended device policy, trial trigger, component treatment or release route as an owner answer. D02 explicitly requires the public personal client, verified-account and ordinary-user scope policy; D04 requires trial outage-clock, uncertain-effect and conversion terms. Qualified component, connector and privacy/financial returns precede the final component and customer-claim freeze.
+
+An independent read-only CFP-1 reviewer initially found three sequencing/coverage defects, which were corrected. Its bounded re-review returned **PASS** against those findings and the [CFP-1 exit rule](../../../work-packets/eh-g8-cfp1-product-rights-and-offer-contract-v1.md). The environment documentation audit returned `ok: true`, queue links resolved and `git diff --check` passed.
+
+This is a specification coordination result. The product owner has not selected D01–D10 merely because they are listed; qualified D11 returns and the D12 integrated claim/component freeze remain open. CFP-1 stays active (`specified`), CFP-2/3 remain blocked, and G8 release evaluation remains active under the [work program](../../../helix-environment-harness-work-program-v1.md).

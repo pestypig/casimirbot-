@@ -1,0 +1,57 @@
+{
+  "schema": "helix.nav_eq_v19_projection_latency_checkpoint.v1",
+  "date_utc": "2026-09-20",
+  "claim_ceiling": "The V19 corrected-EXE root succeeded but no in-motion successor was admitted; diagnostic Fabric logs identify per-event projection latency and heartbeat queueing. Projection batching is built and deterministically tested, not yet live accepted.",
+  "runtime_package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked",
+  "diagnostic_fabric_jar_sha256": "e920c962870def225c2a03433a24e26bb81fd680900f884cca077408a164d294",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "world_id": "minecraft:local:combat-c0",
+  "player": "DatDamPig",
+  "run_id": "run_c94d7f26-8061-40fc-889a-c5150099bc52",
+  "goal_id": "environment_durable_goal:ccbac26f73375cd9b5293bf4d0c1064e7cba5a492c423f6c4dc26b78f2d1e21b",
+  "pre_admission_attempts": [
+    {"plan_id":"nav_eq:south_return:v19:root:1","result":"durable_goal_evidence_stale","evidence_age_ms":5168,"max_age_ms":5000,"motion_admitted":false},
+    {"plan_id":"nav_eq:south_return:v19:root:2","result":"action_policy_denied","cause":"Request effect_class player_motion did not match the advertised sequence.execute continuous_control manifest","motion_admitted":false}
+  ],
+  "root": {
+    "protocol": "2026-09-20-south-floor-return-protocol-v19.json",
+    "plan_id": "nav_eq:south_return:v19:root:3",
+    "plan_hash": "sha256:83526ba0df93c374f1fa7f57956347186c25aa0287b8bed120d90256ac032ae0",
+    "workflow_id": "nav-eq-v19-root-workflow-3",
+    "action_request_id": "nav-eq-v19-root-action-3",
+    "admission": "accepted; not itself execution proof",
+    "outcome": "succeeded",
+    "retained_result_observed_at": "2026-09-20T22:01:09.993Z",
+    "action_evidence_ref": "environment_action_evidence:15356b77377943a92bc225ca6bd5ac2bc8a60dae0",
+    "post_action_probe_evidence_ref": "environment_probe_evidence:b14b846e9d8d9361e361af16dfaf36c1ceb58fa9",
+    "post_action_position": [0.56,65,2.37],
+    "post_action_health": 20,
+    "world_mutation_performed": false,
+    "inventory_mutation_performed": false,
+    "in_motion_successor_admitted": false
+  },
+  "fabric_delivery_log": {
+    "path": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/logs/latest.log",
+    "local_time_zone": "America/New_York",
+    "projection_acknowledged_sequences_observed": [0,19],
+    "typical_single_event_post_latency_ms": "roughly 900-2900",
+    "slow_single_event_post_latency_ms": 4857,
+    "heartbeat_queued_behind_projection_ms": 34786,
+    "in_motion_example": "At local 18:00:57, projection was pending with 10 outbox entries, latest acknowledged sequence 3, and heartbeat age 9905 ms; the native root later settled before the projection stream drained.",
+    "interpretation": "The projection endpoint and client delivery lane are serializing one HTTP POST per event. Observed delivery latency is sufficient to push the projected checkpoint behind the unchanged five-second current-evidence window. This is transport evidence, not proof of a single server substage."
+  },
+  "candidate_patch": {
+    "purpose": "Coalesce a frozen ordered prefix of projection events into one server-supported event batch, preserve byte-identical retry and checkpoint fences, and validate receipt identity before acknowledgement.",
+    "fabric_jar_sha256": "9de77e3309f7f9dd1533d4bdcf1794475d259a63d87c01cadf57a3b02bb56f47",
+    "focused_outbox_tests": "13/13 passed",
+    "fabric_game_tests": "5/5 passed",
+    "live_retest": "pending"
+  },
+  "build_retention": {
+    "active_exe": "apps/desktop/release-nav-eq-verified-20260920",
+    "rollback_exe": "apps/desktop/release-nav-eq-prefix-20260920",
+    "new_exe_built": false,
+    "superseded_exe_to_recycle": false
+  },
+  "maturity": "NAV-EQ specified"
+}

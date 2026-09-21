@@ -1,0 +1,59 @@
+{
+  "schema": "helix.nav_eq_direct_native_serial_calibration_protocol.v1",
+  "frozen_at": "2026-09-20T14:58:42Z",
+  "scope": "Second single-action calibration after the first admitted plan failed before controller start; not NAV-EQ acceptance",
+  "reason_for_new_protocol": {
+    "prior_plan_id": "nav_eq:calibration:20260920:2",
+    "prior_source_client_tick": 12680,
+    "prior_delivery_client_tick": 12776,
+    "prior_delivery_offset_ticks": 96,
+    "prior_stop_unit": 60,
+    "deduction": "The prior resident clock offset exceeded its stop watermark. This is a concrete candidate cause of the generic temporal delivery preflight failure; other checks remain unproven."
+  },
+  "runtime_package_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3A44999919AD06BA9F",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "run_id": "run_a3cfbf3f-af2a-4579-a73c-be404f440f31",
+  "goal_id": "environment_durable_goal:61dbe6ee45afcea8e53a02e0219b3eddb4699a4b40b2fa2bd5a4773b14ddf292",
+  "action_authority_id": "environment_action_authority:13344148-a2cb-4ed1-b058-35f2a52648fd",
+  "course": {
+    "start_position_approx": [-2.1, 65, 7.7],
+    "direction": "forward approximately north",
+    "action_duration_ms": 500,
+    "max_distance_blocks": 3,
+    "max_action_duration_ms": 10000,
+    "fresh_same-player_clear-north-observation_required": true,
+    "health_required": 20,
+    "max_entities_or_hazards_in_snapshot": 0
+  },
+  "temporal_limits": {
+    "latest_start_unit": 140,
+    "maximum_duration_units": 20,
+    "decision_unit": 120,
+    "stop_unit": 180,
+    "committed_through_unit": 240,
+    "maximum_total_units": 240,
+    "monotonic_deadline_offset_ms": 12000,
+    "request_deadline_offset_ms": 15000
+  },
+  "invariants": {
+    "control_engine": "native_fabric",
+    "manual_override_policy": "cancel",
+    "combat_allowed": false,
+    "world_mutation_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 0,
+    "automatic_replay_allowed": false
+  },
+  "success_criteria": [
+    "direct MCP submission admitted through compiler and broker",
+    "retained resident result independently confirms a bounded action and release",
+    "fresh post-action actor and inventory observations confirm position change with no unrelated mutation"
+  ],
+  "stop_criteria": [
+    "identity or epoch mismatch",
+    "stale perception or expired frontier",
+    "native delivery rejects again",
+    "manual input, hazard, health loss, unexpected world or inventory mutation"
+  ],
+  "claim_ceiling": "At most one direct serial action calibration; cannot prove rolling successors or NAV-EQ live acceptance."
+}

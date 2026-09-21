@@ -196,8 +196,13 @@ The public plugin remains a separate production path and stays locked until its
 Auth0 and Codex acceptance gate passes. Neither path copies the per-launch
 desktop session secret into Codex configuration.
 
-The desktop account-link lane uses a separate Auth0 Native public client with
-S256 PKCE and the registered `casimirbot://oauth/callback` protocol. The
+The desktop account-link and MFA step-up lanes use a separate Auth0 Native
+public client with S256 PKCE and an exact, short-lived
+`http://127.0.0.1:8767/callback` return. The native main process reserves
+that port before opening the system browser, binds the one-use state to the
+current attempt, and fails closed if another process owns the port. The
+Auth0 Native application's Allowed Callback URLs must include this exact URI;
+`casimirbot://` is a legacy association and is not the new return route. The
 renderer receives only a validated authorization URL and sanitized completion
 receipt. The authorization code, PKCE verifier, access token, and provider
 subject remain in the app-only host/service boundary and are never persisted or

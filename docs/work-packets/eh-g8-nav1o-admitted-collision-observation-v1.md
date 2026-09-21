@@ -751,3 +751,226 @@ the result had no `navigation_collision` field. No gameplay movement, world
 command, Player Embodiment grant, or NAV-EQ successor was attempted. NAV1-O
 remains deterministically verified only; installed live opt-in qualification
 remains open at the tool-catalog boundary.
+
+The full tunnel transition returned `tool_list_changed_requested: true`,
+`tool_list_changed_supported: true`, and `catalog_refresh_required: false`.
+Nevertheless, this task's available v2 actor-status descriptor remained the
+old one after the transition and after a fresh user continuation. The current
+source registers the opt-in in both full-MCP actor status and situation probe;
+the loaded plugin's connector schema does not expose either. This is an
+observed catalog propagation divergence, not evidence of a Fabric sensor
+failure. A subsequent no-flag read again succeeded with `DatDamPig` at full
+20/20 health, unchanged position (-2.1, 65, 7.7), and no nearby entities.
+Do not request further gameplay movement until the caller can express and
+verify the explicit collision opt-in. Determine whether the full-route tool
+list changed across the stable scope router and whether the Codex plugin
+refreshes its published connector schema; then perform one stationary opt-in
+read before NAV-EQ.
+
+The catalog-refresh path was narrowed further without mutating the game. The
+native service sends `tool_list_changed_requested: true` from the per-request
+MCP server, but its HTTP transport is stateless with JSON responses
+(`sessionIdGenerator: undefined`, `enableJsonResponse: true`). The SDK's
+`sendToolListChanged()` call has no related request ID; in that transport,
+an unscoped notification with no standalone SSE stream resolves without
+delivering a message to the caller. The in-memory notification unit test does
+not exercise this HTTP boundary. Thus `requested` is not a receipt of Codex
+catalog refresh, and `catalog_refresh_required: false` is not supported by
+this live observation. A second notification request was made after the full
+scope route had already settled; the currently loaded v2 tool descriptors
+still lacked the collision flag and dedicated situation probe. A subsequent
+fresh Codex turn or plugin catalog re-registration is needed to distinguish
+same-turn schema caching from longer-lived published-plugin schema staleness.
+The connector remained online, fresh and probe-ready at 20:20:57 UTC. No
+collision capture or gameplay action was attempted.
+
+The owner-facing `CasimirBot Device Check v2` developer-app settings were
+inspected read-only. They show the old saved action schema, a `Refresh`
+control, development review status, and `Allow all actions` for the current
+plugin permission setting. This makes a frozen app-action snapshot a concrete
+second boundary in addition to the stateless notification transport. OpenAI's
+[custom MCP app guidance](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt)
+states that approved app tool/input snapshots do not automatically follow MCP
+server changes. That general product rule is consistent with this observation;
+it does not alone prove the exact Codex plugin cache policy. No Refresh was
+clicked: rescanning a full-scope MCP endpoint under an allow-all setting could
+expose newly advertised write actions, beyond NAV1-O's read-only opt-in. The
+next owner-reviewed step is to inspect the refresh diff and admit only the
+intended observation action/schema without widening unrelated permissions,
+then reload this task's tool catalog and perform one stationary opt-in read.
+
+### Source catalog/receipt repair — 2026-09-19
+
+A new Codex turn still exposed the old v2 actor-status input (only `room_id`)
+and no v2 situation probe. The separate older Device Check plugin exposed a
+situation probe, but its perception input likewise lacked the collision opt-in.
+An owner-facing app Refresh was not performed. Read-only Device Check still
+reported the selected room connector online, fresh, `probe_ready: true`, with
+no blocking reasons; no game action or collision capture was made.
+
+The deterministic catalog-parity test exposed a second source defect: the
+coordination-only surface pre-advertised an older actor-status description and
+schema, while the full surface accepted `include_navigation_collision`. The
+shadow schema now matches the full read tool's opt-in, but its shadow handler
+still denies calls until the full route is active; a flagged shadow read was
+explicitly tested to fail closed. The stateless JSON MCP route
+now explicitly marks tool-list notifications undeliverable; transition
+receipts report `tool_list_changed_requested: false`,
+`tool_list_changed_supported: false`, and `catalog_refresh_required: true`
+instead of mistaking an SDK send resolution for client receipt. The existing
+in-memory transport retains its working notification behavior.
+
+Verification: the complete local-supervisor coordination suite passed 37/37,
+including a new no-delivery case and the previously failing shadow/full schema
+parity assertion; the Helix Ask quick discipline scan passed; the server build
+passed with four unrelated existing warnings. Full-project `tsc` ran out of
+its 4 GiB Node heap and produced no type verdict. This source repair is not
+yet packaged into the running EXE or reflected in this task's saved plugin
+action snapshot. NAV1-O remains deterministically verified, not live
+qualified; NAV-EQ remains unopened. The next live step remains an
+owner-reviewed narrow plugin refresh, a matching installed package, and one
+stationary explicit opt-in read before any movement qualification.
+
+### Matched-source package staged — 2026-09-19
+
+The repaired source was built into a separate unpacked development package at
+`apps/desktop/release-nav1o-catalog-20260919/win-unpacked` without replacing
+the running EXE or stopping Minecraft. Client, server, native host, runtime
+staging, Electron packaging and packed runtime-tree verification passed. The
+packed service contains two exact opt-in actor-status descriptions (shadow and
+full) and the notification-delivery boundary. Package SHA-256 values:
+
+- `CasimirBot.exe`: `13F73C907348713F5B1BD4879817B17AB9017080F4F5585479F7643FE4A356C4`;
+- `resources/app.asar`: `812B24B3EB986FE27BA2DFE1705F035CE771D0628D0269BB8F18F44B3504F420`;
+- packed runtime manifest: `0710f5d30356a71d8938d16979326a9e1e6d24dd2b22353aa34601da6c02b38e`.
+
+The previously running package has different EXE/ASAR hashes. The new package
+is staged but not launched or live-accepted. The saved v2 plugin action schema
+also remains unrefreshed; the owner-facing `Refresh` control was not used.
+Neither packaging nor a healthy existing connector proves a current selected-
+player collision capture. NAV1-O and NAV-EQ maturity are unchanged.
+
+### Read-only action-refresh blast-radius audit — 2026-09-19
+
+The current v2 plugin exposes 48 saved tool names. A source-level in-memory
+`tools/list` of the staged build exposed 39 coordination-only tools and 78
+full-route tools. Every coordination-only tool name is already among the saved
+48, and the repaired shadow actor-status schema now advertises the collision
+opt-in. By contrast, 48 full-route names are absent from the saved v2 list:
+21 read-only, 27 write-capable, including five marked destructive. This is a
+source catalog comparison, not proof that the app's refreshed, OAuth-filtered
+action set will contain all 78. It establishes why a full-route Refresh under
+the currently saved `Allow all actions` setting is a material permission
+expansion risk. The [official OpenAI configuration reference](https://developers.openai.com/es-419/docs/config-file/config-reference)
+also documents per-app and per-tool enablement/approval controls; their
+presence does not mean they were configured here.
+
+The narrower candidate is to switch to the staged EXE, verify its
+coordination-only route and catalog, review/refresh the saved plugin action
+snapshot there, then use the pre-advertised collision input after the governed
+full-scope transition. This still requires an owner-reviewed app refresh; no
+permission setting was changed. At audit time, the old EXE owned two
+one-member rooms on its service instance, so it was not stopped merely to
+stage the catalog audit. Minecraft and connector state remained intact.
+
+After that audit, the old EXE was closed through its verified main window and
+all its processes exited normally. The staged `release-nav1o-catalog-20260919`
+EXE was launched from its exact package path. The Fabric server stayed on
+port 25566 and both Java server/client processes remained alive. The v2
+plugin reached the new EXE's coordination-only route: a room-list call failed
+closed as `full_mcp_transition_required`, while read-only Device Check
+succeeded. Device Check reported the NAV room connector online, fresh and
+`probe_ready: true` with no blockers; a separate old connector was stale and
+offline. This proves a runtime handoff and live shadow-route access, not that
+the v2 action snapshot has refreshed or that collision sensing has been read.
+No full-scope transition, app Refresh, gameplay action, or NAV-EQ execution
+was performed after the handoff.
+
+### Saved app permission and refresh handoff — 2026-09-19
+
+The purpose-built plugin permission inspector confirmed that `CasimirBot
+Device Check v2` has the app-specific setting `Allow all actions`, while the
+account default is `Allow low-risk actions`. The saved v2 actor-status input
+still lacks `include_navigation_collision`, and no v2 situation probe is
+callable in this task. There is no available purpose-built action-catalog
+refresh tool. The Windows Computer Use contract prohibits operating Codex's
+own settings UI or changing in-app security/privacy settings, so the agent
+cannot perform that UI refresh by computer control. No Refresh or permission
+change occurred. The app is intentionally left on the coordination-only MCP
+route; the owner must refresh the v2 app action catalog there and verify the
+new actor-status input before this task requests the governed full-scope
+transition. Do not treat standing device/game authorization as a substitute
+for this app-setting boundary. NAV1-O live collision capture and NAV-EQ remain
+open.
+
+### Installed live opt-in checkpoint — 2026-09-19
+
+The operator refreshed the saved `CasimirBot Device Check v2` app action
+snapshot. Its 48 action names remained unchanged, while the actor-status
+input gained `include_navigation_collision?: boolean`. The running
+`release-nav1o-catalog-20260919` EXE, its ASAR and the dedicated combat-c0
+Fabric sensor match the frozen SHA-256 values in the
+[live evidence](../evidence/eh-g8-environment-spatial-navigation-v1/2026-09-19-nav1o-installed-live-collision-checkpoint.json).
+Device Check reported the selected Fabric source online, fresh and
+probe-ready. The coordination-only actor read failed closed; an existing
+trusted-device delegation admitted a short-lived **transport-only** full-MCP
+transition. That transition granted no Player Embodiment authority.
+
+Three explicit, stationary opt-in reads reached the selected `DatDamPig`
+actor. The first returned `navigation_collision.status=unavailable` with
+`elapsed_budget_exceeded`; its overall snapshot took 78.99 ms, exceeding the
+native capture's cooperative 20 ms budget. The next two returned provenance-
+valid 125-cell native collision replays in 6.31 and 5.16 ms. The final replay
+was at tick 16506909 in `minecraft:overworld`, with zero unknown cells and
+35 explicitly unsupported cells. Unsupported is **not** silently converted to
+traversable or complete topology. Player position remained (-2.1, 65, 7.7)
+at 20/20 health; no movement, inventory, or world action was dispatched.
+
+This is a **live-accepted checkpoint for the exact bounded NAV1-O read path**
+on this installed unsigned development profile. The budget miss remains part
+of the result, and three reads do not establish a latency distribution or
+reliability SLO. The provider-neutral NAV capability row remains
+`deterministically verified`; full NAV1, NAV-EQ, room-driven steering and
+release acceptance remain open. NAV-EQ may now begin its separately specified
+preflight, but rolling movement must not be inferred from sensing success.
+
+### Matched installed repeatability checkpoint — 2026-09-20
+
+The [four-read checkpoint](../evidence/eh-g8-environment-spatial-navigation-v1/2026-09-20-nav1o-installed-repeatability-checkpoint.json)
+records four consecutive fresh, provenance-valid, same-revision opt-in
+collision captures from the running installed profile and Fabric source.
+Each replay contained 125 cells: 90 empty and 35 explicitly unsupported.
+Native capture time was 3.83–5.61 ms; external MCP call wall time was
+3.825–4.310 seconds. These clocks measure different stages and are not
+interchangeable. A later read found DatDamPig stationary at (-2.1, 65, 7.7)
+with 20/20 health. The four successes strengthen bounded read-path
+repeatability evidence but do not erase the earlier budget miss, establish a
+reliability SLO, or classify unsupported cells as safe. Full NAV1, NAV-EQ and
+movement remain unaccepted.
+
+### Additional installed read-only series — 2026-09-20 16:28 UTC
+
+The [separate five-read checkpoint](../evidence/eh-g8-environment-spatial-navigation-v1/2026-09-20-nav1o-five-read-1628-checkpoint.json)
+records five consecutive direct-MCP opt-in perception reads on the same
+installed EXE and selected DatDamPig actor. All five returned a fresh
+same-tick 125-cell native collision replay at stationary position
+(0.25, 65, -5.63), with 46 explicitly unsupported cells. Native capture
+durations ranged from 2.49 to 10.96 ms; external MCP call wall time ranged
+from 2.566 to 8.796 seconds (median 6.754 seconds). This was exploratory,
+not a frozen reliability SLO trial. The earlier budget miss remains valid;
+unsupported cells remain unknown for route admission. No gameplay mutation
+was requested, and neither full NAV1 nor NAV-EQ is promoted.
+
+### Patched installed EXE read series — 2026-09-20
+
+After packaging the NAV-EQ heartbeat change and completing its separate root
+motion trial, the [new EXE five-read checkpoint](../evidence/eh-g8-environment-spatial-navigation-v1/2026-09-20-nav1o-patched-exe-five-read-checkpoint.json)
+captured five consecutive opt-in collision snapshots with no active Player
+Embodiment authority or gameplay action during the series. All five reads
+returned the stationary selected player at (-3, 65, -3.7), 20 health and a
+125-cell replay with 100 empty and 25 explicitly unsupported cells. Native
+capture ranged from 1.23 to 4.02 ms; external MCP wall time ranged from
+1.754 to 2.321 seconds (median 2.069 seconds). Those are different clocks.
+This confirms repeatable read-path operation on the current matched installed
+EXE, not a moving-sensor latency guarantee, reliability SLO, full NAV1 or
+NAV-EQ acceptance. The earlier native budget miss remains recorded.

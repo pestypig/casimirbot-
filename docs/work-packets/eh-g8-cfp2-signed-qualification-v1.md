@@ -1,0 +1,33 @@
+Program gate: G8 — Environment-harness release evaluation
+Workstream: CFP-2.SIGNED-QUALIFICATION candidate prerequisite lane
+Capability or component: Privately signed evaluation EXE and installed identity tuple for P1/PNA2 proof
+Lifecycle stage: signed artifact qualification before CFP-2 installed acceptance
+Reaction timescale: one immutable evaluation build and every affected rebuild
+Authority owner: Release signing operator and artifact reviewer; CFP-2 coordinator owns tuple admission; product owner retains customer-release decisions
+Current maturity: specified
+Target maturity: deterministically verified signed evaluation tuple, then separately reviewed installed-use evidence under CFP-2
+Required evidence: CFP-1 closure and reviewed planned component/notice scope, approved signing identity, exact source/toolchain/staged dependency closure, Authenticode publisher and hashes, independent artifact review, P1S-01–07 consumption by installed CFP-2 children
+Explicit non-goals: no dispatch before CFP-1 closure, customer release or feed, public tag, source visibility or production billing change, commercial Minecraft permission, final CFP-3 release acceptance or G8 promotion
+Downstream gate unlocked: CFP-2 signed P1/PNA2 evaluation only after this tuple passes; CFP-3 remains gated on full CFP-2 closure
+
+# CFP-2.SIGNED-QUALIFICATION — private signed evaluation tuple
+
+Status: candidate child packet, **NOT DISPATCHABLE** while CFP-1 remains active. The [signed-stage audit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-signed-p1-stage-cycle-audit-262.md) establishes why CFP-2 needs this prerequisite lane. It repairs stage order without treating a diagnostic build as a customer product or moving CFP-3.SIGNING's release responsibility forward.
+
+## Admission and ownership
+
+Require canonical CFP-1 closure, the reviewed planned C01–C15 inclusion/notice boundary for these evaluation bytes, and an owner-approved, verified public-trust signing identity. The [individual-signing screen](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-individual-code-signing-route-screen-260.md) is a feasible conditional path for the reported U.S. individual seller; it is no evidence of an existing certificate or consent to create a billable Azure resource. Freeze one signing operator, independent artifact reviewer and CFP-2 coordinator. CFP-2.PUBLIC/ONBOARD implement the selected P1 command mode and trust controls; this lane owns only the packaging, provenance, signature and installed tuple needed to exercise them. Shared builder, release-script and workflow edits require a file-ownership assignment before dispatch.
+
+Consume the [identity/signing cash guard](eh-g8-cfp1-d07-identity-and-signing-cash-guard-owner-freeze-v1.md). Before provisioning, prove that the individual billing legal name, sold-to address, approved seller/display name and public certificate profile are consistent with the qualified D11 return. Use an isolated Artifact Signing billing scope or reconcile the exact SKU and every billed signature. Reserve each artifact/batch before dispatch, count retries conservatively, prohibit paid overage, stop routine/candidate work at 800 signatures and preserve 200 of the 1,000-signature provider-month/rolling-30-day ceiling for same-or-newer security/rights repair. The `$15` ceiling is a CFP-1 policy guard, not proof of eligibility, checkout, tax or an existing signature.
+
+The current release preflight requires a clean tagged source and the desktop release workflow triggers on `desktop-v*` tags in the production environment. A private qualification build must use an expressly separate **no-publication** recipe and provenance receipt, not an untagged pass of the customer release workflow. Do not relax customer release preflight, reuse mutable `release/` contents as an immutable cohort, upload a public GitHub Release, activate a feed, or provision a paid signing account without the owner's separate operational decision. If a valid publicly trusted signing route cannot be provisioned, keep signed P1/PNA2 acceptance and CFP-2 closure blocked; source tests and unpacked builds may still locate defects but cannot substitute.
+
+## Required tuple and checks
+
+Reserve one source commit with recorded dirty-file state, lockfiles/toolchain, client and runtime tree, selected service and connector versions, intended package identity and reviewed component/notice selection. If an evaluation fixture cannot use a clean checkout, hash every changed input and do not label it a reproducible release. Produce one private installed EXE with the reviewed `--mcp-stdio-personal` command mode, a publicly trusted Authenticode signature and the exact publisher identity accepted by the installer/updater policy. Record installer, EXE, ASAR, service, manifest, selected companion, notice and relevant source hashes; reject stale or substituted bytes, missing rights-reviewed notices and a changed publisher. Verify the signature and timestamp with an independent tool and capture sanitized receipts. Apply Casimir release verification if the actual build/release changes fall within that gate; a historical PASS is not a new artifact's certificate.
+
+Before CFP-2.ONBOARD runs P1S-01–07, the independent reviewer must compare the installed tuple to the build and rights manifests, inspect the command-mode launch from the signed installed path, verify protocol-only stdout and deny an unsigned/wrong-publisher or altered executable. CFP-2 then runs the ordinary `user` full-catalog, account/grant, wrong-user/wrong-service, effect/revoke, outage and restart fixtures against **that exact tuple**, with C07's selected JAR/profile identity where Minecraft is the task. A code, connector, signing identity or staged-resource change invalidates affected results and requires a newly reviewed tuple. This lane does not claim a successful personal task merely because the installer signed.
+
+## Handoff and boundary
+
+CFP-2 closure requires this child and PUBLIC, ONBOARD and CAPABILITY results, each independently reviewed, on an identified installed cohort. Preserve diagnostic runs separately. CFP-3.SIGNING later consumes the selected publisher and the CFP-2 findings but creates a **new** rights-reviewed immutable customer cohort with final SBOM/notices, release Casimir gate, signed bytes and distribution handoff. CFP-4 repeats the useful task, P1 lifecycle and full selected matrix on that final same-signed artifact before a pilot. A CFP-2 evaluation signature grants no customer download, commercial action, paid eligibility, source-visibility change or release-ready status.

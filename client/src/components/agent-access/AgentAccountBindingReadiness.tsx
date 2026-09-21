@@ -355,14 +355,18 @@ export function AgentAccountBindingReadiness() {
       // The native bridge may never settle. Recovery must cover that wait too.
       setAwaitingCallback(true);
       await open(receipt.authorization_url);
-      // Remain busy until the protocol callback is completed or the user
+      // Remain busy until the private loopback callback is completed or the user
       // explicitly retries. No OAuth credential is returned to this renderer.
-    } catch {
+    } catch (caught) {
       if (generation !== linkWaitGeneration.current) return;
       setLinkBusy(false);
       setAwaitingCallback(false);
       setLinkError(
-        "Auth0 account linking is unavailable or not configured in this desktop build.",
+        caught instanceof Error && caught.message.includes("desktop_auth0_callback_port_unavailable")
+          ? "CasimirBot cannot reserve its private Auth0 return port on this device. Close any other active CasimirBot authentication attempt, then retry."
+          : caught instanceof Error && caught.message.includes("desktop_auth0_callback_route_unavailable")
+          ? "This CasimirBot instance cannot receive its Auth0 callback because the desktop protocol is not routed to this exact profile. Use the registered installation or repair the protocol association before retrying."
+          : "Auth0 account linking is unavailable or not configured in this desktop build.",
       );
     } finally {
       if (linkStartRequest.current === startController) linkStartRequest.current = null;

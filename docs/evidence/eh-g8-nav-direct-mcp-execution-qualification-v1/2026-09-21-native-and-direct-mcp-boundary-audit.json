@@ -1,0 +1,42 @@
+{
+  "schema": "helix.nav_eq_native_and_direct_mcp_boundary_audit.v1",
+  "observed_at_utc": "2026-09-21T01:23:44Z",
+  "claim_ceiling": "The current installed native window and both available Codex MCP routes were checked without gameplay mutation. Neither MCP route is presently available for a fresh Minecraft observation, and the isolated EXE remains unregistered; this is not NAV1-O or NAV-EQ live acceptance.",
+  "installed_node": {
+    "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "private_loopback_port": 59664,
+    "native_window_count": 1,
+    "native_panel": "Connections, Billing & Security / Device & Security",
+    "device_status": "unregistered",
+    "native_status": "waiting for Auth0 MFA",
+    "register_button": "disabled",
+    "latest_recorded_step_up_start_utc": "2026-09-21T00:46:44.610Z",
+    "newer_step_up_start_observed": false
+  },
+  "mcp_routes": {
+    "keyed_direct_local": {
+      "endpoint": "loopback port 1522",
+      "listener_present": false,
+      "device_check": "HTTP transport send error before an observation"
+    },
+    "installed_device_check_plugin": {
+      "device_check": "McpServerError: Session terminated",
+      "environment_observation_received": false
+    }
+  },
+  "source_candidate": {
+    "native_cancel_retry_patch": "source only; not in the running installed EXE",
+    "focused_tests": "32/32 passed",
+    "desktop_release_slice_audit": "PASS with three unrelated cross-owner hunk-review notices",
+    "shared_worktree_changed_entries": 413,
+    "packaging_disposition": "No package produced from the concurrently dirty shared worktree in this audit; an isolated, provenance-checked build is required before runtime claims."
+  },
+  "authority": {
+    "oauth_code_or_otp_inspected": false,
+    "device_registration_inferred": false,
+    "room_or_world_grant_changed": false,
+    "minecraft_action_dispatched": false
+  },
+  "next_boundary": "Restore a supported authenticated MCP transport and fresh source/actor identity without bypassing native device or room authority. Separately package and verify the native retry recovery candidate before using it to diagnose a fresh Auth0 transaction; do not attribute the observed HTTP 400 to an incorrect code without Auth0-side evidence.",
+  "nav_eq_maturity": "specified"
+}

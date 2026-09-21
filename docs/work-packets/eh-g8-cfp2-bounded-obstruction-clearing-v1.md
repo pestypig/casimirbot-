@@ -5,8 +5,8 @@ Lifecycle stage: tool admission; evidence normalization; evidence re-entry
 Reaction timescale: short semantic replanning; bounded native execution where applicable
 Authority owner: Minecraft action/adapter implementer; independent effect and evidence reviewer
 Current maturity: specified
-Target maturity: deterministically verified and separately recorded ordinary-user diagnostic acceptance within the frozen scope
-Required evidence: canonical CFP-1 closure, approved rights/terms and acceptance freeze, exact installed evaluation identity, assigned files and resources, positive and negative scoped results
+Target maturity: deterministically verified with separately recorded ordinary-user signed-evaluation acceptance within the frozen scope
+Required evidence: canonical CFP-1 closure, approved rights/terms and acceptance freeze, CFP-2.SIGNED-QUALIFICATION tuple for installed completion, assigned files and resources, positive and negative scoped results
 Explicit non-goals: no dispatch from this draft, verified purchase claim, production license bypass, publication, commercial permission, bundled reasoning runtime or broader G8 promotion
 Downstream gate unlocked: CFP-3 only after all CFP-2 component evidence is reviewed by the coordinator
 
@@ -57,4 +57,4 @@ Unapproved third target, autonomous movement, unbounded task extension, stale or
 
 Each run records its exact installation class, runtime/client/companion versions and hashes, source HEAD plus relevant dirty hashes, grant provenance, expected/actual results, complete trial count, timings, effect and observation references, first divergence, representative failures and not-run surfaces. Write new immutable artifacts under docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-2/<task-id>/<run-id>/. Keep previous failed cohorts. No secret, private reasoning or raw account store belongs in exports.
 
-A distinct reviewer checks bounds and evidence before handoff. Parent CFP-2 closure requires all three child results; a child does not advance G8, publish, charge or change source visibility. Unresolved technical prerequisites return to their owning packets.
+A distinct reviewer checks bounds and evidence before handoff. Parent CFP-2 closure requires all four child results, including [SIGNED-QUALIFICATION](eh-g8-cfp2-signed-qualification-v1.md); a child does not advance G8, publish, charge or change source visibility. Unresolved technical prerequisites return to their owning packets.

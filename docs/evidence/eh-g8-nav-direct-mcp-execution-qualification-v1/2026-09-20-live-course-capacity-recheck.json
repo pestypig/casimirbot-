@@ -1,0 +1,48 @@
+{
+  "schema": "helix.nav_eq_live_course_capacity_recheck.v1",
+  "scope": "Read-only installed-runtime course and connector recheck; no NAV-EQ rolling execution",
+  "service_instance": "service_instance:50f1c88ffb72f58e659c6e4c84a20605",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "world_id": "minecraft:local:combat-c0",
+  "source_id": "source:room-ingress:fd527d00-c1b9-49b8-9cee-4928577d6bb7",
+  "subject": "DatDamPig",
+  "device_check": {
+    "observed_at": "2026-09-20T15:21:48.494Z",
+    "health": "online",
+    "freshness": "fresh",
+    "probe_ready": true,
+    "blocking_reasons": []
+  },
+  "actor_status": {
+    "observed_at": "2026-09-20T15:21:50.835Z",
+    "evidence_ref": "environment_probe_evidence:febd4f57c78d7c45591712a7247a1749c7d03191",
+    "position": [-2.49, 65, 5.58],
+    "health": 20,
+    "game_mode": "survival"
+  },
+  "same_revision_perception": {
+    "observed_at": "2026-09-20T15:20:18.726Z",
+    "evidence_ref": "environment_probe_evidence:d75155a02c302a928d5101e597e7b2fccf3a309d",
+    "observation_revision": 17779758,
+    "navigation_collision": "captured",
+    "horizontal_radius": 7,
+    "reachable_footholds": 124,
+    "entities": 0,
+    "projectiles": 0,
+    "hazards": 0,
+    "coverage_boundary_reached": true
+  },
+  "runway_screen": {
+    "historical_one_walk_speed_blocks_per_second": 4.31,
+    "historical_read_call_seconds": [3.236, 4.164, 3.876],
+    "candidate_four_segment_duration_seconds": [24, 32],
+    "candidate_distance_at_historical_pace_blocks": [103.44, 137.92],
+    "interpretation": "A 100-150 block unobstructed course is a candidate for root plus three useful 6-8 second rolling segments. This is a planning estimate, not a frozen pass limit or proof that such a route exists. The current radius-seven frontier proves no route beyond its boundary."
+  },
+  "authority_and_effects": {
+    "new_action_authority_granted": false,
+    "temporal_plan_submitted": false,
+    "gameplay_mutation_requested": false
+  },
+  "maturity": "NAV1-O matched-runtime bounded read is live-accepted at its recorded scope; NAV-EQ remains specified."
+}

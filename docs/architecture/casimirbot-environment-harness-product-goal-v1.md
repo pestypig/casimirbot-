@@ -11,14 +11,31 @@ and required evidence are maintained only in
 
 ## Commercial delivery direction
 
-The selected product direction is a free personal CasimirBot harness with paid hosted collaboration for users
-of an existing supported reasoning application, with Codex App as the first
-polished connection profile. Personal supported tools are free; subscriptions
+The selected product direction is a free personal CasimirBot harness for an
+owner's existing supported reasoning application, with Codex App as the first
+polished connection profile, plus paid hosted collaboration for invited
+participants. Personal supported tools are free; subscriptions
 fund maintained hosted collaboration, integrations, updates and support. The ordinary
 external-client journey does not require a second bundled model runtime,
 provider-key enrollment, or CasimirBot-funded inference. Any required hosted
 coordination must be costed into the subscription. Managed model/API consumption
 and credit purchases or bundles are deferred outside the initial offer.
+The owner's [resource-token direction](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-owner-resource-token-direction-154.md)
+adds an internal hosted-cost budgeting option to CFP-1, not a model-token or
+prepaid-credit product. The [budget-token contract](../work-packets/eh-g8-cfp1-hosted-resource-budget-token-contract-v1.md)
+keeps subscription access, free personal tools, the seven-day trial calendar
+and independent program-action authority intact; final capacity and customer
+wording still require D07/D11/D12 review.
+
+The provisional first-cohort operator policy now includes conditional Auth0 and
+Windows-signing cash/admission guards: `$45` for the full provider-billed
+identity scope with at most 450 counted MAU, and `$15` for at most 1,000 billed
+artifact signatures per provider month and rolling 30 days, split into 800
+routine/candidate and 200 protected repair. These values shape CFP-2/3
+qualification; they are not customer quotas, provider purchases, evidence of a
+configured tenant/certificate, or a final `$60` offer. The NYC individual
+seller's legal/assumed name, public certificate identity and address treatment
+remain D11/D12 inputs.
 
 The intended source boundary is proprietary future first-party product
 implementation where ownership and dependency obligations permit, with
@@ -69,6 +86,13 @@ the personal tool loop first, then the invite/grant/use/revoke/reconnect journey
 specified in CFP-1. One host sponsoring invited guests with explicit handoff
 to another eligible host is selected; handoff protocol, capacity and price-tier
 mapping remain open.
+The provisional [guest request ingress](../work-packets/eh-g8-cfp1-hosted-guest-request-ingress-v1.md)
+targets one exact first-party request by an authenticated invited guest who has
+no GPT/Codex account, under the program owner's one-use grant and the same
+native effect checks. A guest's own supported MCP reasoning client is an optional
+separately qualified path. This is not a current or approved customer claim;
+the selected action, first-party route, rights and installed evidence remain
+subject to CFP-1/3/4 and D12.
 
 The owner also selected an [action-inclusive first paid benefit](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-shared-actions-benefit-owner-selection-26.md): at least one guest-requested program action under its owner's exact grant, after that connector and commercial relationship are rights-cleared and technically accepted. Coordination/read-only alone does not fulfill the selected first paid offer. No specific Minecraft action or connector has yet met those conditions.
 
@@ -79,8 +103,9 @@ accepted release claim. Dan, Sam and Alex want to reach a cave entrance while
 talking, stay together, avoid deep water and recover if one player disconnects.
 The Minecraft setting makes control and progress visible; the platform must
 eventually support other consented programs through the same contracts. The
-owner-selected launch offer above remains free personal MCP tools plus paid
-hosted collaboration using the user's supported external reasoning client.
+owner-selected launch offer above remains free personal MCP tools for an owner
+with a supported external reasoning client, plus paid hosted collaboration
+whose invited guests may use the proposed first-party bounded request path.
 
 The reference proposes a richer service split. Its human-only room and
 CasimirBot-funded AI modes require a new commercial decision, operating-cost

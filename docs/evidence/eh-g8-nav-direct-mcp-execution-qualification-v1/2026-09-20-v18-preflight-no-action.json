@@ -1,0 +1,31 @@
+{
+  "schema": "helix.nav_eq_v18_preflight_no_action.v1",
+  "date_utc": "2026-09-20",
+  "protocol": "2026-09-20-south-floor-return-protocol-v18.json",
+  "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked",
+  "run_id": "run_73a769ae-8ded-40c0-845e-407bfef3fafd",
+  "goal_id": "environment_durable_goal:0a1565560716d90ec267b656983018dcd8ce91418d0a404c17bf93bad5bd2b5a",
+  "authority_id": "environment_action_authority:82f06307-9dc9-4cce-a6ab-675d7b4cb9e6",
+  "source_repaired_privately": true,
+  "player_paired_privately": true,
+  "fresh_perception_evidence_ref": "environment_probe_evidence:416bfd76a3ce3ec4c579523e8ad54cb1306bc705",
+  "fresh_frontier_id": "environment_frontier:f49c980a-9363-434d-bb61-25d3be064063",
+  "frontier_result": "Movement-only sequence.execute and walk were conditional; all other player actions were outside authority.",
+  "root_submitted": false,
+  "reason_not_submitted": "The finite action lease was too close to its 2026-09-20T21:35:00Z expiry to leave a safe post-motion evidence-drain and successor window. A frontier receipt is not an execution admission.",
+  "authority_after_expiry": "expired",
+  "post_expiry_probe": {
+    "observed_at": "2026-09-20T21:35:29.419Z",
+    "evidence_ref": "environment_probe_evidence:cafd006aa3243400542c4f0872026cb57d9042c4",
+    "position": [6.72, 65, -2.24],
+    "health": 20
+  },
+  "build_retention": {
+    "active": "apps/desktop/release-nav-eq-verified-20260920",
+    "rollback": "apps/desktop/release-nav-eq-prefix-20260920",
+    "superseded_diagnostic_recycled": "apps/desktop/release-nav-eq-diagnostic-20260920",
+    "additional_builds_recycled_this_checkpoint": 0,
+    "new_exe_built_this_checkpoint": false
+  },
+  "claim_ceiling": "No V18 movement action or live successor occurred. NAV-EQ remains specified."
+}

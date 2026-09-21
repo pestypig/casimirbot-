@@ -120,6 +120,7 @@ const createFixture = (resolved: HelixAccountSession | null = session("developer
       target_ref: DEVICE_REF,
       expires_at: "2026-08-27T21:02:00.000Z",
     })),
+    cancelForSession: vi.fn(() => 1),
   };
   const receipts = {
     consumeNativeOperation: vi.fn(() => ({
@@ -202,6 +203,33 @@ describe("desktop Auth0 MFA step-up route", () => {
       targetRef: DEVICE_REF,
     }));
     expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("lets only the same native developer session invalidate pending MFA", async () => {
+    const { app, controller } = createFixture();
+    await request(app).post("/api/account/security/step-up/cancel")
+      .send({}).expect(401);
+    const cancelled = await native(request(app)
+      .post("/api/account/security/step-up/cancel"))
+      .send({}).expect(200);
+    expect(controller.cancelForSession).toHaveBeenCalledWith({
+      session: { sessionId: "session-developer", profileId: "profile-developer" },
+      deviceId: DEVICE_ID,
+    });
+    expect(cancelled.body).toMatchObject({
+      schema: "helix.auth0_step_up_cancel.v1",
+      cancelled_intent_count: 1,
+      usable_receipt_included: false,
+    });
+    expect(cancelled.body).not.toHaveProperty("authorization_url");
+    await native(request(app).post("/api/account/security/step-up/cancel"))
+      .send({ purpose: "device_register" }).expect(400);
+    expect(controller.cancelForSession).toHaveBeenCalledTimes(1);
+    const publicSession = createFixture(session("user"));
+    await native(request(publicSession.app)
+      .post("/api/account/security/step-up/cancel"))
+      .send({}).expect(403);
+    expect(publicSession.controller.cancelForSession).not.toHaveBeenCalled();
   });
 
   it("keeps future payment/provider purposes closed", async () => {

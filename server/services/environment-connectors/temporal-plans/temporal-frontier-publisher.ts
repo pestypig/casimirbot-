@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import { readTemporalPublicationClock } from "./temporal-publication-clock";
 import { HELIX_MINECRAFT_PERCEPTION_SNAPSHOT_READ_CAPABILITY } from "@shared/helix-environment-connector";
 import type { HelixEnvironmentAffordanceEntry } from "@shared/helix-environment-time";
@@ -8,13 +9,40 @@ import { TemporalPlanError } from "./temporal-plan-error";
 import { readTemporalSuccessorContext } from "./temporal-successor-context";
 
 const store = new EnvironmentTemporalFrontierStore();
+const RESIDENT_CLOCK_CATCHUP_ATTEMPTS = 6;
+const RESIDENT_CLOCK_CATCHUP_DELAY_MS = 200;
 
 export const publishTemporalPerceptionFrontier = async (
   input: Parameters<typeof resolveTemporalPerceptionContext>[0],
   frontierStore: Pick<EnvironmentTemporalFrontierStore, "publish"> = store,
 ) => {
   const requestReceived = readTemporalPublicationClock();
-  const context = await resolveTemporalPerceptionContext(input);
+  // A same-player perception can outrun the one-second Fabric heartbeat while
+  // a plan is moving. Wait only for a *measured* matching heartbeat; each read
+  // revalidates the goal, authority, producer epoch and five-second evidence
+  // window. Never extrapolate a resident tick or admit a stale observation.
+  let context = await resolveTemporalPerceptionContext(input);
+  for (let attempt = 0; attempt < RESIDENT_CLOCK_CATCHUP_ATTEMPTS; attempt++) {
+    const observedTick = context.evidence.observation.result.game_tick;
+    const observedRevision = context.evidence.observation.result.observation_revision;
+    if (!Number.isSafeInteger(observedTick) || Number(observedTick) < 0 ||
+        !Number.isSafeInteger(observedRevision) || Number(observedRevision) < 0 ||
+        Number(observedTick) > Number.MAX_SAFE_INTEGER - MINECRAFT_TEMPORAL_FRONTIER_WINDOW_TICKS) {
+      throw new TemporalPlanError("temporal_frontier_observation_clock_invalid");
+    }
+    const resident = context.catalog.resident_clock_observation;
+    const residentTick = resident?.clock.world_tick_index;
+    if (!resident || (resident.producer_epoch_ref === context.action_producer_epoch_ref &&
+        resident.clock.clock_kind === "minecraft_game_tick" &&
+        Number.isSafeInteger(residentTick) && Number(residentTick) >= Number(observedTick))) break;
+    if (resident.producer_epoch_ref !== context.action_producer_epoch_ref ||
+        resident.clock.clock_kind !== "minecraft_game_tick" ||
+        !Number.isSafeInteger(residentTick) || attempt === RESIDENT_CLOCK_CATCHUP_ATTEMPTS - 1) {
+      throw new TemporalPlanError("temporal_frontier_resident_clock_unmapped");
+    }
+    await delay(RESIDENT_CLOCK_CATCHUP_DELAY_MS);
+    context = await resolveTemporalPerceptionContext(input);
+  }
   const identity = context.goal.identity;
   const snapshot = context.evidence.observation.result;
   const tick = snapshot.game_tick;

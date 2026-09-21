@@ -1,0 +1,50 @@
+{
+  "schema": "helix.nav_eq_post_restart_local_snapshot_checkpoint.v1",
+  "date_utc": "2026-09-20",
+  "claim_ceiling": "The computer restart interrupted the V20 live attempt. A zeroed local EXE database snapshot prevented trustworthy account and MCP recovery. The snapshot was preserved and a fail-closed source patch passed local tests, but the patch is not packaged or live accepted, and no post-restart Minecraft action was attempted.",
+  "pre_restart_state": {
+    "fabric_jar_sha256": "9de77e3309f7f9dd1533d4bdcf1794475d259a63d87c01cadf57a3b02bb56f47",
+    "v20_protocol_frozen": true,
+    "v20_root_submitted": false
+  },
+  "post_restart_observations": {
+    "initial_exe_running": false,
+    "initial_minecraft_client_running": false,
+    "initial_fabric_server_listening_on_25566": false,
+    "staged_isolated_fabric_jar_hash_matched": true,
+    "free_physical_memory_gb_approx": 5.35,
+    "exe_relaunch": "Exact NAV test build launched on port 51996 for diagnosis, then only its five verified processes were stopped; no Minecraft action was issued.",
+    "exe_healthz_status": 200,
+    "codex_mcp_error": "Session terminated",
+    "plugin_reconnect_result": "We couldn't connect this account. Please try again.",
+    "causality_note": "The snapshot restore failure and plugin reconnect failure co-occurred; an exact causal link was not proved."
+  },
+  "local_snapshot": {
+    "path": "C:/Users/dan/AppData/Roaming/@casimirbot/desktop/state/helix-local-pg-mem.json",
+    "length_bytes": 78448889,
+    "nonzero_bytes": 0,
+    "sha256": "0d902b62f8e289737e4203e83c0a429bc247cd6f4564d37fa37c971863266795",
+    "last_write_utc": "2026-09-20T22:17:15Z",
+    "preserved_copy": "C:/Users/dan/AppData/Roaming/@casimirbot/desktop/state/helix-local-pg-mem.corrupt-pre-recovery-20260920.json",
+    "preserved_copy_hash_matches": true,
+    "newest_parseable_temp_snapshot": "helix-local-pg-mem.json.3472.tmp",
+    "newest_parseable_temp_snapshot_saved_at": "2026-09-14T16:30:06.007Z",
+    "older_snapshot_restored": false,
+    "backup_or_current_snapshot_deleted": false,
+    "vss_read_attempt": "Unavailable without elevated permission; no shadow-copy write attempted."
+  },
+  "source_patch": {
+    "files": [
+      "server/db/client.ts",
+      "server/__tests__/local-pg-mem-persistence.test.ts"
+    ],
+    "behavior": "Malformed JSON or unsupported snapshot schema rejects database initialization, preserves the file, and retains the failure across same-process retries rather than silently treating the profile as empty and writable. Log output reports a bounded failure class rather than raw corrupted content.",
+    "full_persistence_suite": "11/11 passed before the final log-sanitization edit",
+    "focused_fail_closed_tests_after_final_edit": "2/2 passed",
+    "server_build": "passed with four pre-existing unrelated warnings",
+    "global_typecheck": "Stopped without verdict after memory use left approximately 0.49 GB free; not reported as a pass or code failure.",
+    "installed_exe_contains_patch": false
+  },
+  "nav_eq_maturity": "specified",
+  "next_boundary": "Recover or deliberately replace the local snapshot only after an explicit owner choice, then reconnect the MCP client, re-pair fresh Minecraft identities, and freeze a new live protocol. Do not reuse V20's expired authorities or claim its unsubmitted root as executed."
+}

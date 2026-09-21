@@ -167,8 +167,9 @@ const strictCallback = (
     );
   }
   if (
-    parsed.protocol !== "casimirbot:" ||
-    parsed.hostname !== "oauth" ||
+    parsed.protocol !== "http:" ||
+    parsed.hostname !== "127.0.0.1" ||
+    parsed.port !== "8767" ||
     parsed.pathname !== "/callback" ||
     parsed.username ||
     parsed.password ||

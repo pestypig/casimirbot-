@@ -1,0 +1,7 @@
+# CFP-1 Fabric player identity independent review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. An independent read-only agent reviewed [crosswalk 161](2026-09-20-cfp1-fabric-player-package-identity-crosswalk-161.md), its D01/C07 acceptance and decision-sheet edits, and the canonical work-program backlink against the checked source.
+
+The first pass found two defects: `ensureBuiltinEnvironmentConnectorPackages` uses `ON CONFLICT (package_version_id) DO NOTHING`, so a prior database `0.4.0` row could retain an older content hash/descriptors; and the D01 queue incorrectly placed an actual signed/installed cohort before CFP-1's specification exit. Both were corrected. The crosswalk now requires persisted-row hash/metadata equality or reviewed version/migration/fail-closed treatment. D01 freezes the **planned** catalog→artifact→manifest relation and fixtures in CFP-1; CFP-2/3 bind signed installed bytes and execute the fixtures.
+
+**Final bounded review: PASS.** Source hashes, the local development JAR's metadata/hash, distinct `0.4.0`/`0.4.11`/`0.4.12` identities, rights limits, corrected stage ownership and local links checked out. `npm run helix:environment-harness:docs-audit` and `git -c core.safecrlf=false diff --check` passed after correction. The review proves a consistent specification and source gap, not persisted database equality, installed pairing, JAR provenance, legal permission or a customer-supported Minecraft operation. CFP-1 remains active (`specified`); CFP-2/3 remain blocked.

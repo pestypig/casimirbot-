@@ -1,0 +1,7 @@
+# Independent CFP-1 D07 Autoscale and FC-08 review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`), CFP-2/3 blocked. An independent read-only reviewer checked [public cost evidence 146](2026-09-20-cfp1-autoscale-saturation-cost-stress-146.md), its private calculation and hash, the prior [Replit configuration read](2026-09-20-cfp1-replit-deployment-and-usage-recheck-115.md), official Replit billing documentation, and the edited D07 assay, worksheet, owner queue, work program, FC-08 worksheet and landing-copy candidate.
+
+Review result: **PASS** for the bounded specification and arithmetic. The reviewer verified that full configured Autoscale utilization is expressly an adverse assumption, not typical room usage or a complete cost upper bound; Replit request-work billing and the database five-minute active tail are distinguished. Public files disclose no private account rate or derived account amount. The corrected FC-08 sentence is conditional on C10 rights, packaging and an independent **registered built-in system-clock** probe; it does not claim open third-party registration. Links and stage fences resolve.
+
+`npm run helix:environment-harness:docs-audit` returned `ok: true` with no failures, and `git -c core.safecrlf=false diff --check` passed after the edits. This review neither selects a hosted price nor closes D07, D11 or D12. No runtime, billing, production, publication or external-inquiry action occurred. CFP-1 stays active (`specified`), CFP-2/3 blocked and G8 active.

@@ -1,0 +1,113 @@
+{
+  "schema": "helix.nav_eq_restart_source_commit_telemetry_checkpoint.v1",
+  "date_utc": "2026-09-21",
+  "claim_ceiling": "The keyed developer harness, C0 Fabric arena, isolated client, and a fresh read-only room source were brought back after restart. A Windows host-commit sampler defect was repaired and verified. The authenticated direct MCP read reached a fail-closed installed-node read-grant boundary. A disposable native EXE profile then reached local health but rejected the old direct-local MCP session at its native desktop-session boundary. No NAV-EQ movement, rolling successor, or fresh post-patch Minecraft observation was accepted.",
+  "runtime": {
+    "keyed_launcher": "approved opaque start-myapp-for-codex action",
+    "workspace": "canonical Desktop CasimirBot repository",
+    "server_run_directory": "minecraft/helix-fabric-sensor/run/combat-c0-server",
+    "harness_origin": "http://127.0.0.1:1522",
+    "harness_healthz_http_status": 200,
+    "account_session_http_status": 200,
+    "helix_pipeline_http_status": 200,
+    "agent_providers_http_status": 200,
+    "browser_account": "Auth0-linked C0 Codex profile",
+    "cli_mcp_entry": "casimirbot_g2_a1_local OAuth",
+    "current_task_local_mcp_tools_exposed_during_first_turn": false,
+    "current_task_local_mcp_tools_exposed_next_turn": true,
+    "current_task_room_inspect": "authenticated owner C0 Codex; room waiting_for_participant; no shared-model runtime",
+    "current_task_device_check_v2_result": "McpServerError: Session terminated"
+  },
+  "minecraft_preflight": {
+    "room_id": "shared_realtime_room:0ad5efc6-26e6-40e1-a1ca-29fbec49b93b",
+    "room_label": "NAV-EQ C0 direct movement qualification",
+    "server_port": 25566,
+    "server_world": "helix_combat_c0_world",
+    "server_difficulty": "normal",
+    "server_gamemode": "survival",
+    "client_profile": "helix-combat-c0-isolated",
+    "client_launch_receipt": "helix.minecraft.workstation_launch_receipt.v1 status=connected; mod_loaded=true; isolated_game_directory=true",
+    "client_connected_player": "DatDamPig",
+    "client_join_position_from_server_log": [0.5573658030683669, 65.0, 2.3671694243869497],
+    "source_pairing": "private local sensing handoff; pairing material not inspected or recorded",
+    "source_status_before_shutdown": "active, fresh, 12 admitted read capabilities",
+    "sensor_manifest_log": "admitted; read-only observations active",
+    "command_lane": "disabled",
+    "player_action_authority_created": false,
+    "movement_submitted": false
+  },
+  "memory_boundary": {
+    "physical_memory_gb": 15.78,
+    "client_launch_receipt_used_percent": 96.5,
+    "lowest_observed_free_physical_gb_approx": 0.69,
+    "operator_action": "Stopped only the verified Minecraft Launcher helper processes, then the exact newly launched Fabric client. Stopped the Fabric server normally with its console stop command after its world saved. Docker and unrelated processes were untouched.",
+    "post_fabric_stop_free_physical_gb_approx": 2.68
+  },
+  "first_divergence": {
+    "initial_read_only_prompt": "Ask the fresh room Fabric source for DatDamPig's position, support and nearby obstruction without gameplay mutation.",
+    "initial_visible_error": "Ask turn rejected: host_commit_telemetry_stale",
+    "observed_host_issue": "wmic.exe absent; Windows host-commit monitor repeatedly logged sample_error ENOENT",
+    "patch_classification": "Ask turn admission telemetry availability; no change to admission thresholds, source identity, tool authority, or terminal authority",
+    "patched_files": [
+      "server/services/runtime/host-commit-memory.ts",
+      "server/services/runtime/__tests__/host-commit-memory.test.ts"
+    ],
+    "patch_behavior": "Use a fixed, hidden PowerShell Get-CimInstance Win32_OperatingSystem fallback for the same FreeVirtualMemory and TotalVirtualMemorySize commit counters when WMIC is absent or invalid; fail closed if both samplers fail.",
+    "focused_tests": "45/45 passed across host-commit and runtime-memory-governor suites",
+    "discipline_quick": "passed; no Helix Ask-sensitive changes classified",
+    "server_build": "passed with four unrelated existing warnings",
+    "actual_windows_sample": "status=available; source=windows_cim; freeMiB=13317.7; limitMiB=29987.3; ratio=0.5559",
+    "restarted_keyed_server_log": "host commit monitor ready source=windows_cim"
+  },
+  "post_patch_ask": {
+    "same_read_only_prompt_retried": true,
+    "fabric_running_during_retry": false,
+    "provider_path_entered": true,
+    "workstation_actor_status_reads": "three failed attempts against stale connector admission",
+    "visible_typed_failure": "Every matching Minecraft connector admission is stale and must send a fresh observation before probing.",
+    "fresh_minecraft_observation": false,
+    "debug_export_captured": false,
+    "caveat": "The UI displayed the typed failure after the agent clicked Stop generation on a turn that had shown a completed native provider event; this is an admission-path regression check, not a successful observation or complete Helix parity acceptance."
+  },
+  "direct_mcp_follow_up": {
+    "task_tool_catalog_exposed": true,
+    "room_inspect_result": "authenticated owner C0 Codex; one participant; room waiting_for_participant",
+    "fabric_server_restarted": "Java 21, C0 combat world, 127.0.0.1:25566, read-only manifest admitted",
+    "fabric_server_heap_limit_mib": 1024,
+    "isolated_client_rejoined": "DatDamPig joined from the helix-combat-c0-isolated Fabric client",
+    "mcp_lifecycle_launch_result": "account_policy_blocked / minecraft_local_lifecycle_device_trust_required",
+    "client_started_by": "existing local Fabric loopback launcher; receipt status connected, mod loaded, 94.6% physical memory used",
+    "mcp_actor_status_collision_opt_in": "permission_revoked / room_read_grant_identity_mismatch",
+    "device_check_exact_connection_blocker": "installed_node_unbound",
+    "identity_cause": "The keyed developer process has no verified HELIX_DESKTOP_DEVICE_ID; room-read-grant authorization requires a current installed-node connection even for the owner. Fresh source pairing alone does not meet that contract.",
+    "read_grant_bypassed": false,
+    "post_patch_fresh_observation": false,
+    "movement_or_temporal_plan_submitted": false,
+    "cleanup": "Closed only the exact Fabric client through its window close request; DatDamPig disconnected. Stopped the exact Fabric server with console stop and confirmed all dimensions saved."
+  },
+  "isolated_exe_follow_up": {
+    "profile": "C:/Users/dan/AppData/Local/CasimirBotNavEqIsolated20260920",
+    "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "primary_profile_modified": false,
+    "keyed_harness_stopped_by": "Ctrl+C on this task's retained Node session after local-supervisor presence disconnect; no other client presence was reported",
+    "temporary_loopback_port_preference": 1522,
+    "exe_healthz_http_status": 200,
+    "local_origin": "http://127.0.0.1:1522",
+    "direct_local_mcp_result": "HTTP 401 desktop_session_required",
+    "interpretation": "An OAuth token for the prior keyed Node service is not a native desktop session for the installed EXE. The supported private tunnel/account flow was not established in this disposable profile.",
+    "credential_or_session_secret_inspected": false,
+    "cleanup": "Stopped only the five path-verified isolated EXE processes; restored the profile's original preferred loopback port 59664.",
+    "new_minecraft_action": false
+  },
+  "current_state": {
+    "keyed_harness_port_1522": "stopped by this task; port released",
+    "fabric_server_port_25566": "restarted, then stopped normally after direct-MCP read denial",
+    "fabric_client": "rejoined, then closed normally after direct-MCP read denial",
+    "isolated_exe": "stopped after HTTP 401 diagnostic",
+    "primary_installed_exe_profile_snapshot": "untouched",
+    "new_exe_build": false,
+    "exe_recycling_required": false
+  },
+  "nav_eq_maturity": "specified",
+  "next_boundary": "Establish the supported private MCP tunnel and account authorization on a valid isolated installed-EXE profile, or explicitly design and verify a separately scoped keyed direct-MCP source admission that does not pretend an unbound developer process is an installed node. Keep the corrupt primary snapshot untouched. Then re-pair the exact source/player, obtain fresh read-only NAV1-O collision evidence, and only afterward freeze a new finite NAV-EQ movement protocol."
+}

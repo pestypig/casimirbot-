@@ -1,0 +1,49 @@
+{
+  "schema": "eh.g8.nav_eq.short_course_runway_screen.v1",
+  "date": "2026-09-19",
+  "world_id": "minecraft:local:combat-c0",
+  "subject": "DatDamPig",
+  "course_geometry_ref": "docs/evidence/eh-g8-nav-direct-mcp-execution-qualification-v1/2026-09-19-combat-c0-stationary-course-reconnaissance.json",
+  "historical_live_calibration_ref": "docs/evidence/eh-g8-et6-continuous-session-build-v1/2026-09-08-cs3-live-calibration.json",
+  "historical_live_calibration": {
+    "movement_blocks": 4.31,
+    "measured_movement_ms": 1056,
+    "derived_speed_blocks_per_second_approx": 4.08,
+    "scope": "one prior admitted walk, not a NAV-EQ capacity or speed distribution"
+  },
+  "current_straight_strip": {
+    "sampled_clear_supported_cells": 7,
+    "estimated_travel_seconds_at_historical_single_walk_speed_approx": 1.72,
+    "scope": "geometry and arithmetic only; no movement was dispatched on this strip"
+  },
+  "current_read_only_actor_and_perception_calls": [
+    {
+      "wall_ms": 3236,
+      "actor_evidence_ref": "environment_probe_evidence:a9fa9bce21a8ff47c41616c7b8d78290999ba7c3",
+      "perception_evidence_ref": "environment_probe_evidence:e17eacbe83e74d36a6c591c2cefb114bc69dfb95",
+      "outcome": "succeeded"
+    },
+    {
+      "wall_ms": 4164,
+      "actor_evidence_ref": "environment_probe_evidence:2d977fad033ef619720d0883257a2bf19f41c1c9",
+      "perception_evidence_ref": "environment_probe_evidence:9445aa87d302c80b07e1e871f22b645aa7e63e63",
+      "outcome": "succeeded"
+    },
+    {
+      "wall_ms": 3876,
+      "actor_evidence_ref": "environment_probe_evidence:2e1ac95a7c20dc1ff7006ad8f20d6564102a9fb3",
+      "perception_evidence_ref": "environment_probe_evidence:114c44f4be5961574224d3cc3cee542c1d3cfc64",
+      "outcome": "succeeded"
+    }
+  ],
+  "measurement_basis": "Date.now wall time around each MCP Device Check v2 actor-status call, including its compatibility perception result; these are end-to-end read timings, not native sensor computation, model reasoning, temporal admission, or a statistical latency distribution.",
+  "position_before_and_after": { "x": -2.1, "y": 65, "z": 7.7 },
+  "screen_result": "The sampled seven-block straight strip is unsuitable as the useful moving runway for a read-then-reason-then-admit rolling successor trial on the observed call path: each of three read calls alone exceeded the strip's approximate historical travel time. Choose and freeze a longer meaningful course or a separately qualified faster read path before NAV-EQ capacity acceptance.",
+  "limits": {
+    "provider_turn_latency_measured": false,
+    "successor_admission_latency_measured": false,
+    "native_execution_on_current_course": false,
+    "latency_percentiles_claimed": false,
+    "nav_eq_live_accepted": false
+  }
+}

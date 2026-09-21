@@ -1,0 +1,62 @@
+{
+  "schema": "helix.environment_harness.nav_eq.connector_list_and_connect_retry.v1",
+  "recorded_at": "2026-09-21T06:28:23.5308780Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "ChatGPT plugin discovery and CasimirBot Device Check v2 connector-account admission",
+  "lifecycle_stage": "tool admission and connector-account persistence diagnostic",
+  "reaction_timescale": "one plugin-list inspection and one normal connector sign-in attempt",
+  "authority_owner": "the user owns connector authorization; ChatGPT owns plugin installation and connected-account persistence; Helix owns neither ChatGPT catalog refresh nor account storage",
+  "current_maturity": "diagnostic connector checkpoint",
+  "target_maturity": "authenticated callable direct temporal MCP route",
+  "plugin_list_observation": {
+    "surface": "ChatGPT in-app browser Plugins settings",
+    "casimirbot_device_check_v1_listed": true,
+    "casimirbot_device_check_v2_listed": true,
+    "v2_detail_opened": true,
+    "v2_public_action_catalog_visible": true,
+    "v2_connected_accounts_heading_visible": true,
+    "v2_connected_account_row_visible": false,
+    "v2_connect_another_account_control_visible": true
+  },
+  "connection_attempt": {
+    "started_from_v2_plugin_detail": true,
+    "add_plugin_panel_opened": true,
+    "sign_in_control_invoked": true,
+    "new_oauth_tab_observed": false,
+    "result_banner": "We couldn't connect this account. Please try again.",
+    "connected_account_row_appeared": false,
+    "v1_account_disconnected": false,
+    "oauth_callback_value_captured": false,
+    "credential_captured": false
+  },
+  "browser_console_observation": {
+    "relevant_error_or_warning_observed": false,
+    "browser_console_assigned_as_cause": false
+  },
+  "finding": {
+    "v2_plugin_missing": false,
+    "v2_catalog_missing": false,
+    "v2_connector_account_persisted": false,
+    "failure_preceded_a_usable_oauth_return": true,
+    "exact_internal_cause_claimed": false,
+    "authenticated_direct_temporal_route_available_from_this_attempt": false,
+    "nav_eq_maturity": "specified"
+  },
+  "safety_and_scope": {
+    "minecraft_action_attempted": false,
+    "environment_authority_changed": false,
+    "durable_run_or_goal_created": false,
+    "temporal_plan_submitted": false,
+    "connected_v1_disconnected": false,
+    "credentials_included": false,
+    "oauth_callback_values_included": false
+  },
+  "stop_fail_criteria": [
+    "Do not invoke a direct temporal tool through the unauthenticated v2 client.",
+    "Do not disconnect the healthy v1 account merely to retry v2.",
+    "Do not treat plugin-list presence or public-catalog visibility as authenticated tool admission.",
+    "Do not promote NAV-EQ from this connector checkpoint."
+  ],
+  "downstream_gate_unlocked": "Plugin discovery is no longer an open question. The unresolved boundary remains connected-account admission or a refreshed callable schema on the already-authenticated v1 client."
+}

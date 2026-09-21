@@ -1,0 +1,42 @@
+{
+  "schema": "helix.nav_eq_isolated_profile_transport_preflight.v1",
+  "date_utc": "2026-09-20",
+  "claim_ceiling": "A separate EXE profile restored a valid September 14 snapshot and reached local API readiness, but it did not establish an MCP tunnel or Codex authorization. No Minecraft client, Fabric server, player authority, temporal plan, or movement was started in this preflight. NAV-EQ remains specified.",
+  "primary_profile_boundary": {
+    "snapshot_sha256_before_and_after": "0d902b62f8e289737e4203e83c0a429bc247cd6f4564d37fa37c971863266795",
+    "primary_snapshot_modified": false,
+    "preserved_corrupt_copy_modified": false,
+    "older_snapshot_restored_to_primary": false
+  },
+  "isolated_profile": {
+    "root": "C:/Users/dan/AppData/Local/CasimirBotNavEqIsolated20260920",
+    "source_snapshot": "C:/Users/dan/AppData/Roaming/@casimirbot/desktop/state/helix-local-pg-mem.json.3472.tmp",
+    "source_snapshot_saved_at": "2026-09-14T16:30:06.007Z",
+    "source_snapshot_length_bytes": 22900147,
+    "source_snapshot_sha256": "5bb57d59aaf20943ca2c71706f15d49a76323abdef122bef88ff91312c23fa5e",
+    "restore_reported_rows": 6421,
+    "restore_compacted_or_invalid_rows": 1480,
+    "post_restore_snapshot_length_bytes": 17773599,
+    "installed_exe": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "local_origin": "http://127.0.0.1:59664",
+    "healthz_status": 200,
+    "healthz_ready": true,
+    "isolated_tunnel_credential_present": false,
+    "tunnel_client_process_running": false
+  },
+  "client_transport": {
+    "plugin_reconnect_result": "We couldn't connect this account. Please try again.",
+    "codex_mcp_result": "McpServerError: Session terminated",
+    "attribution": "The isolated profile was not configured with a native MCP-tunnel credential, and no tunnel process was observed. This explains why its local API readiness did not itself provide a live MCP path; the exact cause of the plugin's generic reconnect error was not independently established.",
+    "oauth_code_or_secret_recorded": false
+  },
+  "cleanup": {
+    "isolated_exe_exact_processes_stopped": 5,
+    "isolated_profile_preserved": true,
+    "primary_exe_started": false,
+    "minecraft_or_fabric_stopped": false,
+    "unrelated_processes_stopped": false
+  },
+  "nav_eq_maturity": "specified",
+  "next_boundary": "Choose how to recover the primary profile or authorize a deliberately isolated account/tunnel. Then establish a fresh MCP session and Minecraft pairing before freezing any new rolling-successor protocol. Neither local health nor the earlier V19 movement proves V20 or NAV-EQ acceptance."
+}

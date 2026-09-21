@@ -1,0 +1,83 @@
+{
+  "schema": "helix.nav_eq_patched_exe_root_without_successor_result.v1",
+  "date": "2026-09-20",
+  "protocol": "2026-09-20-patched-installed-arena-handoff-protocol-v6.json",
+  "package": {
+    "exe_sha256": "BF93EB7B9F8E5A7618066B21D1CFD5F0D996721C6F757FACBF4B3D0AB17FDF37",
+    "service_sha256": "f2ff2182b84bc780f41f5d810f1cb66a6f5085f1ac9a22070a07ae43d20270b1",
+    "service_instance_ref": "service_instance:8c061787ca3954283abdee04f92bdc43",
+    "matching_service_bundle_verified": true,
+    "package_tree_verification": "passed",
+    "signed_release_authority": false
+  },
+  "preflight": {
+    "full_mcp_transport": "delegated and connected",
+    "pairing": "owner-authorized, same-host inbox; code and credential not exposed",
+    "run_id": "run_8e53c7ac-b358-4b95-a13e-3d42c4d035d3",
+    "goal_id": "environment_durable_goal:b2d75fc0075f5fefbd273f7e4b6e3bef8cc8a522a59d83fd9f1fb2da3dfcfade",
+    "authority_id": "environment_action_authority:25032dbe-368f-4254-a609-2ce6ddcfb1f5",
+    "producer_epoch_ref": "environment_action_epoch:b9aab429-f010-407d-b4b3-945fb1693ede",
+    "fresh_actor_position": [0.25, 65, -5.63],
+    "fresh_actor_yaw": -180,
+    "fresh_health": 20,
+    "nearby_entities": 0,
+    "nearby_hazards": 0,
+    "probe_evidence_ref": "environment_probe_evidence:9b2936e2de09c03234787e6ac15746aca6bbb01a",
+    "resident_clock_measured_same_epoch": true
+  },
+  "root": {
+    "plan_id": "nav_eq:arena:patched:root:20260920:2",
+    "plan_hash": "sha256:c83a697c266aa3ac078daddd8bdcf04aa05e357757dfcba33c85ee3c416284a5",
+    "compilation_hash": "sha256:bc678de1e46e10c663d66b0696c2832e9571643af1c31fe1de853ce72e7fd049",
+    "frontier_id": "environment_frontier:fda14adb-47cd-40f3-8ae8-a6b02e1ba465",
+    "action_request_id": "nav_eq:patched:root:action:2",
+    "workflow_id": "nav_eq:patched:workflow:root:2",
+    "admission_receipt_is_execution_proof": false,
+    "retained_result_evidence_ref": "environment_action_evidence:74a81166edb8cce62841bae95f7973833ff5461c6",
+    "retained_outcome": "succeeded",
+    "native_engine": "native_fabric",
+    "required_checkpoints_satisfied": 2,
+    "resident_start_tick": 6111,
+    "resident_complete_tick": 6256,
+    "duration_ticks": 145,
+    "wall_clock_elapsed_ms": 7210,
+    "dispatch_to_first_tick_ms": 69,
+    "resident_computation_ms": 31,
+    "missed_ticks": 4,
+    "deviation_count_reported_by_native_executor": 0,
+    "native_controls_released": true,
+    "player_motion_performed": true,
+    "world_mutations_performed": 0,
+    "inventory_mutations_performed": 0,
+    "post_health": 20,
+    "stable_post_position": [-3, 65, -3.7],
+    "protocol_expected_end_approx": [-1.9, 65, -5.6],
+    "horizontal_endpoint_difference_blocks_approx": 2.20,
+    "post_position_within_frozen_course_envelope": true
+  },
+  "successor": {
+    "submitted": false,
+    "first_post_admission_probe_evidence_ref": "environment_probe_evidence:f8af09ce148e39b8a9a3971535c01d7447773366",
+    "first_probe_game_tick": 17902235,
+    "root_completion_world_tick": 17902204,
+    "first_probe_was_after_root_completion": true,
+    "first_frontier_rejection": "durable_goal_evidence_stale",
+    "later_probe_evidence_ref": "environment_probe_evidence:33f8b73d130eff5e4c5678231d92944353dd8a16",
+    "later_frontier_id": "environment_frontier:f29b5949-f7fe-4db3-924a-c599f433e53a",
+    "later_successor_context": "no_current_verified_checkpoint",
+    "live_heartbeat_catchup_branch_exercised": false,
+    "reason_to_stop": "No current checkpoint for exact successor linkage and the measured endpoint differs from the frozen prediction."
+  },
+  "authority_end": {
+    "revoke_requested_at": "2026-09-20T17:03:47.514Z",
+    "immediate_state": "suspended pending emergency stop",
+    "subsequent_owner_inspection_active_authorities": 0,
+    "terminal_revoked_state_observed": false
+  },
+  "old_build_cleanup": {
+    "recycled_recoverably": ["apps/desktop/release-nav1o-20260919", "apps/desktop/release-nav1o-catalog-20260919"],
+    "retained_current": "apps/desktop/release-nav-eq-heartbeat-20260920",
+    "retained_immediate_rollback": "apps/desktop/release-nav-eq-20260920"
+  },
+  "claim_ceiling": "Patched installed EXE root route executed and verified. No in-motion frontier, no successor handoff, no three-successor course, no complete NAV-EQ acceptance. The endpoint prediction requires recalibration before a conditional child."
+}

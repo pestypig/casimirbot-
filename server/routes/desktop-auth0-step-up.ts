@@ -1,6 +1,7 @@
 import { json, Router, type Request, type Response } from "express";
 import {
   DESKTOP_AUTH0_STEP_UP_CALLBACK_PATH,
+  DESKTOP_AUTH0_STEP_UP_CANCEL_PATH,
   DESKTOP_AUTH0_STEP_UP_DEVICE_RECOVER_PATH,
   DESKTOP_AUTH0_STEP_UP_DEVICE_REGISTER_PATH,
   DESKTOP_AUTH0_STEP_UP_DEVICE_REVOKE_PATH,
@@ -10,6 +11,7 @@ import {
   DESKTOP_AUTH0_STEP_UP_STATUS_PATH,
   helixInstalledSecurityStatusSchema,
   helixStepUpPurposeSchema,
+  helixStepUpCancelReceiptSchema,
   helixStepUpStartRequestSchema,
   helixStepUpStartReceiptSchema,
   type HelixStepUpPurpose,
@@ -65,7 +67,7 @@ type ResolveSession = (sessionId: string | null) =>
   Promise<HelixAccountSession | null>;
 
 export type DesktopAuth0StepUpRouterDependencies = Readonly<{
-  controller?: Pick<Auth0StepUpController, "start" | "inspectStart" | "complete">;
+  controller?: Pick<Auth0StepUpController, "start" | "inspectStart" | "complete" | "cancelForSession">;
   receipts?: Pick<HelixStepUpReceiptStore, "consumeNativeOperation" | "revokeBound">;
   security?: Pick<
     InstalledSecurityStore,
@@ -269,6 +271,36 @@ export const createDesktopAuth0StepUpRouter = (
       }));
       privateHeaders(res);
       res.status(200).json(receipt);
+    } catch (error) {
+      safeError(res, error);
+    }
+  });
+
+  router.post(relative(DESKTOP_AUTH0_STEP_UP_CANCEL_PATH), async (req, res) => {
+    try {
+      requireDesktop(req, desktopSession);
+      const session = await requireDeveloperSession(req, resolveSession);
+      if (!req.body || typeof req.body !== "object" ||
+          Array.isArray(req.body) || Object.keys(req.body).length !== 0) {
+        throw new Auth0StepUpError(400, "invalid_request", SAFE_MESSAGES.invalid_request);
+      }
+      const cancelled = controller.cancelForSession({
+        session: {
+          sessionId: session.session_id,
+          profileId: session.profile.profile_id,
+        },
+        deviceId: deviceIdFromEnv(env),
+      });
+      privateHeaders(res);
+      res.status(200).json(helixStepUpCancelReceiptSchema.parse({
+        schema: "helix.auth0_step_up_cancel.v1",
+        ok: true,
+        cancelled_intent_count: cancelled,
+        usable_receipt_included: false,
+        identity_token_included: false,
+        access_token_included: false,
+        factor_detail_included: false,
+      }));
     } catch (error) {
       safeError(res, error);
     }

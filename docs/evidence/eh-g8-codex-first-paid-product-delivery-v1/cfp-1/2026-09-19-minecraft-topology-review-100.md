@@ -1,0 +1,7 @@
+# CFP-1 Minecraft endpoint-topology review — 2026-09-19
+
+The [R-MC-01 topology map](2026-09-19-minecraft-room-and-game-endpoint-topology-99.md) ties the current saved Fabric-server and client launchers' loopback requirements to the separate CasimirBot room/broker path and proposed cross-member guest action. It identifies the actual endpoint/operator facts a qualified reviewer must settle before considering Minecraft's server-hosting allowance, Mod conditions and promotion rules. It does not conclude that the paid/trial relationship is permitted or prohibited.
+
+An independent read-only reviewer checked the two launch scripts at source HEAD `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93`, the [payment-to-effect source map](2026-09-19-payment-to-minecraft-effect-source-map-15.md), the [first shared-action candidate](../../../work-packets/eh-g8-cfp1-first-paid-shared-action-candidate-v1.md), current official [EULA](https://www.minecraft.net/en-us/eula) and [Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines), the R-MC-01 backlink and local links. It returned **PASS** on the bounded factual and question-map claim. No qualified legal disposition, owner-selected exact action or installed guest effect was returned.
+
+The environment documentation audit returned `ok: true`, local links resolved and `git diff --check` passed on the affected tracked packet. R-MC-01 and CFP-1 remain open (`specified`); CFP-2/3 stay blocked under the [work program](../../../helix-environment-harness-work-program-v1.md).

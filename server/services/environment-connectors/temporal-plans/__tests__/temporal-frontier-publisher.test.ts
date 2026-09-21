@@ -87,3 +87,61 @@ it.each(["valid", "delayed_response", "diagnostic_failure", "successor_failure",
     expect(clocks.monotonic.origin_id).toMatch(/^frontier_publication_clock:/u);
   }
 });
+
+it("waits for an actual same-epoch resident heartbeat before publishing a moving-player frontier", async () => {
+  vi.spyOn(console, "info").mockImplementation(() => {});
+  vi.spyOn(successor, "readTemporalSuccessorContext").mockResolvedValue({
+    available: false, reason_code: "no_current_verified_checkpoint",
+    execution_authority: false, answer_authority: false, terminal_eligible: false,
+  });
+  const makeContext = (worldTick: number, epoch = "epoch:action") => ({
+    goal: { goal_id: "goal:test", goal_revision: 1, identity: {
+      environment_binding_id: "environment:test", source_id: "source:test",
+      subject_binding_id: "subject:test", action_authority_id: "authority:test",
+      authority_policy_version: 1,
+    } },
+    observation_producer_epoch_ref: "epoch:observation", action_producer_epoch_ref: "epoch:action",
+    evidence: { observation: { evidence_ref: "evidence:test", observed_at: "2026-09-05T00:00:00Z",
+      result: { game_tick: 100, observation_revision: 7 } } },
+    catalog: { context: { catalogSnapshotId: "catalog:test" },
+      resident_clock_observation: { producer_epoch_ref: epoch,
+        clock: { clock_kind: "minecraft_game_tick", world_tick_index: worldTick,
+          monotonic: { origin_id: "resident:test", elapsed_ms: 10 } } },
+      capabilities: [{ capability_id: "move", capability_version: 1,
+        policy_listed: true, native_fabric_available: true }] },
+  }) as unknown as Awaited<ReturnType<typeof context.resolveTemporalPerceptionContext>>;
+  const resolve = vi.spyOn(context, "resolveTemporalPerceptionContext")
+    .mockResolvedValueOnce(makeContext(99)).mockResolvedValueOnce(makeContext(100));
+  const publish = vi.spyOn(EnvironmentTemporalFrontierStore.prototype, "publish")
+    .mockImplementation(async input => ({ created: true, frontier: buildHelixEnvironmentAffordanceFrontier({
+      ...input.draft, frontier_id: "environment_frontier:test",
+      identity: { ...input.draft.identity, affordance_revision: 1 },
+    }) }));
+  const input = { goalId: "goal:test", profileId: "profile:test", participantId: "participant:test",
+    expectedRevision: 1, roomId: "room:test", runId: null, turnId: "turn:test",
+    priorTurnId: "turn:prior", probeRequestId: "probe:test" };
+  const result = await publishTemporalPerceptionFrontier(input);
+  expect(resolve).toHaveBeenCalledTimes(2);
+  expect(publish).toHaveBeenCalledOnce();
+  expect(result.planning_context.resident_clock_observation?.clock.world_tick_index).toBe(100);
+  expect(result.resident_clock_alignment_proven).toBe(false);
+
+  resolve.mockReset().mockResolvedValueOnce(makeContext(99))
+    .mockResolvedValueOnce(makeContext(100, "epoch:other"));
+  publish.mockClear();
+  await expect(publishTemporalPerceptionFrontier(input))
+    .rejects.toThrow("temporal_frontier_resident_clock_unmapped");
+  expect(publish).not.toHaveBeenCalled();
+
+  resolve.mockReset().mockResolvedValueOnce(makeContext(99))
+    .mockRejectedValueOnce(new Error("durable_goal_evidence_stale"));
+  await expect(publishTemporalPerceptionFrontier(input))
+    .rejects.toThrow("durable_goal_evidence_stale");
+  expect(publish).not.toHaveBeenCalled();
+
+  resolve.mockReset().mockResolvedValueOnce(makeContext(99))
+    .mockRejectedValueOnce(new Error("durable_goal_authority_stale"));
+  await expect(publishTemporalPerceptionFrontier(input))
+    .rejects.toThrow("durable_goal_authority_stale");
+  expect(publish).not.toHaveBeenCalled();
+});

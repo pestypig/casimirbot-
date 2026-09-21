@@ -1,0 +1,31 @@
+{
+  "schema": "helix.nav_eq_isolated_mfa_callback_stall_checkpoint.v1",
+  "observed_at_utc": "2026-09-21T00:53:37Z",
+  "claim_ceiling": "The user's Auth0 MFA form remained on code entry after Continue, and the isolated installed EXE recorded no step-up callback. This locates the observed stall before native callback handling, without proving whether Auth0 rejected the code or browser protocol handoff failed. Device registration, private MCP transport and NAV-EQ live execution remain unaccepted.",
+  "installed_node": {
+    "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "profile": "C:/Users/dan/AppData/Local/CasimirBotNavEqIsolated20260920",
+    "service_origin": "http://127.0.0.1:59664",
+    "service_listening": true,
+    "main_process_id": 11612
+  },
+  "mfa_handoff": {
+    "user_visible_page_after_continue": "Auth0 one-time-code entry remains visible; no inline error is visible in the supplied screenshot",
+    "screenshot_retained_in_evidence": false,
+    "one_time_code_recorded": false,
+    "isolated_oauth_diagnostic_last_event": "2026-09-21T00:25:03.853Z process_entry",
+    "isolated_callback_received_after_attempt": false,
+    "native_device_registration_verified": false,
+    "failure_stage": "before_observed_native_callback",
+    "exact_browser_or_auth0_cause": "not_established"
+  },
+  "mcp_and_game": {
+    "device_check_result": "McpServerError: Session terminated",
+    "private_tunnel_verified_ready": false,
+    "fresh_minecraft_observation": false,
+    "temporal_plan_submitted": false,
+    "gameplay_effect": false
+  },
+  "next_boundary": "The user completes the MFA form with a fresh code without sharing it. Check whether Auth0 advances and whether the isolated EXE logs a callback; if Auth0 advances without native delivery, diagnose the custom-protocol handoff separately. Do not infer registration or grant trust from the code-entry screenshot.",
+  "nav_eq_maturity": "specified"
+}

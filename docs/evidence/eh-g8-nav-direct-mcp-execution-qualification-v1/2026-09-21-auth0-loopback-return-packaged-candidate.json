@@ -1,0 +1,40 @@
+{
+  "schema": "eh_g8_nav_eq_auth0_loopback_return_packaged_candidate_v1",
+  "date": "2026-09-21",
+  "environment": "one isolated Windows CasimirBot developer profile; no Minecraft or Fabric action",
+  "diagnosis": {
+    "latest_user_mfa_attempt": "Auth0 Logs show Second Factor Started at 02:36:56.321Z, OTP Auth Succeed at 02:37:13.110Z, and Success Login at 02:37:13.276Z for the Desktop Account Link native client.",
+    "native_receipt": "No subsequent received callback marker appeared in the exact isolated profile's fixed-label OAuth journal.",
+    "boundary": "The first observed divergence is after successful Auth0 authentication and before callback delivery to the isolated native host. An Auth0 code exchange was not observed for this attempt.",
+    "protocol_probe": "A temporary exact-profile Windows custom-scheme handler was restored after the normal user-driven attempt. Shell dispatch had passed an earlier harmless diagnostic, but Chrome-to-native dispatch was not established."
+  },
+  "source_candidate": {
+    "return_uri": "http://127.0.0.1:8767/callback",
+    "method": "The native host reserves an exclusive, bounded loopback listener before opening Auth0, accepts only one exact-state callback, and redirects the browser to a query-free local completion page. The existing private service retains PKCE, nonce, claim, device, session, receipt and one-use checks.",
+    "fail_closed": "A wrong state, host, method, path, duplicate code or occupied port is rejected. The browser response contains no OAuth code, token or state.",
+    "tests": "35/35 focused native/account-link/step-up/controller/route tests; 26/26 account and security UI tests; 8/8 step-up route tests; desktop TypeScript passed.",
+    "full_typecheck": "Stopped without a verdict when the single process approached 3.7 GiB working set and physical headroom fell below 0.5 GiB."
+  },
+  "packaging": {
+    "output": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+    "client_build": "passed",
+    "host_and_service_build": "passed",
+    "runtime_stage": "passed",
+    "directory_package": "passed",
+    "packaged_smoke": "PASS; five packaged processes, four expected loopback listeners, full service readiness, private key vault, protocol association preserved, minimum free physical memory 3.72 GiB, maximum committed bytes 62.5%",
+    "payload_check": "Packaged main and service contain the new fixed loopback URI; packaged client assets contain the new user-facing return-port message.",
+    "isolated_launch": "The rebuilt EXE was launched against the same isolated profile and produced a fresh ready receipt on its existing private node at 127.0.0.1:59664.",
+    "old_build_recycling": "After checking exact containment and zero running processes, release-nav-eq-mfa-retry-20260921 was moved to the Windows Recycle Bin. The previous verified NAV rollback build was preserved."
+  },
+  "remaining": [
+    "The Auth0 Native app currently allowlists casimirbot://oauth/callback and the old local website callback, not the new exact 127.0.0.1:8767 callback. Explicit owner confirmation was requested before adding it.",
+    "The new loopback return has not been tested with a real Auth0 MFA response or signed-token exchange.",
+    "Device registration, Codex MCP attach, NAV1-O live observation and NAV-EQ movement remain unaccepted."
+  ],
+  "maturity": {
+    "auth0_loopback_candidate": "deterministically verified",
+    "nav_eq": "specified"
+  },
+  "secrets_in_artifact": false
+}

@@ -1,0 +1,7 @@
+# CFP-1 non-game shared-action fallback checkpoint — 2026-09-19
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains **active (specification)**; CFP-2/3 remain **blocked**. No runtime, connector, room, account, billing, release, publication or production state changed.
+
+The owner already selected Minecraft **conditionally** for the first paid/trial shared action, with a non-game fallback. The [source check](2026-09-19-first-paid-action-fallback-source-check-45.md) establishes that the current non-game system-clock profile is read-only and no non-game action adapter is registered. The new [fallback decision packet](../../../work-packets/eh-g8-cfp1-non-game-shared-action-fallback-decision-v1.md) now describes an owner-owned reference-canvas action with an exact one-marker effect envelope and compares a named external-program connector route. This is a choice and acceptance proposal, not implementation, qualified rights clearance, verified customer value or owner selection. The public developer kit remains probe-only until a separate action contract is admitted.
+
+The product owner has been asked which non-game route to develop if Minecraft is excluded. Even a selection would not fulfill the action-inclusive paid benefit until its exact connector/room operation IDs, rights, installed two-account effect, trial counting and customer wording pass review. The separate Minecraft technical pilot may continue under its admitted NAV/ET/PNA gates. This checkpoint admits no child stage.

@@ -1,0 +1,10 @@
+# CFP-1 domain guest route source seam — 2026-09-20
+
+Source HEAD inspected: `cc5a7a4c1ac956606aea756f59e6fcb0324a9f93`; shared dirty worktree. Read-only source inspection, no installed or public-user acceptance.
+
+- `client/src/App.tsx` maps `/` and `/open` to the adaptive workstation and `/download` to a download page. This is a reusable domain shell, not a guest-action page or accepted first-customer landing flow.
+- `server/routes/google-auth.ts` verifies a Google token and a CSRF value before account-session issue. The proposed guest browser flow can use the verified CasimirBot identity boundary, but current sign-in does not grant hosted membership, a program effect or a finite public client session by itself.
+- `server/routes/agi.realtime-room/room-lifecycle-routes.ts` currently has HTTP invite and join endpoints. The join handler checks for a personal Realtime session and responds “Stop your personal GPT Live session before joining a one-model room” when one exists. These endpoints belong to the experimental Shared Realtime/GPT Live room contract; they are not evidence of the selected non-model hosted room or first-party guest action. A new admitted room mode/route must prove its own eligibility and absence of provider-session coupling without bypassing the existing experimental-room policy.
+- `client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomPlayerEmbodimentPanel.tsx` is owner setup/activation and requires exact Codex task pickup for its Play journey. No inspected first-party ordinary-guest exact action request and owner approval/result path exists.
+
+Disposition: the [guest ingress packet](../../../work-packets/eh-g8-cfp1-hosted-guest-request-ingress-v1.md) recommends a domain browser route as a **future** first-cohort path. The [D07 assay](../../../work-packets/eh-g8-cfp1-d07-provider-unit-allocation-and-assay-v1.md) must cost that route rather than assuming the current GPT Live room endpoints are the paid workload. D07/D11/D12 and CFP-3 implementation/installed acceptance remain open.

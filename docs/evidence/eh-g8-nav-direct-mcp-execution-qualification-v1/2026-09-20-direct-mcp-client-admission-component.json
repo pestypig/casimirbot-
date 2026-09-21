@@ -1,0 +1,34 @@
+{
+  "schema": "helix.nav_eq_direct_mcp_client_admission_component_evidence.v1",
+  "date": "2026-09-20",
+  "capability": "NAV-EQ direct authenticated-MCP client temporal admission",
+  "maturity_scope": "component deterministic verification only; NAV-EQ remains specified",
+  "first_divergence_repaired": "temporal submit required a room-steering reasoning binding before compiler/broker admission even for direct MCP use",
+  "new_tool": "helix_environment_temporal_plan_submit_direct",
+  "association_authority": "server-derived authenticated MCP client/account session plus current room participant and verified run; not a provider-thread or Helix-chat binding",
+  "resident_successor_handoff": "process-local verified direct association, maximum five-minute handoff; each successor lease and reconciliation rechecks context, and loss on process replacement fails closed",
+  "unchanged_boundaries": [
+    "room-steering submit still verifies its exact reasoning binding",
+    "fresh goal/perception/frontier and native serial executor policy",
+    "finite Player Embodiment authority and ordinary action broker",
+    "successor lineage, checkpoint association, fresh frontier and one-shot lease",
+    "no admission receipt is execution or terminal proof"
+  ],
+  "focused_tests": [
+    { "suite": "direct-mcp-temporal-context + temporal-plan-admission + temporal-plan-preflight", "passed": 28, "failed": 0 },
+    { "suite": "direct-mcp-temporal-registry identity, revocation and expiry", "passed": 2, "failed": 0 },
+    { "suite": "helix-mcp-environment-durable-goal", "passed": 7, "failed": 0 },
+    { "suite": "helix-mcp-local-supervisor-coordination", "passed": 37, "failed": 0 },
+    { "suite": "minecraft-environment-time-compiler including direct successor publication without a reasoning-binding store, one-shot lease and post-revocation denial", "passed": 11, "failed": 0 },
+    { "suite": "environment-temporal-delivery route including direct-client path without a reasoning-binding store", "passed": 11, "failed": 0 }
+  ],
+  "build_server": "passed with four unrelated duplicate-key/case warnings",
+  "broader_check_limitations": [
+    "environment-actions project typecheck remains red on widespread errors outside the changed direct-MCP modules; filtering the output found no diagnostics in the changed direct-MCP modules",
+    "public UI catalog test has two stale-count failures (expected 398 controls versus current 402; expected 100 room controls versus current 101), unrelated to the new temporal MCP tool"
+  ],
+  "live_minecraft_plan_submitted": false,
+  "live_movement_observed": false,
+  "nav_eq_live_accepted": false,
+  "installed_exe_rebuilt": false
+}

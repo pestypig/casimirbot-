@@ -1,0 +1,7 @@
+# CFP-1 current Replit usage/readiness review — 2026-09-20
+
+Program gate: G8 — Environment-harness release evaluation. CFP-1 remains active (`specified`); CFP-2/3 blocked.
+
+An independent read-only cost/source reviewer checked [public evidence 231](2026-09-20-cfp1-current-replit-usage-readiness-recheck-231.md), its [D07 assay](../../../work-packets/eh-g8-cfp1-d07-provider-unit-allocation-and-assay-v1.md) and [owner-queue](../../../work-packets/eh-g8-cfp1-owner-decision-and-review-queue-v1.md) links, and the operator-private note/hash. Review result: **PASS with no concrete defect**. The public evidence omits exact private account rates, units and derived amounts; the private SHA-256 matched. It keeps the zero-credit publishing/offline warnings separate from two successful point-in-time `/api/ready` responses and claims neither durable availability nor immediate shutdown. It treats the current period as incomplete and mixed, not sponsor-attributed B/P/T cost or a final PBT/price/margin result.
+
+The environment-harness docs audit returned `ok: true` and zero failures, a targeted three-document relative-link check found zero missing links, and `git diff --check` found no whitespace error. D07/D11/D12 remain open; this technical source review is not a qualified financial return, a production continuity fix or a CFP-1 exit decision. No billing, deployment, runtime or production setting changed.

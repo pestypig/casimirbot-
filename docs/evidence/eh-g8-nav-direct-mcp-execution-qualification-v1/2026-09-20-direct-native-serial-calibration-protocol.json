@@ -1,0 +1,58 @@
+{
+  "schema": "helix.nav_eq_direct_native_serial_calibration_protocol.v1",
+  "frozen_at": "2026-09-20T14:53:51Z",
+  "scope": "One short, movement-only native-Fabric serial-plan calibration; not the NAV-EQ three-successor acceptance course",
+  "runtime": {
+    "package": "apps/desktop/release-nav-eq-20260920/win-unpacked/CasimirBot.exe",
+    "package_sha256": "53D3C806A1F790181DDB0859EC920710B878EA59EFEA3A44999919AD06BA9F",
+    "app_asar_sha256": "0B5A27E7F4A0576F141B770AAFEB3EFFE95F717DD45EC33D4C259D2E5F62C88D",
+    "runtime_manifest_sha256": "FE0F082563BDF67030A9EE96F4A165F19F96D875964EE70D0E0A40487D841182"
+  },
+  "identity": {
+    "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+    "run_id": "run_a3cfbf3f-af2a-4579-a73c-be404f440f31",
+    "goal_id": "environment_durable_goal:61dbe6ee45afcea8e53a02e0219b3eddb4699a4b40b2fa2bd5a4773b14ddf292",
+    "environment_binding_id": "environment_binding:legacy:e1ba990d7442233c10fa9dbe8461e4554ef24c31",
+    "world_id": "minecraft:local:combat-c0",
+    "subject_label": "DatDamPig",
+    "action_authority_id": "environment_action_authority:13344148-a2cb-4ed1-b058-35f2a52648fd",
+    "action_producer_epoch": "environment_action_epoch:a1ba06d3-37b9-45eb-86a8-e73500bec059"
+  },
+  "course": {
+    "start_position_approx": [-2.1, 65, 7.7],
+    "start_yaw_approx_degrees": 169.8,
+    "direction": "forward approximately north",
+    "action_duration_ms": 500,
+    "max_distance_blocks": 3,
+    "max_action_duration_ms": 5000,
+    "same_world_and_subject_required": true,
+    "fresh_perception_and_clear_local_footholds_required": true,
+    "no_hostile_entities_or_hazards_in_snapshot": true
+  },
+  "authority_limits": {
+    "allowed_capability_ids": [
+      "com.casimirbot.minecraft.player.walk",
+      "com.casimirbot.minecraft.player.sequence.execute"
+    ],
+    "control_engine": "native_fabric",
+    "manual_override_policy": "cancel",
+    "combat_allowed": false,
+    "world_mutation_allowed": false,
+    "max_block_mutations": 0,
+    "max_inventory_transfers": 0,
+    "automatic_replay_allowed": false
+  },
+  "success_criteria": [
+    "one direct MCP submission is admitted by the exact runtime and native serial compiler/broker",
+    "a separately observed settled receipt shows bounded player motion",
+    "fresh post-action perception confirms changed position, stable world and subject, and no inventory or world mutation",
+    "no late or duplicate motion after the plan settles"
+  ],
+  "stop_criteria": [
+    "identity or producer epoch mismatch",
+    "stale perception or expired frontier",
+    "unavailable native sequence executor or resident clock mismatch",
+    "manual input, hazard, health loss, world change, unexpected motion or mutation"
+  ],
+  "claim_ceiling": "Calibration of one direct serial action only. It cannot establish three rolling successors, interruption/reconnect performance, or NAV-EQ live acceptance."
+}

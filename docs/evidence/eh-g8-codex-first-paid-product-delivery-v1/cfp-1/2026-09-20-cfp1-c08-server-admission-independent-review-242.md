@@ -1,0 +1,7 @@
+# CFP-1 C08 server admission independent technical review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. CFP-1 remains active (`specified`); CFP-2/3 remain blocked.
+
+**Verdict: PASS for the revised CFP-1 technical handoff.** The independent reviewer checked [evidence 241](2026-09-20-cfp1-c08-server-admission-source-gap-241.md) and the CFP-3 distribution packet against current registry, shared schema, broker and player-source paths. The registered `navigate_to` capability allows Baritone; the request schema parses `requested_control_engine=baritone`; a live manifest can therefore pass engine intersection and reach ordinary enqueue subject to other authority checks. The schema requires each capability engine to be available at the manifest top level, but permits an extra top-level engine that no capability uses; the broker stores that top-level field separately. The revised release fixtures cover both a Baritone navigation capability and a Baritone-only top-level claim, with typed pre-effect denial for a schema-valid forged request, no customer readiness/catalog exposure and continued native-action use.
+
+This technical review does not prove a signed customer build, installed denial, first-party bridge provenance, upstream mod distribution rights or Minecraft commercial permission. D11 qualified rights/commercial returns and D12 final component/claim freeze remain open; no runtime or production setting changed.

@@ -1,0 +1,76 @@
+{
+  "schema": "helix.environment_harness.nav_eq.runtime_integrity_verification.v1",
+  "recorded_at": "2026-09-21T06:38:38.7808154Z",
+  "program_gate": "EH-G8",
+  "workstream": "NAV direct MCP execution qualification",
+  "capability_or_component": "Current installed execution-profile artifact integrity",
+  "lifecycle_stage": "pre-admission runtime identity verification",
+  "reaction_timescale": "one read-only local artifact hash verification",
+  "authority_owner": "the user owns the installed runtime; Helix admission depends on exact declared artifacts; this verifier grants no execution authority",
+  "current_maturity": "diagnostic execution-preflight checkpoint",
+  "target_maturity": "live accepted NAV-EQ execution profile",
+  "integrity_result": {
+    "integrity_ok": true,
+    "artifacts": [
+      {
+        "artifact_id": "desktop_executable",
+        "path": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/CasimirBot.exe",
+        "sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+        "readable": true,
+        "hash_matches": true
+      },
+      {
+        "artifact_id": "desktop_app_asar",
+        "path": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/resources/app.asar",
+        "sha256": "569FF6A1DDD01507C4B2C969BA6824B890556A44457BAB99B87D532BD1778CD5",
+        "readable": true,
+        "hash_matches": true
+      },
+      {
+        "artifact_id": "fabric_jar",
+        "path": "C:/Users/dan/AppData/Roaming/.minecraft-helix-c0/mods/HelixFabricPlayerAgent-0.4.12.jar",
+        "sha256": "9DE77E3309F7F9DD1533D4BDCF1794475D259A63D87C01CADF57A3B02BB56F47",
+        "readable": true,
+        "hash_matches": true
+      },
+      {
+        "artifact_id": "runtime_manifest",
+        "path": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/resources/runtime/runtime-manifest.json",
+        "sha256": "4A3F5EC60E1DC2E29A94A49C94A659EE0750583BA73D8F4C08CEB2886BF6DBB1",
+        "readable": true,
+        "hash_matches": true
+      }
+    ],
+    "manifest": {
+      "parsed": true,
+      "schema": "casimir_desktop_runtime_manifest/2",
+      "schema_matches": true,
+      "source_commit": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+      "source_commit_matches": true,
+      "server_sha256": "a036a3159cfc7b27ef8c1499b1ea7076a3b9906f26d855a904aeb225c933630a",
+      "server_sha256_matches": true
+    },
+    "violations": []
+  },
+  "safety_and_scope": {
+    "files_modified_by_verifier": false,
+    "minecraft_action_attempted": false,
+    "environment_authority_changed": false,
+    "durable_run_or_goal_created": false,
+    "temporal_plan_submitted": false,
+    "credentials_included": false
+  },
+  "finding": {
+    "declared_execution_profile_matches_disk": true,
+    "runtime_identity_ready_as_frozen_input": true,
+    "direct_tool_admission_proven": false,
+    "movement_qualification_proven": false,
+    "nav_eq_maturity": "specified"
+  },
+  "stop_fail_criteria": [
+    "Any later artifact hash change invalidates this runtime-integrity evidence.",
+    "Runtime integrity does not substitute for authenticated direct-tool admission, fresh geometry, authority, clocks, measurements or live course evidence.",
+    "Do not promote NAV-EQ from this read-only verification."
+  ],
+  "downstream_gate_unlocked": "The current package and Fabric artifact identities are independently verified rather than merely transcribed. They may be reused only while their hashes remain unchanged."
+}

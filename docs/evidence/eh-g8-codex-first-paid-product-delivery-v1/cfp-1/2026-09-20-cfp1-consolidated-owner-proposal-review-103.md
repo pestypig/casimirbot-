@@ -1,0 +1,7 @@
+# CFP-1 consolidated owner proposal review — 2026-09-20
+
+The [consolidated owner decision proposal](../../../work-packets/eh-g8-cfp1-consolidated-owner-decision-proposal-v1.md) turns the [D01–D12 answer queue](../../../work-packets/eh-g8-cfp1-owner-decision-and-review-queue-v1.md) into one review surface for D01–D10 without recording unanswered prompts as owner selections. It keeps D07 cost/Price evidence, D11 qualified returns and D12 integrated claim/component acceptance as separate closure requirements.
+
+An independent read-only reviewer found that the first D06 wording could preserve a deleting sponsor's effect authority while handoff was pending. The proposal was corrected to fence new sponsor-derived effects immediately on deletion or eligibility loss, stop or bound in-flight native effects, and permit only a separately authorized suspended same-room handoff within the reviewed window. The re-review returned **PASS** for the corrected authority order, unselected proposals, local links and unchanged CFP-1/G8 status.
+
+This review accepts the packet as a decision **proposal**, not the choices themselves. The owner has not answered D01–D10 by saying “continue,” no qualified reviewer has cleared planned component distribution or the paid/trial Minecraft relationship, and no exact customer claim is frozen. CFP-1 remains active (`specified`), CFP-2/3 blocked and G8 active under the [canonical work program](../../../helix-environment-harness-work-program-v1.md).

@@ -1,0 +1,47 @@
+{
+  "schema": "eh_g8_nav_eq_auth0_loopback_device_registration_live_acceptance_v1",
+  "date_utc": "2026-09-21",
+  "environment": "one isolated Windows CasimirBot developer profile; no Minecraft or Fabric action",
+  "installed_candidate": {
+    "output": "apps/desktop/release-nav-eq-auth0-loopback-20260921/win-unpacked/CasimirBot.exe",
+    "exe_sha256": "FB89259F027AF3340BD9AD768E1D048D90EEA255EC752CEC4B91CC2D66A59F7F",
+    "profile": "CasimirBotNavEqIsolated20260920",
+    "private_service": "127.0.0.1:59664"
+  },
+  "live_result": {
+    "owner_report": "Authentication returned to CasimirBot. You may close this tab.",
+    "native_fixed_label_journal": [
+      "received",
+      "step_up_handled"
+    ],
+    "native_received_at": "2026-09-21T03:25:11.117Z",
+    "native_step_up_handled_at": "2026-09-21T03:25:11.497Z",
+    "durable_projection": {
+      "label": "This Windows device",
+      "platform": "windows",
+      "status": "active",
+      "registered_at": "2026-09-21T03:25:11.470Z",
+      "revoked_at": null,
+      "recovery_generation": 0
+    },
+    "snapshot_persisted_at": "2026-09-21T03:27:16.741Z"
+  },
+  "security_boundary": {
+    "usable_receipt_or_token_logged": false,
+    "oauth_code_or_state_logged": false,
+    "full_harness_trust_granted_to_new_device": false,
+    "environment_authority_granted": false,
+    "minecraft_action_performed": false
+  },
+  "remaining": [
+    "The owner must separately trust this newly registered exact device before its private MCP tunnel may be used for the NAV test.",
+    "Codex MCP attach, NAV1-O live observation and NAV-EQ movement remain unaccepted."
+  ],
+  "maturity": {
+    "auth0_loopback_configuration": "live accepted",
+    "auth0_loopback_runtime": "live accepted",
+    "installed_device_registration": "live accepted",
+    "nav_eq": "specified"
+  },
+  "secrets_in_artifact": false
+}

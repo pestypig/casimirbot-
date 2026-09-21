@@ -1,0 +1,7 @@
+# CFP-1 Stripe Managed Payments test-read independent review — 2026-09-20
+
+Program gate: **G8 — Environment-harness release evaluation**. CFP-1 remains active (`specified`); CFP-2/3 remain blocked. This is a bounded independent documentation review, not an account audit or qualified financial/tax return.
+
+The reviewer checked the [test-account read](2026-09-20-cfp1-stripe-managed-payments-test-account-read-285.md) and its backlinks in the [D11 submission](../../../work-packets/eh-g8-cfp1-privacy-and-financial-review-submission-v1.md), [Stripe Price/SKU contract](../../../work-packets/eh-g8-cfp1-stripe-price-and-sku-evidence-contract-v1.md) and [canonical work program](../../../helix-environment-harness-work-program-v1.md). The primary agent supplied the bounded observed accessibility text: Test/Sandbox and Verify your business on the signed-in home page; a Managed Payments settings page with a Get started control, 3.5% add-on fee, merchant-of-record heading, and text describing tax compliance, fraud prevention, dispute management and customer support. The reviewer did not access Stripe.
+
+After the observed marketing text was made explicit, the reviewer returned **PASS** on source-to-claim scope, link resolution and stage status. The test page does not prove live enrollment, transaction mode, Price or effective fee. D07/D11 must still verify and cost the actual selected production arrangement, while D12 seller copy remains conditional. The technical review does not satisfy a qualified D11 return, and no Stripe or runtime state was changed.

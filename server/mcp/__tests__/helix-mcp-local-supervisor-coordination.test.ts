@@ -1267,6 +1267,15 @@ describe("Helix MCP local-supervisor coordination", () => {
     expect(JSON.parse((deniedFrontier.content[0] as { text: string }).text)).toMatchObject({
       error: "full_mcp_transition_required", mutation_executed: false,
     });
+    const deniedCollisionRead = await shadowClient.callTool({
+      name: "helix_minecraft_actor_status",
+      arguments: {
+        room_id: "shared_realtime_room:shadow-fixture",
+        include_navigation_collision: true,
+      },
+    });
+    expect(deniedCollisionRead.isError).toBe(true);
+    expect(JSON.stringify(deniedCollisionRead)).toContain("full_mcp_transition_required");
     const deniedEnvironmentMutation = await shadowClient.callTool({
       name: "helix_minecraft_player_action",
       arguments: {
@@ -1605,6 +1614,93 @@ describe("Helix MCP local-supervisor coordination", () => {
     });
     expect(rejected.isError).toBe(true);
     expect(toolListChangedNotifications).toBe(5);
+  });
+
+  it("requires a catalog refresh when stateless JSON cannot deliver tool-list notifications", async () => {
+    const store = new HelixLocalSupervisorCoordinationStore(
+      "service_instance:abababababababababababababababab",
+    );
+    const transitions = new DesktopMcpTunnelTransitionStore(
+      store.serviceInstanceRef,
+    );
+    const base = principal("profile:stateless-json", "oauth_client:unused");
+    const desktopPrincipal: HelixAgentApiPrincipal = {
+      ...base,
+      issuer: "urn:casimirbot:desktop-session",
+      subjectId: "profile:stateless-json",
+      mcpClientRef: "mcp_client:native_desktop:stateless-json",
+      oauthClientRef: null,
+      scopes: new Set([
+        HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+        HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES,
+        HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE,
+        HELIX_DESKTOP_TUNNEL_TRANSITION_EXECUTE_SCOPE,
+      ].flat()),
+      accountContext: {
+        ...base.accountContext,
+        session_id: "account_session:stateless-json",
+      },
+    };
+    const client = await connect(store, desktopPrincipal, {
+      surface: "local_supervisor_coordination",
+      toolListChangedNotificationsDeliverable: false,
+      desktopMcpTunnelTransitionStore: transitions,
+      desktopMcpTunnelTransitionExecutor: async () => ({
+        accepted: true,
+        nativeReceiptRef: "native_transition_receipt:stateless-json",
+        reconnectRequired: false,
+        catalogRefreshRequired: false,
+        stableScopeRouting: true,
+      }),
+    });
+    let notifications = 0;
+    client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
+      notifications += 1;
+    });
+    await heartbeat(client, "codex_thread:stateless-json", "Check catalog delivery.");
+    const requested = await client.callTool({
+      name: "helix_desktop_tunnel_transition_request",
+      arguments: {
+        client_continuation_ref: "codex_thread:stateless-json",
+        declared_task_summary: "Check catalog delivery.",
+        requested_lease_seconds: 60,
+      },
+    });
+    expect(requested.isError).not.toBe(true);
+    expect(requested.structuredContent).toMatchObject({
+      reconnect_required: false,
+      catalog_refresh_required: true,
+      tool_list_changed_supported: false,
+    });
+    const requestRef = (requested.structuredContent as any).request
+      .transition_request_ref;
+    transitions.grant({
+      requestRef,
+      authenticatedProfileRef: "profile:stateless-json",
+      accountSessionId: "account_session:stateless-json",
+      accountType: "developer",
+      leaseSeconds: 60,
+    });
+    const accepted = await client.callTool({
+      name: "helix_desktop_tunnel_transition_execute",
+      arguments: {
+        client_continuation_ref: "codex_thread:stateless-json",
+        transition_request_ref: requestRef,
+        target_scope: "full_helix_agent",
+        idempotency_key: "idempotency-stateless-json",
+      },
+    });
+    expect(accepted.isError, JSON.stringify(accepted)).not.toBe(true);
+    expect(accepted.structuredContent).toMatchObject({
+      accepted: true,
+      reconnect_required: false,
+      catalog_refresh_required: true,
+      stable_scope_routing: true,
+      tool_list_changed_supported: false,
+      tool_list_changed_requested: false,
+    });
+    expect(notifications).toBe(0);
   });
 
   it("keeps governed transition controls registered on the full MCP surface", async () => {
@@ -2035,6 +2131,7 @@ describe("Helix MCP local-supervisor coordination", () => {
       "helix_environment_subject_list",
       "helix_environment_subject_select",
       "helix_environment_temporal_frontier_publish",
+      "helix_environment_temporal_plan_submit_direct",
       "helix_evidence_observation_get",
       "helix_local_supervisor_coordination_read",
       "helix_local_supervisor_presence_disconnect",

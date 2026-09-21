@@ -1,0 +1,87 @@
+{
+  "schema": "helix.nav_eq_v15_live_checkpoint.v1",
+  "date_utc": "2026-09-20",
+  "claim_ceiling": "One direct-MCP root with verified end-position checkpoint; no successor or NAV-EQ acceptance",
+  "protocol": "2026-09-20-south-floor-sweep-protocol-v15.json",
+  "world_id": "minecraft:local:combat-c0",
+  "player": "DatDamPig",
+  "room_id": "shared_realtime_room:fdc38760-5709-4721-b084-04fcfd89cc17",
+  "run_id": "run_30edde95-eedb-42ac-9eb4-5b5ee1af4e7e",
+  "goal_id": "environment_durable_goal:04d71e55e27ee9f3282674f52e62ad79ce0c5f6a7c1574687e724003e753cb92",
+  "authority_id": "environment_action_authority:e151bfd3-85fe-442f-9e14-e5d344bf7db0",
+  "v15_package": "apps/desktop/release-nav-eq-prefix-20260920/win-unpacked",
+  "root": {
+    "action_request_id": "nav-eq-v15-root-action-1",
+    "workflow_id": "nav-eq-v15-root-workflow-1",
+    "plan_id": "nav_eq:south_sweep:v15:root:1",
+    "plan_hash": "sha256:08e028949bb43d382d2e0abf80f12d13db769c0ff480654db31b9fe4f94110ea",
+    "starting_probe_evidence_ref": "environment_probe_evidence:39e944f763eaed7c13b3330f8d8906da05ce37c7",
+    "frontier_id": "environment_frontier:7cebb45e-4e1e-4364-b66a-2bbadf841c1c",
+    "submitted_at": "2026-09-20T19:36:31.233Z",
+    "result_evidence_ref": "environment_action_evidence:3a5240bd5e7a550c72c0893b129842e2531d90795",
+    "outcome": "succeeded",
+    "duration_ticks": 330,
+    "required_source_checkpoints_satisfied": 12,
+    "end_pose_checkpoint": "checkpoint:south-sweep-end-pose",
+    "end_pose_condition": "position_within radius 1.25 of (6.6,65,-2.3)",
+    "end_pose_condition_satisfied": true,
+    "missed_ticks": 6,
+    "resident_computation_ms": 43,
+    "dispatch_to_first_tick_ms": 102,
+    "controls_released_in_retained_result": true,
+    "world_mutation_performed": false,
+    "inventory_mutation_performed": false
+  },
+  "in_motion_frontiers": [
+    {
+      "frontier_id": "environment_frontier:53e1d5ea-a7a2-433c-b9e4-d6ce0d938212",
+      "created_at": "2026-09-20T19:36:41.278Z",
+      "diagnostic_code": "temporal_checkpoint_action_event_mismatch"
+    },
+    {
+      "frontier_id": "environment_frontier:641267c2-e361-490b-a2cd-adb75ac083b2",
+      "created_at": "2026-09-20T19:36:45.509Z",
+      "probe_evidence_ref": "environment_probe_evidence:14775dcaa93f9f0c15dc5ed5bd7c7572befbd944",
+      "observed_actor_position": [2.23, 65, -1.91],
+      "diagnostic_code": "temporal_checkpoint_action_event_mismatch"
+    }
+  ],
+  "child": "Not submitted; checkpoint verifier failed closed twice",
+  "package_skew": {
+    "first_frontier_archived_pair": "Environment event sequence 13 and action event sequence 11 have the same 13 checkpoint settlements; current source replay verifies checkpoint:south-sweep-after-5 at this cutoff",
+    "second_frontier_archived_pair": "Environment event sequence 17 and action event sequence 15 replay verifies checkpoint:south-sweep-after-7 at this cutoff",
+    "replay_script": "scripts/nav-eq-replay-checkpoint-diagnostic.ts",
+    "old_bundled_service": "Strict equality of latest versus paired checkpoint arrays; no checkpointPrefixUnchanged guard",
+    "old_service_built_at": "2026-09-20T18:15:01.552Z",
+    "source_repair_modified_at": "2026-09-20T18:44:56.358Z",
+    "conclusion": "The EXE had been repackaged without rebuilding its bundled service; this trial does not reject the source prefix repair"
+  },
+  "corrected_exe": {
+    "package": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked",
+    "runtime_manifest_sha256": "71dc5248039f98ee2bb145bc4afe6b05c0a6259fb2b4a1ef24af610d14fe98d3",
+    "bundled_service_has_prefix_guard": true,
+    "bundled_service_has_old_strict_comparison": false,
+    "service_port": 51996,
+    "private_tunnel_healthz": "live",
+    "private_tunnel_readyz": "ready",
+    "codex_mcp_initial_after_replacement": "full_mcp_transition_required; no mutation executed",
+    "same_account_plugin_reconnect": "Failed with visible account-link error; no new account link inferred",
+    "native_transition_request_ref": "desktop_tunnel_request:9a2cbcb9-cf57-4c32-88c1-429816b12eb3",
+    "native_transition_receipt_ref": "desktop_tunnel_receipt:11ff61f3-e8b4-4129-b5bb-04190f2258e9",
+    "native_transition_status": "transition_accepted; functional read confirmed",
+    "post_transition_authority_inspect": "Succeeded on corrected EXE; prior action lease expired at 2026-09-20T20:00:00.000Z",
+    "post_transition_actor_probe_evidence_ref": "environment_probe_evidence:542c3729eeb64e08007b74b978ece102bdac16ff",
+    "post_transition_actor_position": [6.72, 65, -2.24],
+    "post_transition_actor_health": 20,
+    "corrected_package_successor_attempted": false
+  },
+  "build_retention": {
+    "recycled_to_windows_recycle_bin": "apps/desktop/release-nav-eq-diagnostic-20260920",
+    "recoverable": true,
+    "retained_running": "apps/desktop/release-nav-eq-verified-20260920",
+    "retained_rollback": "apps/desktop/release-nav-eq-prefix-20260920",
+    "minecraft_and_fabric_server_left_running": true
+  },
+  "verification": "Temporal compiler tests 11/11 passed; archived first-frontier checkpoint replay verified; corrected packaged service byte check passed",
+  "maturity": "NAV-EQ specified; corrected prefix repair packaged but not live accepted"
+}
