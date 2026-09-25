@@ -1,0 +1,80 @@
+
+> @casimirbot/desktop@0.1.0-alpha.11 build:host
+> npm run prepare:assets && npm run prepare:tunnel-client && node scripts/build-host.mjs
+
+
+> @casimirbot/desktop@0.1.0-alpha.11 prepare:assets
+> node scripts/prepare-brand-assets.mjs
+
+[desktop-brand] PASS source=client/public/icons/helix-icon.svg output=dist/icon.png size=512x512 entropy=4.377
+
+> @casimirbot/desktop@0.1.0-alpha.11 prepare:tunnel-client
+> powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-tunnel-client.ps1
+
+[desktop-tunnel] pinned OpenAI tunnel-client v0.0.13 verified
+
+  dist\main.cjs  326.3kb
+
+Done in 87ms
+
+  dist\preload.cjs  7.1kb
+
+Done in 15ms
+
+  dist\realtime-texture-pack-overlay-preload.cjs  1.1kb
+
+Done in 16ms
+▲ [WARNING] Duplicate key "traceId" in object literal [duplicate-object-key]
+
+    ../../server/routes/agi.demonstration.ts:55:4:
+      55 │     traceId: `benchmark:${report.traceId}`,
+         ╵     ~~~~~~~
+
+  The original key "traceId" is here:
+
+    ../../server/routes/agi.demonstration.ts:54:4:
+      54 │     traceId: report.traceId,
+         ╵     ~~~~~~~
+
+▲ [WARNING] This case clause will never be evaluated because it duplicates an earlier case clause [duplicate-case]
+
+    ../../server/modules/halobank-solar/derived.ts:3787:9:
+      3787 │     case "mercury_cross_lane_congruence_diagnostic":
+           ╵          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  The earlier case clause is here:
+
+    ../../server/modules/halobank-solar/derived.ts:3742:9:
+      3742 │     case "mercury_cross_lane_congruence_diagnostic":
+           ╵          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] Duplicate key "benchmark_target_id" in object literal [duplicate-object-key]
+
+    ../../server/modules/starsim/lanes/oscillation-gyre.ts:206:6:
+      206 │       benchmark_target_id: args.star.source_context?.benchmark_ta...
+          ╵       ~~~~~~~~~~~~~~~~~~~
+
+  The original key "benchmark_target_id" is here:
+
+    ../../server/modules/starsim/lanes/oscillation-gyre.ts:193:6:
+      193 │       benchmark_target_id: args.star.source_context?.benchmark_ta...
+          ╵       ~~~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] Duplicate key "benchmark_target_id" in object literal [duplicate-object-key]
+
+    ../../server/modules/starsim/lanes/structure-mesa.ts:204:6:
+      204 │       benchmark_target_id: args.star.source_context?.benchmark_ta...
+          ╵       ~~~~~~~~~~~~~~~~~~~
+
+  The original key "benchmark_target_id" is here:
+
+    ../../server/modules/starsim/lanes/structure-mesa.ts:192:6:
+      192 │       benchmark_target_id: args.star.source_context?.benchmark_ta...
+          ╵       ~~~~~~~~~~~~~~~~~~~
+
+4 warnings
+
+  dist\service.mjs  60.0mb
+
+Done in 2066ms
+[desktop-build] host and bundled service built for cb5bd3c89106359667ef129ee1f3245cc3924bb0; required external=sharp@0.34.3; data_assets=2

@@ -15,11 +15,13 @@ import { ensureDatabase, getPool, resetDbClient } from "../../db/client";
 import { createHelixMcpServer } from "../../mcp/helix-mcp-server";
 import { HelixAgentAccountLinkStore } from "../../services/helix-account/agent-account-link-store";
 import type { SharedLiveRoomBindingStore } from "../../services/shared-live-room-control/binding-store";
-import type { SharedLiveRoomControlService } from "../../services/shared-live-room-control/service";
+import { SharedLiveRoomControlService } from "../../services/shared-live-room-control/service";
+import { createSharedRealtimeRoom, createSharedRealtimeRoomInvite, readSharedRealtimeRoom } from "../../services/helix-ask/realtime-room/room-store";
 import { createAgentAccessDiscoveryRouter } from "../agent-access-discovery";
 import { createHelixAgentProtectedResourceMetadataRouter } from "../helix-agent-api";
 import { createHelixMcpRouter, type HelixMcpServerFactory } from "../helix-mcp";
 import { createHelixSharedLiveRoomRouter } from "../helix-shared-live-rooms";
+import { createDesktopSessionGuard, resolveDesktopSessionConfig } from "../../security/desktop-session";
 
 const BASE_URL = "https://agent-room-e2e.test";
 const ISSUER = "https://issuer-room-e2e.test";
@@ -43,6 +45,7 @@ const relevantEnvironmentKeys = [
   "HELIX_AGENT_OAUTH_ISSUER",
   "HELIX_AGENT_OAUTH_JWKS_URL",
   "HELIX_AGENT_OAUTH_PROVIDER",
+  "HELIX_AGENT_OAUTH_TENANT_CLAIM",
   "HELIX_LOCAL_PG_MEM_PERSIST",
   "NODE_ENV",
 ] as const;
@@ -78,10 +81,11 @@ const roomListReceipt = () => ({
 const signAccessToken = async (input?: {
   secret?: string;
   subject?: string;
+  scopes?: readonly string[];
 }): Promise<string> =>
   new SignJWT({
     tenant_id: TENANT_ID,
-    scope: HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
+    scope: input?.scopes?.join(" ") ?? HELIX_SHARED_LIVE_ROOM_READ_SCOPE,
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuer(ISSUER)
@@ -145,6 +149,9 @@ describe("Shared Live Room real OAuth/account transport chain", () => {
     process.env.HELIX_AGENT_OAUTH_ISSUER = ISSUER;
     process.env.HELIX_AGENT_OAUTH_AUDIENCE = AUDIENCE;
     process.env.HELIX_AGENT_OAUTH_PROVIDER = PROVIDER;
+    // This fixture signs tenant_id; workstation provider configuration may
+    // select a different claim and must not change the test's identity join.
+    process.env.HELIX_AGENT_OAUTH_TENANT_CLAIM = "tenant_id";
     delete process.env.HELIX_AGENT_OAUTH_JWKS_URL;
     process.env.HELIX_AGENT_ALLOW_LOCAL_HS256 = "1";
     process.env.HELIX_AGENT_LOCAL_JWT_SECRET = LOCAL_SECRET;
@@ -225,6 +232,78 @@ describe("Shared Live Room real OAuth/account transport chain", () => {
   afterAll(async () => {
     await resetDbClient();
     restoreEnvironment();
+  });
+
+  it("verifies signed guest identity through durable invitation join and denies revoked-link replay", async () => {
+    const guestProfile = "profile-room-join-guest";
+    const guestSession = "session-room-join-guest";
+    const guestSubject = "subject-room-join-guest";
+    const createdAt = "2026-07-27T13:00:00.000Z";
+    await getPool().query(`INSERT INTO helix_accounts
+      (profile_id, display_name, account_type, provider, provider_subject, created_at, updated_at)
+      VALUES ($1, 'Linked Guest', 'developer', 'local', $1, $2, $2)`, [guestProfile, createdAt]);
+    await getPool().query(`INSERT INTO helix_account_sessions
+      (session_id, profile_id, status, memory_scope, account_policy, created_at, updated_at, expires_at)
+      VALUES ($1, $2, 'active', 'profile', $3::jsonb, $4, $4, $5)`,
+      [guestSession, guestProfile, JSON.stringify({ account_type: "developer" }), createdAt, "2099-01-01T00:00:00.000Z"]);
+    const session = { sessionId: guestSession, profileId: guestProfile };
+    const intent = await linkStore.createLinkIntent({ session, expectedIssuer: ISSUER, expectedAudience: AUDIENCE, expectedProvider: PROVIDER });
+    const linked = await linkStore.completeLinkIntent({ session, state: intent.state,
+      identity: { issuer: ISSUER, audience: AUDIENCE, tenantId: TENANT_ID, providerAlias: PROVIDER, subject: guestSubject } });
+    const room = await createSharedRealtimeRoom({ ownerProfileId: PROFILE_ID, title: "Verified OAuth guest" });
+    const invite = await createSharedRealtimeRoomInvite({ roomId: room.room_id, ownerProfileId: PROFILE_ID });
+    const service = new SharedLiveRoomControlService();
+    const app = express();
+    app.use("/api/v1/rooms", createHelixSharedLiveRoomRouter({ controlService: service, rateLimit: false, enforceTransportSecurity: false }));
+    const installedApp = express();
+    installedApp.use(createDesktopSessionGuard(resolveDesktopSessionConfig({
+      CASIMIR_DESKTOP_HOST: "1",
+      CASIMIR_DESKTOP_SESSION_SECRET: "synthetic-desktop-guard-secret-32-characters",
+    })));
+    installedApp.use("/api/v1/rooms", createHelixSharedLiveRoomRouter({ controlService: service, rateLimit: false, enforceTransportSecurity: false }));
+    const scopes = [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE];
+    const token = await signAccessToken({ subject: guestSubject, scopes });
+    const body = { room_id: room.room_id, invite_code: invite.inviteCode };
+    const join = (bearer: string, value: unknown = body) => request(app).post("/api/v1/rooms/join")
+      .set("Authorization", `Bearer ${bearer}`).set("Idempotency-Key", "verified-guest-join-001").send(value);
+
+    const nativeDenied = await request(installedApp).post("/api/v1/rooms/join")
+      .set("Authorization", `Bearer ${token}`).set("Idempotency-Key", "verified-guest-join-001").send(body).expect(401);
+    expect(nativeDenied.body.error).toBe("desktop_session_required");
+
+    const invalidSignature = await join(await signAccessToken({ subject: guestSubject, scopes, secret: WRONG_LOCAL_SECRET })).expect(401);
+    expect(invalidSignature.body.error).toBe("unauthorized");
+    const unlinked = await join(await signAccessToken({ subject: "unlinked-join-subject", scopes })).expect(403);
+    expect(unlinked.body.error).toBe("account_not_linked");
+    const missingScope = await join(await signAccessToken({ subject: guestSubject })).expect(403);
+    expect(missingScope.body.error).toBe("insufficient_scope");
+    await join(token, { ...body, profile_id: PROFILE_ID }).expect(400);
+    expect((await readSharedRealtimeRoom({ roomId: room.room_id, profileId: PROFILE_ID })).participants).toHaveLength(1);
+
+    const first = await join(token).expect(201);
+    const replay = await join(token).expect(201);
+    expect(first.headers["idempotency-replayed"]).toBe("false");
+    expect(replay.headers["idempotency-replayed"]).toBe("true");
+    expect(first.headers["set-cookie"]).toBeUndefined();
+    expect(first.headers["cache-control"]).toContain("no-store");
+    const current = await readSharedRealtimeRoom({ roomId: room.room_id, profileId: PROFILE_ID });
+    expect(current.participants).toHaveLength(2);
+    const guest = current.participants.find(p => p.participant_id === first.body.room.self_participant_id)!;
+    expect(guest).toMatchObject({ role: "participant", display_name: "Linked Guest", presence: "present",
+      consent: { microphone_to_room: false, microphone_to_model: false, transcript_to_room: false, model_audio_output: false } });
+    expect(current.runtime.state).toBe("idle");
+    expect(first.body).toMatchObject({ answer_authority: false, assistant_answer: false, terminal_eligible: false });
+    for (const response of [first, replay, invalidSignature, unlinked, missingScope]) {
+      expect(JSON.stringify(response.body)).not.toContain(invite.inviteCode);
+      expect(JSON.stringify(response.body)).not.toContain(token);
+    }
+
+    await linkStore.revokeBinding({ session, bindingRef: linked.binding.binding_ref, reason: "guest join revocation test" });
+    const revoked = await join(token).expect(403);
+    expect(revoked.body.error).toBe("account_not_linked");
+    // A revoked external link blocks access; it does not silently remove the
+    // independently account-owned room membership or change consent.
+    expect((await readSharedRealtimeRoom({ roomId: room.room_id, profileId: PROFILE_ID })).participants).toHaveLength(2);
   });
 
   it("joins signed JWT verification, durable account binding, REST/MCP parity, and revocation", async () => {
@@ -330,12 +409,12 @@ describe("Shared Live Room real OAuth/account transport chain", () => {
     });
     const unlinkedRest = await request(app)
       .get("/api/v1/rooms")
-      .set("Authorization", `Bearer ${unlinkedSubjectToken}`)
-      .expect(403);
+      .set("Authorization", `Bearer ${unlinkedSubjectToken}`);
     expect(unlinkedRest.body).toMatchObject({
       schema: "helix.shared_live_room.error.v1",
       error: "account_not_linked",
     });
+    expect(unlinkedRest.status).toBe(403);
     const unlinkedMcp = await request(app)
       .post("/mcp")
       .set("Authorization", `Bearer ${unlinkedSubjectToken}`)
@@ -370,7 +449,12 @@ describe("Shared Live Room real OAuth/account transport chain", () => {
       randomId: () => "oauth-e2e",
     });
 
-    expect(report.status).toBe("partial");
+    const failedChecks = Object.entries(report.sections).flatMap(([section, value]) =>
+      value.checks.filter(check => check.status === "fail").map(check => ({
+        section, id: check.id, reason: check.reason_code, summary: check.summary,
+        ...(check.id === "room_tool_catalog" ? { issues: check.evidence?.issues } : {}),
+      })));
+    expect(report.status, JSON.stringify(failedChecks)).toBe("partial");
     expect(report.sections.public_discovery.status).toBe("pass");
     expect(report.sections.oauth_challenge.status).toBe("pass");
     expect(report.sections.authenticated_catalog.status).toBe("pass");

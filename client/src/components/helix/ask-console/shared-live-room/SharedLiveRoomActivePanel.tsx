@@ -5,6 +5,7 @@ import { SharedLiveRoomConsentPanel } from "./SharedLiveRoomConsentPanel";
 import { SharedLiveRoomDebugPanel } from "./SharedLiveRoomDebugPanel";
 import { SharedLiveRoomParticipantsPanel } from "./SharedLiveRoomParticipantsPanel";
 import { SharedLiveRoomPublicResultsPanel } from "./SharedLiveRoomPublicResultsPanel";
+import { SharedLiveRoomOwnerWorkflow } from "./SharedLiveRoomOwnerWorkflow";
 import { SharedLiveRoomRuntimePanel } from "./SharedLiveRoomRuntimePanel";
 import { SharedLiveRoomSetupPanel } from "./SharedLiveRoomSetupPanel";
 import { SharedLiveRoomVisualLanes } from "./SharedLiveRoomVisualLanes";
@@ -145,6 +146,9 @@ export function SharedLiveRoomActivePanel({
         sectionId={`${idPrefix}-participants`}
       />
       <SharedLiveRoomPublicResultsPanel room={room} />
+      {isOwner && controller.selfParticipant?.presence === "present" && room.status !== "closed" ?
+        <SharedLiveRoomOwnerWorkflow key={`${room.room_id}:${controller.selfParticipant.participant_id}`}
+          room={room} onProcessed={() => controller.openRoom(room.room_id)} /> : null}
       {controller.selfParticipant ? (
         <SharedLiveRoomConsentPanel
           participant={controller.selfParticipant}

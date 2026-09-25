@@ -20,6 +20,9 @@ export function SharedLiveRoomPublicResultsPanel({
         <div className="mt-3 space-y-2" data-testid="shared-live-room-public-results">
           {results.map((result) => (
             <article key={result.result_ref} className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="mb-2 text-[11px] text-emerald-100/80">
+                Shared by {room.participants?.find(member => member.participant_id === result.author_participant_id)?.display_name ?? "a former room member"}
+              </p>
               <p className="whitespace-pre-wrap text-xs leading-5 text-slate-100">{result.text}</p>
               <p className="mt-2 break-all font-mono text-[9px] text-slate-500">
                 turn {result.turn_id} · {result.terminal_artifact_kind}

@@ -1,0 +1,86 @@
+{
+  "classification": "RMS_moment_matched_Maxwell_proxy_not_source_phase_space_or_likelihood",
+  "solver": "adjacent exact Yukawa l=1 radial solver compared with Cassel-Hulthen approximation",
+  "source_code": {
+    "repository": "https://github.com/trinitystenhouse/Totani-Reanalysis",
+    "branch": "Public-Release",
+    "commit": "e66f34c40a81d883cbcc81079d12b446e3697777",
+    "inputs": {
+      "u_halo_pwave": 1.0099905412758712e-06,
+      "u_dwarf_pwave": 9.711106443809227e-09,
+      "u_halo_file": "Totani_reanalysis/velocity_dep/halo_moments.csv",
+      "u_dwarf_file": "Totani_reanalysis/velocity_dep/boddy_moments_0d5.csv"
+    }
+  },
+  "kernel": "v_rel^2 * S1(v_rel)",
+  "maxwell_definition": "untruncated Maxwell relative-speed PDF; mean=sqrt(2/3)*RMS so its second moment exactly matches supplied u_pwave",
+  "quadrature_orders": [
+    24,
+    48,
+    96
+  ],
+  "populations": {
+    "milky_way": {
+      "input_u_rms_relative_squared": 1.0099905412758712e-06,
+      "rms_relative_speed_km_s": 301.28628071103583,
+      "maxwell_mean_relative_speed_km_s": 245.99921808099185,
+      "averages_by_order": {
+        "24": {
+          "exact_yukawa_v2S1": 39.390881544670165,
+          "cassel_hulthen_v2S1": 9.894830805199177
+        },
+        "48": {
+          "exact_yukawa_v2S1": 39.388101774759555,
+          "cassel_hulthen_v2S1": 9.894830791441924
+        },
+        "96": {
+          "exact_yukawa_v2S1": 39.387794133557065,
+          "cassel_hulthen_v2S1": 9.894830791441601
+        }
+      }
+    },
+    "dwarf": {
+      "input_u_rms_relative_squared": 9.711106443809227e-09,
+      "rms_relative_speed_km_s": 29.543031678617584,
+      "maxwell_mean_relative_speed_km_s": 24.121784355830755,
+      "averages_by_order": {
+        "24": {
+          "exact_yukawa_v2S1": 3.499870154004831,
+          "cassel_hulthen_v2S1": 0.23306553804205965
+        },
+        "48": {
+          "exact_yukawa_v2S1": 3.4998701539879837,
+          "cassel_hulthen_v2S1": 0.23306553804206231
+        },
+        "96": {
+          "exact_yukawa_v2S1": 3.4998701539983683,
+          "cassel_hulthen_v2S1": 0.23306553804206168
+        }
+      }
+    }
+  },
+  "derived_at_order_96": {
+    "exact_yukawa_dwarf_over_halo_rate_ratio": 0.08885671896554871,
+    "cassel_hulthen_dwarf_over_halo_rate_ratio": 0.023554272220971027,
+    "source_quoted_representative_rate_ratio": 0.024074074074074074,
+    "exact_over_cassel_ratio": 3.772424727537839,
+    "exact_halo_anchored_dwarf_rate_cm3_s": 2.3991314120698155e-25,
+    "exact_anchored_rate_over_source_quoted_dwarf_rate": 3.6909714031843315,
+    "relative_change_48_to_96": {
+      "milky_way": {
+        "exact_yukawa_v2S1": 7.810511007844134e-06,
+        "cassel_hulthen_v2S1": 3.26405569239796e-14
+      },
+      "dwarf": {
+        "exact_yukawa_v2S1": 2.9671820556131934e-12,
+        "cassel_hulthen_v2S1": 2.7755575615628914e-15
+      }
+    }
+  },
+  "limits": [
+    "The RMS inputs are source-release moments, but a Maxwellian shape is assumed; it is not the release's spatially resolved or per-dwarf phase-space posterior.",
+    "Gauss-Laguerre order convergence does not prove all narrow resonance structure is resolved between nodes.",
+    "The halo-anchored dwarf rate is a rate-ratio illustration, not a refit to the Fermi data or to stacked dwarf likelihoods.",
+    "No relic-density, xenon detector likelihood, Casimir-DP response, or boson-star population calculation is included."
+  ]
+}

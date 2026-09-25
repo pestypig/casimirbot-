@@ -1,0 +1,216 @@
+{
+  "classification": "conditional single-radial-mode, uncorrelated scale-invariant CDM-isocurvature screening estimate; not a full cosmological fit",
+  "assumptions": [
+    "A light spectator field is present during inflation and its inflationary fluctuation is delta_phi=H_inf/(2 pi).",
+    "The field later behaves as a quadratic, coherently oscillating component with no significant late dilution or conversion.",
+    "The field is a fraction f_phi of total CDM, so its total-CDM isocurvature amplitude is diluted by f_phi.",
+    "The mode is uncorrelated with adiabatic curvature and has the scale-invariant CDI spectrum used for the adopted Planck limit.",
+    "The mapping from the existing 3H=m abundance normalization to the pre-oscillation field value uses a numerical homogeneous Klein-Gordon solution in a radiation background with fixed relativistic degrees of freedom."
+  ],
+  "inputs": {
+    "m_phi_eV": 1e-17,
+    "omega_dm_h2": 0.1198,
+    "beta_iso_95pct_upper_limit": 0.038,
+    "A_s_at_k_0p05_Mpc_inverse": 2.1e-09,
+    "phi_fraction_grid": [
+      0.001,
+      0.01,
+      0.1,
+      0.5,
+      1.0
+    ],
+    "inflation_Hubble_scale_grid_GeV": [
+      1000000000.0,
+      10000000000.0,
+      100000000000.0,
+      1000000000000.0,
+      10000000000000.0
+    ],
+    "field_amplitude_source": "casimir-dp-ultralight-condensate-abundance-screen-2026-09-24.py; 3H=m normalization"
+  },
+  "formula": {
+    "component_isocurvature_power": "P_S=(f_phi*H_inf/(pi*phi_i))^2",
+    "beta_iso": "P_S/(A_s+P_S)",
+    "H_inf_upper_bound": "pi*phi_i/f_phi * sqrt([beta_max/(1-beta_max)]*A_s)"
+  },
+  "background_transfer": {
+    "dimensionless_late_time_x": 1000.0,
+    "late_energy_factor_y2_plus_dy2": 2.3383409486813875e-05,
+    "scale_factor_ratio_from_3H_equals_m": 25.81988897471611,
+    "frozen_field_value_over_3H_equals_m_amplitude": 1.5762116270095183,
+    "solver_relative_tolerance": 1e-10
+  },
+  "fractions": [
+    {
+      "global_phi_fraction": 0.001,
+      "radiation_era_frozen_field_value_GeV": 239935154842922.2,
+      "conditional_H_inf_upper_bound_GeV": 6865270710915.785,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380948852715558e-10,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380948157336607e-08,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.38087862002447e-06,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.0008373930711235,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.07732861677180673,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.01,
+      "radiation_era_frozen_field_value_GeV": 758741580048813.9,
+      "conditional_H_inf_upper_bound_GeV": 2170989220013.7275,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380948789499282e-09,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380941835715094e-07,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380246515564796e-05,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.008311292343649117,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.4559584450015342,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.1,
+      "radiation_era_frozen_field_value_GeV": 2399351548429222.5,
+      "conditional_H_inf_upper_bound_GeV": 686527071091.5785,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380948157336604e-08,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380878620024468e-06,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.0008373930711234997,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.07732861677180669,
+          "passes_adopted_Planck_bound": false
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.8934009752156606,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.5,
+      "radiation_era_frozen_field_value_GeV": 5365113164207120.0,
+      "conditional_H_inf_upper_bound_GeV": 307024239870.9201,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 4.190472673862933e-07,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 4.190298836468514e-05,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.004172987631902143,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.29530192599122584,
+          "passes_adopted_Planck_bound": false
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.9766925542537181,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 1.0,
+      "radiation_era_frozen_field_value_GeV": 7587415800488139.0,
+      "conditional_H_inf_upper_bound_GeV": 217098922001.37277,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380941835715094e-07,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 8.380246515564796e-05,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.008311292343649117,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.4559584450015342,
+          "passes_adopted_Planck_bound": false
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.988208866524981,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Planck's limit is model-specific; correlated, blue, post-inflationary, or otherwise modified perturbations need their own likelihood treatment.",
+    "For f_phi<1 this constrains only the phi component; the remaining dark matter is assumed adiabatic.",
+    "A charged complex condensate has two field components, phase/charge perturbations, and possible correlated modes; this radial single-mode estimate does not validate that case.",
+    "The background transfer solves only the homogeneous real field in a fixed-g radiation era; temperature-dependent degrees of freedom, non-quadratic potentials, reheating, and perturbation transfer remain outside this screen.",
+    "Passing the isocurvature screen does not demonstrate fragmentation or boson-star formation."
+  ],
+  "source_references": {
+    "Planck_CDI_bound": "https://arxiv.org/abs/1807.06211",
+    "Planck_scalar_amplitude": "https://arxiv.org/abs/1807.06209"
+  }
+}

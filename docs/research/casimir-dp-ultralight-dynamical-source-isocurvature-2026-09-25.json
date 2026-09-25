@@ -1,0 +1,74 @@
+{
+  "classification": "conditional k=0 separate-universe inflationary density-isocurvature estimate for the coupled x,y,S homogeneous toy",
+  "background": {
+    "source_mass_ratio_M_over_m": 1.0,
+    "phi_fraction_of_total_DM": 0.1,
+    "source_fraction_of_total_DM": 0.07913608152949107,
+    "heavy_remainder_fraction_assumed_adiabatic": 0.8208639184705089,
+    "initial_dimensionless_X_Y_Z": [
+      1.0,
+      0.0,
+      0.8855616054617014
+    ],
+    "dimensionless_total_comoving_action": 1.7752198564524744,
+    "physical_field_scale_F_GeV": 2410232388230671.5,
+    "Planck_beta_iso_limit": 0.038,
+    "Planck_A_s": 2.1e-09
+  },
+  "perturbation_method": {
+    "initial_canonical_inflation_fluctuations": "independent delta_x=delta_y=delta_S=H_inf/(2 pi); equal power because all three fields are assumed light during inflation",
+    "mode_treatment": "superhorizon k=0 separate-universe; evolve finite differences through the full nonlinear homogeneous equations",
+    "density_power": "P_S=(H_inf/(2pi F))^2*(f_phi+f_S)^2*|grad_(X,Y,Z) ln(E_total)|^2",
+    "finite_difference_steps": [
+      0.001,
+      0.0005
+    ],
+    "dimensionless_log_density_gradient": [
+      0.9975164967282176,
+      -0.2683759931246781,
+      1.1157591018307096
+    ],
+    "gradient_norm": 1.5205207029990302,
+    "step_convergence_relative_change": 7.303437656432132e-08
+  },
+  "conditional_95pct_H_inf_upper_bound_GeV": 506380867291.433,
+  "inflationary_Hubble_scale_benchmarks": [
+    {
+      "H_inf_GeV": 1000000000.0,
+      "predicted_beta_iso_if_uncorrelated": 1.5404722563141835e-07,
+      "passes_adopted_Planck_limit": true
+    },
+    {
+      "H_inf_GeV": 10000000000.0,
+      "predicted_beta_iso_if_uncorrelated": 1.5404487634302184e-05,
+      "passes_adopted_Planck_limit": true
+    },
+    {
+      "H_inf_GeV": 100000000000.0,
+      "predicted_beta_iso_if_uncorrelated": 0.0015381030881200968,
+      "passes_adopted_Planck_limit": true
+    },
+    {
+      "H_inf_GeV": 1000000000000.0,
+      "predicted_beta_iso_if_uncorrelated": 0.1334843520896885,
+      "passes_adopted_Planck_limit": false
+    },
+    {
+      "H_inf_GeV": 10000000000000.0,
+      "predicted_beta_iso_if_uncorrelated": 0.9390419526149139,
+      "passes_adopted_Planck_limit": false
+    }
+  ],
+  "validity_limits": [
+    "The source initial displacement is still an assigned misalignment initial condition; the inflation/reheating mechanism that selects it is not modeled.",
+    "This is a separate-universe k=0 calculation in a fixed radiation background, without metric perturbations, finite-k transfer, reheating, or temperature-dependent relativistic degrees of freedom.",
+    "It assumes three independent, unsuppressed canonical field fluctuations during inflation and an uncorrelated, scale-invariant total-CDM isocurvature mode.",
+    "The heavy component is assumed adiabatic and the two scalar components are stable; entropy transfer and source decay are excluded.",
+    "Density perturbations are propagated; the perturbation in conserved U(1) charge and its nonlinear fragmentation response are not included.",
+    "This is not a CMB likelihood fit and does not predict stars, gamma rays, xenon recoils, or Casimir-DP decoherence."
+  ],
+  "source_references": {
+    "Planck_CDI_limit": "https://arxiv.org/abs/1807.06211",
+    "Planck_scalar_amplitude": "https://arxiv.org/abs/1807.06209"
+  }
+}

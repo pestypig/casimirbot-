@@ -1,0 +1,11 @@
+{
+  "observed_at": "2026-09-25T05:14:51.7842926Z",
+  "goal_turn": 3,
+  "browser_control": "kernel_assets_path_missing_os_error_3",
+  "windows_control": "kernel_assets_path_missing_os_error_3",
+  "casimirbot_process_count": 0,
+  "node_or_casimirbot_listener_count": 0,
+  "consecutive_access_blocked_goal_turns": 3,
+  "live_acceptance_run": false,
+  "disposition": "blocked_pending_external_access_recovery"
+}

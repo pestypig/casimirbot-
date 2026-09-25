@@ -311,13 +311,31 @@ describe("Helix MCP local-supervisor coordination", () => {
       expect((await runtimeClient.callTool({ name: "helix_reasoning_prompt_submit", arguments: prompt })).structuredContent)
         .toEqual(submitted.structuredContent);
       const readArgs = { client_continuation_ref: actor.taskId, reasoning_binding_id: runtimeBinding.reasoning_binding_id,
-        binding_epoch: runtimeBinding.binding_epoch, after_cursor: 0 };
+        binding_epoch: runtimeBinding.binding_epoch, helix_conversation_id: "chat:fixture",
+        mission_id: null, run_id: null, after_cursor: 0 };
+      for (const patch of [{ helix_conversation_id: "chat:foreign" },
+        { mission_id: "mission:foreign" }, { run_id: "run:foreign" }]) {
+        const deniedRead = await runtimeClient.callTool({ name: "helix_reasoning_steering_read",
+          arguments: { ...readArgs, ...patch } });
+        expect(deniedRead.isError).toBe(true);
+        expect(JSON.stringify(deniedRead)).toContain("reasoning_binding_task_association_mismatch");
+        const deniedAck = await runtimeClient.callTool({ name: "helix_reasoning_steering_acknowledge",
+          arguments: { client_continuation_ref: readArgs.client_continuation_ref,
+            reasoning_binding_id: readArgs.reasoning_binding_id,
+            binding_epoch: readArgs.binding_epoch,
+            helix_conversation_id: readArgs.helix_conversation_id,
+            mission_id: readArgs.mission_id, run_id: readArgs.run_id, ...patch,
+            steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref } });
+        expect(deniedAck.isError).toBe(true);
+        expect(JSON.stringify(deniedAck)).toContain("reasoning_binding_task_association_mismatch");
+      }
       const pickup = await runtimeClient.callTool({ name: "helix_reasoning_steering_read", arguments: readArgs });
       expect(pickup.isError).not.toBe(true);
       expect((pickup.structuredContent as any).deliveries).toHaveLength(1);
       const acknowledgement = await runtimeClient.callTool({ name: "helix_reasoning_steering_acknowledge", arguments: {
         client_continuation_ref: actor.taskId, reasoning_binding_id: runtimeBinding.reasoning_binding_id,
-        binding_epoch: runtimeBinding.binding_epoch, steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref,
+        binding_epoch: runtimeBinding.binding_epoch, helix_conversation_id: "chat:fixture",
+        mission_id: null, run_id: null, steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref,
       } });
       expect(acknowledgement.isError).not.toBe(true);
       expect(acknowledgement.structuredContent).toMatchObject({ event: { delivery_state: "acknowledged" } });
@@ -447,13 +465,15 @@ describe("Helix MCP local-supervisor coordination", () => {
           client_continuation_ref: actor.taskId, id: predecessorArgs.id } }),
         () => runtimeClient.callTool({ name: "helix_reasoning_steering_read", arguments: {
           client_continuation_ref: actor.taskId, reasoning_binding_id: predecessorBinding.reasoning_binding_id,
-          binding_epoch: predecessorBinding.binding_epoch } }),
+          binding_epoch: predecessorBinding.binding_epoch, helix_conversation_id: "chat:replacement",
+          mission_id: null, run_id: null } }),
         () => runtimeClient.callTool({ name: "helix_reasoning_prompt_submit", arguments: { ...prompt,
           reasoning_binding_id: predecessorBinding.reasoning_binding_id, binding_epoch: predecessorBinding.binding_epoch,
           helix_conversation_id: "chat:replacement", client_event_ref: "fixture-stale-replacement-prompt" } }),
         () => runtimeClient.callTool({ name: "helix_reasoning_steering_acknowledge", arguments: {
           client_continuation_ref: actor.taskId, reasoning_binding_id: predecessorBinding.reasoning_binding_id,
-          binding_epoch: predecessorBinding.binding_epoch, steering_event_ref: "steering:fixture-stale-event" } }),
+          binding_epoch: predecessorBinding.binding_epoch, helix_conversation_id: "chat:replacement",
+          mission_id: null, run_id: null, steering_event_ref: "steering:fixture-stale-event" } }),
       ]) {
         const rejected = await operation(); expect(rejected.isError).toBe(true);
         expect(JSON.stringify(rejected)).toContain("pairing_superseded");
@@ -656,6 +676,10 @@ describe("Helix MCP local-supervisor coordination", () => {
         type: "oauth2",
         scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
       }]],
+      ["helix_reasoning_room_mission_result_submit", [{
+        type: "oauth2",
+        scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+      }]],
       ["helix_reasoning_prompt_submit", [{
         type: "oauth2", scopes: Array.from(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
       }]],
@@ -708,6 +732,8 @@ describe("Helix MCP local-supervisor coordination", () => {
     const binding = (claimed.structuredContent as {
       binding: { reasoning_binding_id: string; binding_epoch: number };
     }).binding;
+    const taskSelection = { helix_conversation_id: "helix-chat:reasoning-current",
+      mission_id: "mission:reasoning-current", run_id: "run:reasoning-current" };
     const event = reasoningStore.dispatch({
       profileRef: identity.accountProfileId,
       bindingId: binding.reasoning_binding_id,
@@ -716,12 +742,49 @@ describe("Helix MCP local-supervisor coordination", () => {
       origin: "gpt_live_finalized",
       instructionText: "Inspect the Minecraft player state, then report evidence.",
     });
+    const sameClientOtherTask = "codex_thread:reasoning-other";
+    const otherHeartbeat = await client.callTool({
+      name: "helix_local_supervisor_presence_update",
+      arguments: { client_continuation_ref: sameClientOtherTask,
+        declared_objective_summary: "Separate task on the same MCP client",
+        lifecycle_state: "active", resource_claims: [], heartbeat_ttl_seconds: 60,
+        thread_observability_bridge: {
+          supported_levels: ["checkpoint_publish", "continuation_ready"], requested_level: "continuation_ready",
+          checkpoint_publication: { freshness_window_seconds: 120,
+            retention: "current_session", revocation: "independent" },
+        } },
+    });
+    expect(otherHeartbeat.isError, JSON.stringify(otherHeartbeat)).not.toBe(true);
+    for (const [patch, rejection] of [
+      [{ client_continuation_ref: sameClientOtherTask }, "reasoning_binding_identity_mismatch"],
+      [{ helix_conversation_id: "helix-chat:wrong" }, "reasoning_binding_task_association_mismatch"],
+      [{ mission_id: "mission:wrong" }, "reasoning_binding_task_association_mismatch"],
+      [{ run_id: "run:wrong" }, "reasoning_binding_task_association_mismatch"],
+    ] as const) {
+      const deniedRead = await client.callTool({ name: "helix_reasoning_steering_read",
+        arguments: { client_continuation_ref: continuation,
+          reasoning_binding_id: binding.reasoning_binding_id,
+          binding_epoch: binding.binding_epoch, ...taskSelection, after_cursor: 0, ...patch } });
+      expect(deniedRead.isError).toBe(true);
+      expect(JSON.stringify(deniedRead)).toContain(rejection);
+      const deniedAck = await client.callTool({ name: "helix_reasoning_steering_acknowledge",
+        arguments: { client_continuation_ref: continuation,
+          reasoning_binding_id: binding.reasoning_binding_id,
+          binding_epoch: binding.binding_epoch, ...taskSelection,
+          steering_event_ref: event.steering_event_ref, ...patch } });
+      expect(deniedAck.isError).toBe(true);
+      expect(JSON.stringify(deniedAck)).toContain(rejection);
+      expect(reasoningStore.inspectEvent({ profileRef: identity.accountProfileId,
+        bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+        eventRef: event.steering_event_ref }).delivery_state).toBe("pending");
+    }
     const read = await client.callTool({
       name: "helix_reasoning_steering_read",
       arguments: {
         client_continuation_ref: continuation,
         reasoning_binding_id: binding.reasoning_binding_id,
         binding_epoch: binding.binding_epoch,
+        ...taskSelection,
         after_cursor: 0,
       },
     });
@@ -746,6 +809,7 @@ describe("Helix MCP local-supervisor coordination", () => {
         client_continuation_ref: continuation,
         reasoning_binding_id: binding.reasoning_binding_id,
         binding_epoch: binding.binding_epoch,
+        ...taskSelection,
         steering_event_ref: event.steering_event_ref,
       },
     });
@@ -755,6 +819,24 @@ describe("Helix MCP local-supervisor coordination", () => {
       answer_authority: false,
       terminal_eligible: false,
     });
+    const resultArgs = { client_continuation_ref: continuation,
+      reasoning_binding_id: binding.reasoning_binding_id,
+      binding_epoch: binding.binding_epoch, ...taskSelection,
+      steering_event_ref: event.steering_event_ref,
+      result_status: "completed", result_text: "A bounded task observation.",
+      evidence_refs: [] };
+    const foreignTaskResult = await client.callTool({
+      name: "helix_reasoning_room_mission_result_submit",
+      arguments: { ...resultArgs, client_continuation_ref: sameClientOtherTask },
+    });
+    expect(foreignTaskResult.isError).toBe(true);
+    expect(JSON.stringify(foreignTaskResult)).toContain("reasoning_binding_identity_mismatch");
+    const unlinkedResult = await client.callTool({
+      name: "helix_reasoning_room_mission_result_submit", arguments: resultArgs,
+    });
+    expect(unlinkedResult.isError).toBe(true);
+    expect(JSON.stringify(unlinkedResult)).toContain("room_task_result_event_not_room_linked");
+    expect(JSON.stringify(unlinkedResult)).not.toContain(resultArgs.result_text);
     const promptArgs = { client_continuation_ref: continuation,
       reasoning_binding_id: binding.reasoning_binding_id, binding_epoch: binding.binding_epoch,
       helix_conversation_id: "helix-chat:reasoning-current", mission_id: "mission:reasoning-current",
@@ -787,14 +869,14 @@ describe("Helix MCP local-supervisor coordination", () => {
       { instruction_text: "Changed replay" }]) expect((await submit(patch)).isError).toBe(true);
     const delivery = await client.callTool({ name: "helix_reasoning_steering_read", arguments: {
       client_continuation_ref: continuation, reasoning_binding_id: binding.reasoning_binding_id,
-      binding_epoch: binding.binding_epoch, after_cursor: event.cursor } });
+      binding_epoch: binding.binding_epoch, ...taskSelection, after_cursor: event.cursor } });
     expect((delivery.structuredContent as any).deliveries).toHaveLength(1);
     expect((delivery.structuredContent as any).deliveries[0]).toMatchObject({
       content_role: "agent_steering_advisory_not_execution",
       event: { origin: "agent_submitted", delivery_state: "pending", answer_authority: false } });
     const agentAck = await client.callTool({ name: "helix_reasoning_steering_acknowledge", arguments: {
       client_continuation_ref: continuation, reasoning_binding_id: binding.reasoning_binding_id,
-      binding_epoch: binding.binding_epoch,
+      binding_epoch: binding.binding_epoch, ...taskSelection,
       steering_event_ref: (submitted.structuredContent as any).event.steering_event_ref } });
     expect(agentAck.structuredContent).toMatchObject({ event: { delivery_state: "acknowledged" }, answer_authority: false });
     const visibleAfterAck = await display();
@@ -812,6 +894,7 @@ describe("Helix MCP local-supervisor coordination", () => {
         client_continuation_ref: "codex_thread:wrong-task",
         reasoning_binding_id: binding.reasoning_binding_id,
         binding_epoch: binding.binding_epoch,
+        ...taskSelection,
         after_cursor: 0,
       },
     });

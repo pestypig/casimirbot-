@@ -11,6 +11,7 @@ describe("SharedLiveRoomPublicResultsPanel", () => {
 
   it("shows the same authorized result as a non-authoritative room projection", () => {
     const room = {
+      participants: [{ participant_id: "participant:guest", display_name: "Sam" }],
       public_terminal_results: [{
         schema: "helix.shared_realtime_room.public_terminal_result.v1",
         result_ref: "room_terminal_result:test",
@@ -36,6 +37,7 @@ describe("SharedLiveRoomPublicResultsPanel", () => {
     } as HelixSharedRealtimeRoom;
     render(<SharedLiveRoomPublicResultsPanel room={room} />);
     expect(screen.getByText("A fresh read reports one sword and four bread.")).toBeTruthy();
+    expect(screen.getByText("Shared by Sam")).toBeTruthy();
     expect(screen.getByText(/com\.casimirbot\.minecraft\.inventory\.check/u)).toBeTruthy();
     expect(screen.getByText(/not another answer or permission source/iu)).toBeTruthy();
   });

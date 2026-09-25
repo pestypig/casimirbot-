@@ -13,6 +13,7 @@ import {
   helixSharedLiveRoomChatBindingClaimRequestSchema,
   helixSharedLiveRoomChatBindingRevokeRequestSchema,
   helixSharedLiveRoomCreateRequestSchema,
+  helixSharedLiveRoomJoinRequestSchema,
   helixSharedLiveRoomIdSchema,
   helixSharedLiveRoomRunBindingRevokeRequestSchema,
   helixSharedLiveRoomRunBindingRequestSchema,
@@ -106,6 +107,10 @@ const protectedRoomRequestValue = (req: Request): unknown => {
       (body as Record<string, unknown>).claim_handle =
         "opaque_browser_chat_claim";
     }
+  }
+  if (req.method === "POST" && req.path === "/join" &&
+      helixSharedLiveRoomJoinRequestSchema.safeParse(body).success) {
+    delete (body as Record<string, unknown>).invite_code;
   }
   return { body, query: req.query };
 };
@@ -426,6 +431,20 @@ export const createHelixSharedLiveRoomRouter = (
       },
     ),
   );
+
+  router.post("/join", asyncRoute(async (req, res, locals) => {
+    const principal = principalFrom(locals);
+    requireAllScopes(principal, [HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE]);
+    requireCurrentRoomFeature(principal);
+    const result = await controlService.joinRoom({
+      actor: buildSharedLiveRoomControlActorFromAgentPrincipal(principal),
+      idempotencyKey: idempotencyKey(req),
+      request: helixSharedLiveRoomJoinRequestSchema.parse(req.body),
+    });
+    responseHeaders(res);
+    res.setHeader("Idempotency-Replayed", String(result.idempotencyReplayed));
+    res.status(result.status).json(result.body);
+  }));
 
   router.post(
     "/run-bindings",

@@ -1,0 +1,23 @@
+{
+  "schema": "casimirbot.ar2e.package_identity.v1",
+  "observed_at": "2026-09-25T04:06:07.066Z",
+  "package_root": "apps/desktop/release-ar2e-20260925/win-unpacked",
+  "source_commit": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "generated_at": "2026-09-25T04:03:39.441Z",
+  "server_sha256": "a13545a8637a3cdc7951be06204bf646fff210f62fd4501c8c99092344e64b10",
+  "client_tree_sha256": "06c187a848ac3edca55b07f5523151c305e106a245ed26360f716195a9ac5c00",
+  "manifest_sha256": "5f4966da39055f5045a14a9a54da467122d54edb1f3a0fccda657b67edf61764",
+  "asar_sha256": "93886ef91b0fddef30b0eeb8549974e52617ec6ee2a0aec6221e20150e95b82c",
+  "executable_sha256": "1dee5df3fcce62761401b34a395d31f30bfefccc6fcf9e620c9d644b090eb9c6",
+  "checks": {
+    "ar2c_source_read": true,
+    "ar2d_catalog": true,
+    "main.cjs": true,
+    "preload.cjs": true,
+    "service.mjs": true,
+    "owner_ui": true
+  },
+  "development_worktree": true,
+  "signed_release_claimed": false,
+  "deployment_performed": false
+}

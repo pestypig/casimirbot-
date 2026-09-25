@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import crypto from "node:crypto";
 import { DurableReasoningBindingAccess } from "../services/local-supervisor/durable-reasoning-binding-access";
+import { createBrowserDurableReasoningAccess } from "../services/local-supervisor/browser-reasoning-access";
 import type { DurableSteeringRepository } from "../services/local-supervisor/durable-steering-repository";
 import type { PairingDeliveryService } from "../services/local-supervisor/pairing-delivery-service";
 import { PairingTransitionService } from "../services/local-supervisor/pairing-transition-service";
@@ -13,6 +14,15 @@ import { isPairingEnvironmentEligible } from "../services/local-supervisor/pairi
 import { resolvePairingAccountIssuer } from "../services/local-supervisor/pairing-account-authority";
 import { createPairingDestinationRegistrationStore, PairingDestinationRegistrationError, type PairingDestinationRegistrationStore } from "../services/local-supervisor/pairing-destination-registration";
 import { dispatchExactChatSteering, steeringDispatchSchema } from "../services/local-supervisor/exact-chat-steering-dispatch";
+import { roomExternalMissionStore, RoomExternalMissionError,
+  type RoomExternalMissionStore } from "../services/local-supervisor/room-external-mission-store";
+import { RoomMissionResultError, projectRoomMissionResultReceipt } from "../services/local-supervisor/room-mission-result";
+import { listRealtimeStagePlayAskHandoffs, readRealtimeStagePlayAskHandoff,
+  readRealtimeStagePlayTurnActorContext } from "../services/helix-ask/live-source/realtime-stage-play-handoff";
+import { revalidateRealtimeRoomTurnActorContext } from "../services/helix-ask/realtime-room/turn-actor-context";
+import { buildRealtimeRequesterRef,
+  readAdmittedRealtimeSession } from "../services/helix-ask/realtime-session/session-registry";
+import type { RoomMissionSteeringEnvelope } from "../services/local-supervisor/room-mission-steering";
 import {
   HELIX_AGENT_CONNECTION_STATUS_SCHEMA,
   HELIX_AGENT_CLIENT_PROFILES,
@@ -41,7 +51,8 @@ import {
   type HelixAgentAccountBindingProjection,
   type HelixAgentAccountLinkStore,
 } from "../services/helix-account/agent-account-link-store";
-import { getAccountSessionById } from "../services/helix-account/account-session-store";
+import { getAccountSessionById, getAccountSessionStatus } from "../services/helix-account/account-session-store";
+import { roomMissionOwnerCatalogSchema, type RoomMissionTarget } from "@shared/helix-room-mission-owner";
 import { readHelixSessionCookie } from "../services/helix-account/session-cookie";
 import {
   HelixReasoningTaskBindingError,
@@ -74,9 +85,10 @@ export type AgentConnectionsRouterDependencies = {
   coordinationStore: PresenceStore;
   reasoningBindingStore?: Pick<
     HelixReasoningTaskBindingStore,
-    "issueClaim" | "dispatch" | "revoke" | "inspect" | "inspectEvent" | "inspectCurrent" | "inspectLatest" | "readForChatDisplay"
+    "issueClaim" | "dispatch" | "revoke" | "inspect" | "inspectEvent" | "inspectCurrent" | "inspectLatest" | "readForChatDisplay" | "resolveOwnedPreparationTarget"
   >;
   resolveSession?: (sessionId?: string | null) => Promise<SessionRecord | null>;
+  missionAccountStatus?: typeof getAccountSessionStatus;
   resolveRunAssociation?: typeof resolveReasoningRunAssociation;
   preparationBindingStore?: Pick<HelixReasoningTaskBindingStore,
     "resolveOwnedPreparationTarget" | "verifyTaskAssociation">;
@@ -84,6 +96,9 @@ export type AgentConnectionsRouterDependencies = {
   prepareBrowserSession?: typeof prepareBrowserEnvironmentSession;
   preparationIntentStore?: Pick<EnvironmentSessionPreparationIntentStore, "request">;
   readPreparationMembership?: typeof readSharedRealtimeRoomMembership;
+  roomMissionStore?: Pick<RoomExternalMissionStore, "select" | "revoke" | "inspect" | "requireCurrent">;
+  roomMissionResultEvidenceReader?: Pick<DurableReasoningBindingAccess,
+    "readCurrentRoomMissionResultEvidence">;
 };
 
 const setPrivateHeaders = (res: Response): void => {
@@ -304,7 +319,7 @@ export const createAgentConnectionsRouter = (
   };
   const reasoningFailure = (res: Response, error: unknown): void => {
     setPrivateHeaders(res);
-    if (error instanceof HelixReasoningTaskBindingError || error instanceof PairingDestinationRegistrationError || error instanceof PairingInvitationError || error instanceof PairingStorageError) {
+    if (error instanceof HelixReasoningTaskBindingError || error instanceof RoomExternalMissionError || error instanceof RoomMissionResultError || error instanceof PairingDestinationRegistrationError || error instanceof PairingInvitationError || error instanceof PairingStorageError) {
       res.status(error.status).json({
         schema: "helix.reasoning_task_binding_error.v1",
         ok: false,
@@ -332,22 +347,9 @@ export const createAgentConnectionsRouter = (
   };
 
   const durableBrowserAccess = (session: SessionRecord, store: HelixReasoningTaskBindingStore) => {
-    return new DurableReasoningBindingAccess(store, async destination => {
-      const profileId = session.profile.profile_id;
-      const deviceId = process.env.HELIX_DESKTOP_DEVICE_ID?.trim();
-      const opaque = (prefix: string, value: string) => `${prefix}:${crypto.createHash("sha256").update(value).digest("hex")}`;
-      if (destination.profileId !== profileId || !deviceId || destination.installationId !== opaque("installation", deviceId)) {
-        throw new HelixReasoningTaskBindingError("pairing_device_identity_mismatch", 403);
-      }
-      const trust = await (dependencies.readPairingDeviceTrust ?? installedSecurityStore.inspectFullHarnessTrust.bind(installedSecurityStore))({ profileId, deviceId });
-      if (!trust.trusted) throw new HelixReasoningTaskBindingError("pairing_device_trust_required", 403);
-      const linked = await bindingStore.listBindings({ session: { sessionId: session.session_id, profileId } });
-      if (!await resolvePairingAccountIssuer({ destination, profileId, deviceId, bindings: linked.bindings,
-        delegatedAccountSessionId: trust.delegated_account_session_id, resolveSession })) {
-        throw new HelixReasoningTaskBindingError("pairing_account_link_required", 403);
-      }
-    }, async () => dependencies.pairingLedgerRepository ?? await createNativePairingLedgerRepository(),
-    undefined, dependencies.durableSteeringRepository ? async () => dependencies.durableSteeringRepository! : undefined);
+    return createBrowserDurableReasoningAccess(session, store, {
+      ...dependencies, bindingStore, resolveSession,
+    });
   };
   const browserReasoningAccess = (session: SessionRecord) => {
     const store = dependencies.reasoningBindingStore;
@@ -616,6 +618,324 @@ export const createAgentConnectionsRouter = (
           assistant_answer: false, terminal_eligible: false, credential_included: false });
       } else { reasoningFailure(res, error); }
     }
+  });
+
+  const requireMissionDeveloper = async (session: SessionRecord) => {
+    const status = await (dependencies.missionAccountStatus ?? getAccountSessionStatus)(session.session_id);
+    if (status.session?.session_id !== session.session_id ||
+        status.session.profile.profile_id !== session.profile.profile_id ||
+        status.account_policy.account_type !== "developer" ||
+        !status.account_policy.feature_flags.includes("shared_realtime_rooms") ||
+        status.account_policy.locked_features.includes("shared_realtime_rooms")) {
+      throw new RoomExternalMissionError("room_mission_developer_required", 403);
+    }
+  };
+
+  // Discovery is a private projection. Selection and dispatch independently
+  // recheck authority; these options are never grants or task content.
+  router.get("/session/agent-connections/room-missions/:roomId/owner-options", async (req, res) => {
+    try {
+      const roomId = z.string().min(3).max(320).parse(req.params.roomId);
+      const session = await resolveBrowserIdentity(req);
+      const profileRef = session.profile.profile_id;
+      const authorize = async () => {
+        const current = await resolveBrowserIdentity(req);
+        if (current.session_id !== session.session_id || current.profile.profile_id !== profileRef)
+          throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+        await requireMissionDeveloper(current);
+        const links = await bindingStore.listBindings({ session: { sessionId: session.session_id, profileId: profileRef } });
+        if (!newestActiveBinding(links.bindings)) throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+        const member = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({ profileId: profileRef, roomId });
+        if (!member || member.role !== "owner" || member.presence !== "present" || member.roomStatus === "closed")
+          throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+        return member;
+      };
+      const member = await authorize();
+      const store = dependencies.roomMissionStore ?? roomExternalMissionStore;
+      const mission = await store.inspect(roomId);
+      if (mission && (mission.room_id !== roomId || mission.owner_profile_id !== profileRef || mission.owner_participant_id !== member.participantId))
+        throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+      let candidate: RoomMissionTarget | null = null;
+      try {
+        const access = browserReasoningAccess(session);
+        const binding = await access.inspectLatest({ profileRef });
+        await access.resolveOwnedPreparationTarget({ profileRef, bindingId: binding.reasoning_binding_id,
+          bindingEpoch: binding.binding_epoch, helixConversationId: binding.helix_conversation_id,
+          missionId: binding.mission_id, runId: binding.run_id });
+        candidate = { reasoning_binding_id: binding.reasoning_binding_id, binding_epoch: binding.binding_epoch,
+          helix_conversation_id: binding.helix_conversation_id, binding_mission_id: binding.mission_id, run_id: binding.run_id };
+      } catch (error) {
+        // An unavailable task must not hide an existing mission's revoke control.
+        // Unknown storage/transport faults fail the whole read, never imply absence.
+        if (!(error instanceof HelixReasoningTaskBindingError) || ![404, 409].includes(error.status)) throw error;
+      }
+      const handoffs = [];
+      const threadId = `helix-ask:room:${roomId}`;
+      for (const handoff of listRealtimeStagePlayAskHandoffs({ threadId, limit: 20 })) {
+        const actor = readRealtimeStagePlayTurnActorContext(handoff.handoff_id);
+        if (!actor || actor.requester_profile_id !== profileRef || actor.room_id !== roomId ||
+            !actor.participant_id || actor.realtime_session_id !== handoff.realtime_session_id ||
+            handoff.transcript_text_char_count > 4000 ||
+            readAdmittedRealtimeSession({ realtimeSessionId: actor.realtime_session_id,
+              requesterRef: buildRealtimeRequesterRef(session.session_id) })?.threadId !== threadId ||
+            !(await revalidateRealtimeRoomTurnActorContext(actor).catch(() => false))) continue;
+        handoffs.push({ handoff_id: handoff.handoff_id, realtime_session_id: handoff.realtime_session_id,
+          speaker_participant_id: actor.participant_id, transcript_text_hash: handoff.transcript_text_hash,
+          transcript_text_char_count: handoff.transcript_text_char_count, created_at_ms: handoff.created_at_ms });
+      }
+      const finalMember = await authorize();
+      const finalMission = await store.inspect(roomId);
+      if (finalMember.participantId !== member.participantId || finalMission?.mission_id !== mission?.mission_id ||
+          finalMission?.mission_revision !== mission?.mission_revision || finalMission?.status !== mission?.status)
+        throw new RoomExternalMissionError("room_mission_not_current", 409);
+      setPrivateHeaders(res);
+      res.json(roomMissionOwnerCatalogSchema.parse({ schema: "helix.room_mission_owner_catalog.v1", room_id: roomId,
+        mission: mission ? { room_id: roomId, mission_id: mission.mission_id, mission_revision: mission.mission_revision,
+          status: mission.status, reasoning_binding_id: mission.reasoning_binding_id, binding_epoch: mission.binding_epoch,
+          helix_conversation_id: mission.helix_conversation_id, binding_mission_id: mission.binding_mission_id, run_id: mission.run_id } : null,
+        candidate, candidate_unavailable: candidate === null, handoffs,
+        execution_authority: false, answer_authority: false, raw_content_included: false }));
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
+  const missionSelectionSchema = z.object({
+    request_id: z.string().trim().min(3).max(120),
+    room_id: z.string().trim().min(3).max(320),
+    reasoning_binding_id: z.string().trim().min(3).max(320),
+    binding_epoch: z.number().int().positive(),
+    helix_conversation_id: z.string().trim().min(3).max(320),
+    binding_mission_id: z.string().trim().min(3).max(320).nullable(),
+    run_id: z.string().trim().min(3).max(320).nullable(),
+    expected_revision: z.number().int().positive().nullable(),
+  }).strict();
+
+  router.post("/session/agent-connections/room-missions/select", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      await requireMissionDeveloper(session);
+      const body = missionSelectionSchema.parse(req.body);
+      const preparationStore = dependencies.preparationBindingStore;
+      if (!preparationStore) throw new HelixReasoningTaskBindingError("reasoning_binding_unavailable", 503);
+      const authorization = await bindingStore.listBindings({ session: {
+        sessionId: session.session_id, profileId: session.profile.profile_id,
+      } });
+      if (!newestActiveBinding(authorization.bindings)) {
+        throw new HelixReasoningTaskBindingError("reasoning_binding_identity_mismatch", 403);
+      }
+      const membership = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({
+        profileId: session.profile.profile_id, roomId: body.room_id,
+      });
+      if (!membership || membership.role !== "owner" || membership.presence !== "present" ||
+          membership.roomStatus === "closed") {
+        throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+      }
+      const targetStore = preparationStore instanceof HelixReasoningTaskBindingStore
+        ? durableBrowserAccess(session, preparationStore) : preparationStore;
+      await targetStore.resolveOwnedPreparationTarget({
+        profileRef: session.profile.profile_id, bindingId: body.reasoning_binding_id,
+        bindingEpoch: body.binding_epoch, helixConversationId: body.helix_conversation_id,
+        missionId: body.binding_mission_id, runId: body.run_id,
+      });
+      const mission = await (dependencies.roomMissionStore ?? roomExternalMissionStore).select({
+        roomId: body.room_id, ownerProfileId: session.profile.profile_id,
+        ownerParticipantId: membership.participantId,
+        bindingId: body.reasoning_binding_id, bindingEpoch: body.binding_epoch,
+        helixConversationId: body.helix_conversation_id,
+        bindingMissionId: body.binding_mission_id, runId: body.run_id,
+        expectedRevision: body.expected_revision, requestId: body.request_id,
+      });
+      setPrivateHeaders(res);
+      res.status(200).json({ ok: true, mission, dispatch_authority: false,
+        answer_authority: false, terminal_eligible: false });
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
+  router.post("/session/agent-connections/room-missions/result-source", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      const body = z.object({
+        room_id: z.string().trim().min(3).max(320),
+        room_mission_id: z.string().trim().min(3).max(320),
+        room_mission_revision: z.number().int().positive(),
+        steering_event_ref: z.string().trim().min(3).max(320),
+      }).strict().parse(req.body);
+      const profileRef = session.profile.profile_id;
+      const authorize = async () => {
+        const linked = await bindingStore.listBindings({ session: {
+          sessionId: session.session_id, profileId: profileRef,
+        } });
+        if (!newestActiveBinding(linked.bindings)) {
+          throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+        }
+        const membership = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({
+          profileId: profileRef, roomId: body.room_id,
+        });
+        if (!membership || membership.role !== "owner" || membership.presence !== "present" ||
+            membership.roomStatus === "closed") {
+          throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+        }
+        const mission = await (dependencies.roomMissionStore ?? roomExternalMissionStore).inspect(body.room_id);
+        if (!mission || mission.status !== "active" || mission.owner_profile_id !== profileRef ||
+            mission.owner_participant_id !== membership.participantId ||
+            mission.mission_id !== body.room_mission_id ||
+            mission.mission_revision !== body.room_mission_revision) {
+          throw new RoomExternalMissionError("room_mission_not_current", 409);
+        }
+        await (dependencies.roomMissionStore ?? roomExternalMissionStore).requireCurrent({
+          roomId: body.room_id, ownerProfileId: profileRef,
+          missionId: body.room_mission_id, missionRevision: body.room_mission_revision,
+          bindingId: mission.reasoning_binding_id, bindingEpoch: mission.binding_epoch,
+          helixConversationId: mission.helix_conversation_id,
+          bindingMissionId: mission.binding_mission_id, runId: mission.run_id,
+        });
+        return membership.participantId;
+      };
+      const participantId = await authorize();
+      const reader = dependencies.roomMissionResultEvidenceReader ??
+        (dependencies.reasoningBindingStore instanceof HelixReasoningTaskBindingStore
+          ? durableBrowserAccess(session, dependencies.reasoningBindingStore) : null);
+      if (!reader) throw new HelixReasoningTaskBindingError("reasoning_binding_unavailable", 503);
+      const result = await reader.readCurrentRoomMissionResultEvidence({
+        ownerProfileId: profileRef, steeringEventRef: body.steering_event_ref,
+      });
+      if (result.envelope.roomId !== body.room_id ||
+          result.envelope.roomMissionId !== body.room_mission_id ||
+          result.envelope.roomMissionRevision !== body.room_mission_revision) {
+        throw new RoomMissionResultError("room_task_result_source_mismatch", 409);
+      }
+      if (await authorize() !== participantId) {
+        throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+      }
+      setPrivateHeaders(res);
+      res.status(200).json({ schema: "helix.room_mission_result_source_receipt.v1",
+        ok: true, participant_id: participantId,
+        receipt: projectRoomMissionResultReceipt(result),
+        ask_reentry_performed: false, room_publication_attempted: false,
+        answer_authority: false, assistant_answer: false, terminal_eligible: false,
+        raw_content_included: false });
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
+  router.post("/session/agent-connections/room-missions/:roomId/revoke", async (req, res) => {
+    try {
+      const session = await resolveBrowserIdentity(req);
+      const body = z.object({ request_id: z.string().trim().min(3).max(120),
+        expected_revision: z.number().int().positive() }).strict().parse(req.body);
+      const store = dependencies.roomMissionStore ?? roomExternalMissionStore;
+      const current = await store.inspect(req.params.roomId);
+      if (!current || current.owner_profile_id !== session.profile.profile_id) {
+        throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+      }
+      const mission = await store.revoke({
+        roomId: req.params.roomId, ownerProfileId: session.profile.profile_id,
+        expectedRevision: body.expected_revision, requestId: body.request_id,
+      });
+      setPrivateHeaders(res);
+      res.status(200).json({ ok: true, mission, dispatch_authority: false,
+        answer_authority: false, terminal_eligible: false });
+    } catch (error) { reasoningFailure(res, error); }
+  });
+
+  router.post("/session/agent-connections/room-missions/dispatch-handoff", async (req, res) => {
+    try {
+      if (!dependencies.reasoningBindingStore) {
+        throw new HelixReasoningTaskBindingError("reasoning_binding_unavailable", 503);
+      }
+      const session = await resolveBrowserIdentity(req);
+      await requireMissionDeveloper(session);
+      const body = z.object({
+        room_id: z.string().trim().min(3).max(320),
+        room_mission_id: z.string().trim().min(3).max(320),
+        room_mission_revision: z.number().int().positive(),
+        handoff_id: z.string().trim().min(3).max(320),
+        transcript_text: z.string().trim().min(1).max(4_000),
+        client_event_ref: z.string().trim().min(3).max(320),
+      }).strict().parse(req.body);
+      const profileRef = session.profile.profile_id;
+      const authorization = await bindingStore.listBindings({ session: {
+        sessionId: session.session_id, profileId: profileRef,
+      } });
+      if (!newestActiveBinding(authorization.bindings)) {
+        throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+      }
+      const membership = await (dependencies.readPreparationMembership ?? readSharedRealtimeRoomMembership)({
+        profileId: profileRef, roomId: body.room_id,
+      });
+      if (!membership || membership.role !== "owner" || membership.presence !== "present" ||
+          membership.roomStatus === "closed") {
+        throw new RoomExternalMissionError("room_mission_owner_unavailable", 403);
+      }
+      const handoff = readRealtimeStagePlayAskHandoff(body.handoff_id);
+      const actor = readRealtimeStagePlayTurnActorContext(body.handoff_id);
+      const text = body.transcript_text.trim();
+      const textHash = `sha256:${crypto.createHash("sha256").update(text).digest("hex")}`;
+      const roomThreadId = `helix-ask:room:${body.room_id}`;
+      const liveSession = actor ? readAdmittedRealtimeSession({
+        realtimeSessionId: actor.realtime_session_id,
+        requesterRef: buildRealtimeRequesterRef(session.session_id),
+      }) : null;
+      if (!handoff || !actor || actor.resolution !== "resolved" || !actor.voice_authority ||
+          !actor.participant_id || actor.room_id !== body.room_id ||
+          actor.requester_profile_id !== profileRef ||
+          handoff.thread_id !== roomThreadId ||
+          handoff.realtime_session_id !== actor.realtime_session_id ||
+          handoff.transcript_text_hash !== textHash ||
+          handoff.transcript_text_char_count !== text.length ||
+          liveSession?.threadId !== roomThreadId ||
+          !(await revalidateRealtimeRoomTurnActorContext(actor).catch(() => false))) {
+        throw new RoomExternalMissionError("room_mission_handoff_not_current", 409);
+      }
+      const mission = await (dependencies.roomMissionStore ?? roomExternalMissionStore).inspect(body.room_id);
+      if (!mission || mission.status !== "active" ||
+          mission.mission_id !== body.room_mission_id ||
+          mission.mission_revision !== body.room_mission_revision ||
+          mission.owner_profile_id !== profileRef ||
+          mission.owner_participant_id !== membership.participantId) {
+        throw new RoomExternalMissionError("room_mission_not_current", 409);
+      }
+      const access = browserReasoningAccess(session);
+      const task = await access.resolveOwnedPreparationTarget({
+        profileRef, bindingId: mission.reasoning_binding_id,
+        bindingEpoch: mission.binding_epoch,
+        helixConversationId: mission.helix_conversation_id,
+        missionId: mission.binding_mission_id, runId: mission.run_id,
+      });
+      const envelope: RoomMissionSteeringEnvelope = {
+        schema: "helix.room_mission_steering.v1",
+        roomId: body.room_id, ownerProfileId: profileRef,
+        roomMissionId: mission.mission_id,
+        roomMissionRevision: mission.mission_revision,
+        handoffId: body.handoff_id,
+        realtimeSessionId: actor.realtime_session_id,
+        runtimeId: actor.voice_authority.runtime_id,
+        speakerParticipantId: actor.participant_id,
+        capturedAtMs: actor.captured_at_ms,
+        consentVersion: actor.voice_authority.consent_version,
+        consentReceiptRef: actor.voice_authority.consent_receipt_ref,
+        transcriptTextHash: textHash,
+        bindingId: mission.reasoning_binding_id,
+        bindingEpoch: mission.binding_epoch,
+        authenticatedMcpClientRef: task.authenticatedMcpClientRef,
+        clientSessionRef: task.clientSessionRef,
+        clientContinuationRef: task.clientContinuationRef,
+        helixConversationId: mission.helix_conversation_id,
+        bindingMissionId: mission.binding_mission_id,
+        runId: mission.run_id,
+      };
+      const event = await access.dispatch({
+        profileRef, bindingId: mission.reasoning_binding_id,
+        bindingEpoch: mission.binding_epoch,
+        clientEventRef: body.client_event_ref,
+        origin: "gpt_live_finalized", instructionText: text,
+        roomMission: envelope,
+      });
+      setPrivateHeaders(res);
+      res.status(202).json({ ok: true, event, room_mission_id: mission.mission_id,
+        room_mission_revision: mission.mission_revision,
+        speaker_participant_id: actor.participant_id,
+        provider_pickup_confirmed: false, answer_authority: false,
+        terminal_eligible: false });
+    } catch (error) { reasoningFailure(res, error); }
   });
 
   router.post("/session/agent-connections/reasoning-bindings/claims", async (req, res) => {

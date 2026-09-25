@@ -1,0 +1,49 @@
+{
+  "schema": "casimirbot.ar1.audit-validation.v1",
+  "scope": "Contract/source audit only; no runtime acceptance",
+  "tests": {
+    "command": "node node_modules/vitest/vitest.mjs run <five files in tests.json> --pool=forks --reporter=json --outputFile=docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-1/tests.json",
+    "report": "tests.json",
+    "exit_code": 1,
+    "total": 121,
+    "passed": 120,
+    "failed": 1,
+    "pending": 0,
+    "isolated_reproduction": {
+      "exit_code": 1,
+      "test": "Realtime transcript worker admission > routes a named document relation follow-up through docs.search",
+      "expected_precedence_reason": "named_doc_relation_source_target",
+      "actual_precedence_reason": "authoritative_docs_topic_source_target",
+      "unchanged_observed": {
+        "target_source": "docs_viewer",
+        "allow_no_tool_direct": false
+      },
+      "later_assertions": "not reached",
+      "disposition": "Unresolved source/test contract drift; separately admitted triage before relying on this case. No runtime or test edits."
+    }
+  },
+  "docs_audit": {
+    "command": "node node_modules/tsx/dist/cli.mjs scripts/audit-environment-harness-work-program.ts",
+    "exit_code": 0,
+    "ok": true,
+    "active_gate": "G8",
+    "capability_status_rows_checked": 40
+  },
+  "source_manifest": {
+    "file": "source-manifest.json",
+    "file_count": 37,
+    "verification": "PASS: all 37 recorded hashes match the working-tree files at final validation"
+  },
+  "links": {
+    "verification": "PASS: 46 local Markdown links checked; no missing targets"
+  },
+  "api_calls": 0,
+  "runtime_edits": 0,
+  "casimir_verification": "Not applicable: documentation/source audit; no adapter-contract, physics, release-verifier or certificate implementation changed.",
+  "budget": {
+    "guide_credit_cap": 250,
+    "guide_checkpoint": 187.5,
+    "exact_task_spend": null,
+    "reason": "No attributable starting balance; shared account balance is not per-task usage."
+  }
+}

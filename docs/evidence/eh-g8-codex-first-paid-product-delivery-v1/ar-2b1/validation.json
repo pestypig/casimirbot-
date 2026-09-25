@@ -1,0 +1,43 @@
+{
+  "schema": "casimirbot.ar2b1.validation.v1",
+  "goal_scope": "Exact browser Ready up goal identity check only; Live dispatch and return remain open",
+  "tests": {
+    "command": "node node_modules/vitest/vitest.mjs run server/services/environment-connectors/session/__tests__/prepare-browser-session.test.ts server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts --pool=forks --reporter=verbose",
+    "exit_code": 0,
+    "total": 63,
+    "passed": 63,
+    "failed": 0,
+    "negative_new_cases": 7
+  },
+  "typecheck": {
+    "status": "unverified",
+    "exit_code": 1,
+    "reason": "Whole-repository tsc exhausted Node's default 4 GB heap before diagnostics. No type verdict is claimed."
+  },
+  "server_build": {
+    "command": "npm run build:server",
+    "exit_code": 0,
+    "status": "PASS",
+    "warnings": "Four duplicate-key/case warnings in unrelated source files."
+  },
+  "docs_audit": {
+    "exit_code": 0,
+    "ok": true,
+    "active_gate": "G8"
+  },
+  "discipline_quick": {
+    "exit_code": 0,
+    "sensitive_helix_ask_files": 0
+  },
+  "git_diff_check": "PASS",
+  "source_manifest": "source-manifest.json",
+  "integrity": {
+    "source_hashes_checked": 3,
+    "source_hash_mismatches": 0,
+    "local_markdown_links_checked": 6,
+    "missing_local_links": 0
+  },
+  "api_calls": 0,
+  "native_effects": 0,
+  "commercial_acceptance": false
+}

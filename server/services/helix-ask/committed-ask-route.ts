@@ -156,6 +156,7 @@ const sourceBackedTargets = new Set([
   "visual_scene_memory",
   "repo_code",
   "runtime_evidence",
+  "room_mission_result",
   "capability_catalog",
   "workspace_directory",
   "workspace_diagnostic",
@@ -175,6 +176,7 @@ const sourceBackedTargets = new Set([
 ]);
 
 export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
+  if (capabilityId === "room.mission_result.read_selected") return "room_mission_result";
   if (/^com\.casimirbot\.minecraft\./i.test(capabilityId)) return "live_environment";
   if (/^com\.casimirbot\.environment\./i.test(capabilityId)) return "live_environment";
   if (/^environment\./i.test(capabilityId)) return "live_environment";
@@ -204,6 +206,7 @@ export const inferCommittedRouteToolFamily = (capabilityId: string): string => {
 };
 
 export const inferCommittedRouteToolFamilyFromSourceTarget = (sourceTarget: string): string => {
+  if (sourceTarget === "room_mission_result") return "room_mission_result";
   if (sourceTarget === "docs_viewer" || sourceTarget === "active_doc") return "docs_viewer";
   if (sourceTarget === "repo_code") return "repo_code";
   if (sourceTarget === "capability_catalog") return "capability_catalog";

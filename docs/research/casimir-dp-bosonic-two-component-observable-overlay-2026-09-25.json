@@ -1,0 +1,254 @@
+{
+  "classification": "conditional_two_component_four_observable_overlay_not_joint_likelihood",
+  "model": {
+    "phi": "ultralight complex field; only a chosen compact fraction is assigned to reference boson stars",
+    "H": "1080 GeV inert-doublet inelastic xenon benchmark with 369 keV splitting",
+    "only_shared_abundance_parameter": "f_phi; f_H=1-f_phi",
+    "no_dynamical_conversion": true
+  },
+  "frozen_LZ_halo_input": {
+    "file": "casimir-dp-idm-folsom-tng50-recoil-spectrum-2026-09-25.json",
+    "sha256": "d99157a7f5d00017bb936a16ebf31afb1c84d9b16c39cee076da4985aa0ae8ef",
+    "isotope_A": 131,
+    "recoil_keV": 248.0,
+    "epoch": "2000-03-09",
+    "percentile_order": [
+      "16th",
+      "median",
+      "84th"
+    ],
+    "rho_eta_over_IDM_SHM": {
+      "scaled_all_98": [
+        0.9370007766481209,
+        7.9549161602701055,
+        38.16312137647127
+      ],
+      "scaled_MW_like_7": [
+        2.162228528131496,
+        7.327796240318982,
+        9.717807151688051
+      ],
+      "unscaled_all_98": [
+        0.0,
+        5.597139787892456e-06,
+        2.9658301055058582
+      ],
+      "unscaled_MW_like_7": [
+        2.4539893796687804,
+        4.560078653855818,
+        21.06094772571047
+      ]
+    }
+  },
+  "fixed_published_IDM_profile_relic_budget": {
+    "published_Omega_H_h2": 0.12014,
+    "adopted_total_Omega_DM_h2": 0.1198,
+    "adopted_total_sigma": 0.0012,
+    "largest_f_phi_if_fixed_H_point_plus_phi_must_stay_below_Planck_plus_1sigma": 0.007178631051753035,
+    "largest_f_phi_if_fixed_H_point_plus_phi_must_stay_below_Planck_plus_2sigma": 0.017195325542571003,
+    "interpretation": "the fixed published thermal relic point leaves room for less than a percent-level phi component at 1 sigma; larger f_phi requires a new underabundant IDM relic calculation or nonstandard cosmology"
+  },
+  "assumptions": [
+    "H follows the cosmic heavy-component fraction in the local halo and Galactic Center",
+    "the Folsom paired rho*eta halo factors and their selected validation subsets are applied unchanged to H",
+    "gamma scaling assumes the same H final-state yield, J-profile shape, and cross section",
+    "the entire phi fraction is assigned to identical 4.02e6 solar-mass reference stars for the count/rate column",
+    "Casimir-DP uses the previously screened conditional H-kernel ceiling, not an independently qualified instrument response"
+  ],
+  "outputs_by_f_phi": [
+    {
+      "f_phi_cosmic_assumed": 0.0,
+      "f_H_cosmic_and_local_if_co_tracing": 1.0,
+      "required_Omega_H_h2": 0.1198,
+      "H_relic_fraction_of_published_IDM_profile": 0.9971699683702347,
+      "Omega_total_h2_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 0.12014,
+      "Planck_sigma_deviation_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 0.2833333333333276,
+      "approx_freezeout_sigma_eff_multiplier_for_required_underabundance_inverse_Omega_scaling_only": 1.002838063439065,
+      "H_annihilation_flux_density_squared_factor_if_GC_co_traces": 1.0,
+      "H_cross_section_multiplier_to_preserve_same_gamma_flux_if_profile_and_yield_fixed": 1.0,
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 7e-19,
+      "all_phi_in_identical_reference_stars_count_in_1e12_Msun_halo": 0.0,
+      "10y_star_encounter_probability_if_all_phi_compact_and_co_tracing": 0.0,
+      "conditional_LZ_rate_ratio_to_IDM_SHM_profile_by_halo_sample": {
+        "scaled_all_98": [
+          0.9370007766481209,
+          7.9549161602701055,
+          38.16312137647127
+        ],
+        "scaled_MW_like_7": [
+          2.162228528131496,
+          7.327796240318982,
+          9.717807151688051
+        ],
+        "unscaled_all_98": [
+          0.0,
+          5.597139787892456e-06,
+          2.9658301055058582
+        ],
+        "unscaled_MW_like_7": [
+          2.4539893796687804,
+          4.560078653855818,
+          21.06094772571047
+        ]
+      }
+    },
+    {
+      "f_phi_cosmic_assumed": 0.01,
+      "f_H_cosmic_and_local_if_co_tracing": 0.99,
+      "required_Omega_H_h2": 0.118602,
+      "H_relic_fraction_of_published_IDM_profile": 0.9871982686865324,
+      "Omega_total_h2_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 0.121338,
+      "Planck_sigma_deviation_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 1.281666666666665,
+      "approx_freezeout_sigma_eff_multiplier_for_required_underabundance_inverse_Omega_scaling_only": 1.0129677408475406,
+      "H_annihilation_flux_density_squared_factor_if_GC_co_traces": 0.9801,
+      "H_cross_section_multiplier_to_preserve_same_gamma_flux_if_profile_and_yield_fixed": 1.0203040506070808,
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 6.93e-19,
+      "all_phi_in_identical_reference_stars_count_in_1e12_Msun_halo": 2487.5621890547263,
+      "10y_star_encounter_probability_if_all_phi_compact_and_co_tracing": 3.9612880000000004e-19,
+      "conditional_LZ_rate_ratio_to_IDM_SHM_profile_by_halo_sample": {
+        "scaled_all_98": [
+          0.9276307688816396,
+          7.875366998667404,
+          37.781490162706554
+        ],
+        "scaled_MW_like_7": [
+          2.1406062428501813,
+          7.254518277915792,
+          9.62062908017117
+        ],
+        "unscaled_all_98": [
+          0.0,
+          5.541168390013531e-06,
+          2.9361718044507996
+        ],
+        "unscaled_MW_like_7": [
+          2.4294494858720928,
+          4.51447786731726,
+          20.850338248453365
+        ]
+      }
+    },
+    {
+      "f_phi_cosmic_assumed": 0.1,
+      "f_H_cosmic_and_local_if_co_tracing": 0.9,
+      "required_Omega_H_h2": 0.10782,
+      "H_relic_fraction_of_published_IDM_profile": 0.8974529715332112,
+      "Omega_total_h2_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 0.13212,
+      "Planck_sigma_deviation_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 10.266666666666653,
+      "approx_freezeout_sigma_eff_multiplier_for_required_underabundance_inverse_Omega_scaling_only": 1.1142645149322945,
+      "H_annihilation_flux_density_squared_factor_if_GC_co_traces": 0.81,
+      "H_cross_section_multiplier_to_preserve_same_gamma_flux_if_profile_and_yield_fixed": 1.2345679012345678,
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 6.3e-19,
+      "all_phi_in_identical_reference_stars_count_in_1e12_Msun_halo": 24875.621890547263,
+      "10y_star_encounter_probability_if_all_phi_compact_and_co_tracing": 3.961288e-18,
+      "conditional_LZ_rate_ratio_to_IDM_SHM_profile_by_halo_sample": {
+        "scaled_all_98": [
+          0.8433006989833088,
+          7.1594245442430955,
+          34.34680923882414
+        ],
+        "scaled_MW_like_7": [
+          1.9460056753183466,
+          6.595016616287084,
+          8.746026436519246
+        ],
+        "unscaled_all_98": [
+          0.0,
+          5.03742580910321e-06,
+          2.6692470949552725
+        ],
+        "unscaled_MW_like_7": [
+          2.208590441701902,
+          4.104070788470237,
+          18.954852953139422
+        ]
+      }
+    },
+    {
+      "f_phi_cosmic_assumed": 0.25,
+      "f_H_cosmic_and_local_if_co_tracing": 0.75,
+      "required_Omega_H_h2": 0.08985,
+      "H_relic_fraction_of_published_IDM_profile": 0.7478774762776761,
+      "Omega_total_h2_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 0.15009,
+      "Planck_sigma_deviation_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 25.241666666666667,
+      "approx_freezeout_sigma_eff_multiplier_for_required_underabundance_inverse_Omega_scaling_only": 1.3371174179187535,
+      "H_annihilation_flux_density_squared_factor_if_GC_co_traces": 0.5625,
+      "H_cross_section_multiplier_to_preserve_same_gamma_flux_if_profile_and_yield_fixed": 1.7777777777777777,
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 5.25e-19,
+      "all_phi_in_identical_reference_stars_count_in_1e12_Msun_halo": 62189.05472636816,
+      "10y_star_encounter_probability_if_all_phi_compact_and_co_tracing": 9.903220000000001e-18,
+      "conditional_LZ_rate_ratio_to_IDM_SHM_profile_by_halo_sample": {
+        "scaled_all_98": [
+          0.7027505824860907,
+          5.966187120202579,
+          28.62234103235345
+        ],
+        "scaled_MW_like_7": [
+          1.621671396098622,
+          5.495847180239236,
+          7.288355363766039
+        ],
+        "unscaled_all_98": [
+          0.0,
+          4.197854840919341e-06,
+          2.2243725791293936
+        ],
+        "unscaled_MW_like_7": [
+          1.8404920347515854,
+          3.4200589903918637,
+          15.795710794282853
+        ]
+      }
+    },
+    {
+      "f_phi_cosmic_assumed": 0.5,
+      "f_H_cosmic_and_local_if_co_tracing": 0.5,
+      "required_Omega_H_h2": 0.0599,
+      "H_relic_fraction_of_published_IDM_profile": 0.4985849841851174,
+      "Omega_total_h2_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 0.18004,
+      "Planck_sigma_deviation_if_published_IDM_profile_is_left_unchanged_and_phi_is_added": 50.2,
+      "approx_freezeout_sigma_eff_multiplier_for_required_underabundance_inverse_Omega_scaling_only": 2.00567612687813,
+      "H_annihilation_flux_density_squared_factor_if_GC_co_traces": 0.25,
+      "H_cross_section_multiplier_to_preserve_same_gamma_flux_if_profile_and_yield_fixed": 4.0,
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 3.5e-19,
+      "all_phi_in_identical_reference_stars_count_in_1e12_Msun_halo": 124378.10945273632,
+      "10y_star_encounter_probability_if_all_phi_compact_and_co_tracing": 1.9806440000000002e-17,
+      "conditional_LZ_rate_ratio_to_IDM_SHM_profile_by_halo_sample": {
+        "scaled_all_98": [
+          0.46850038832406043,
+          3.9774580801350528,
+          19.081560688235633
+        ],
+        "scaled_MW_like_7": [
+          1.081114264065748,
+          3.663898120159491,
+          4.8589035758440255
+        ],
+        "unscaled_all_98": [
+          0.0,
+          2.798569893946228e-06,
+          1.4829150527529291
+        ],
+        "unscaled_MW_like_7": [
+          1.2269946898343902,
+          2.280039326927909,
+          10.530473862855235
+        ]
+      }
+    }
+  ],
+  "reading_guide": {
+    "LZ": "multiply each halo percentile by f_H; the resulting factor is relative to the published IDM SHM profile at the same isotope and recoil bin",
+    "gamma": "density-squared factor only; not a fit to the 43 GeV line, 0.5-0.8 TeV continuum interpretation, or Galactic Center excess",
+    "Casimir_DP": "the ceiling remains far below a measurable exponent in the screened channel",
+    "boson_stars": "the close-passage probability is negligible and the reference mass function is assumed, not predicted"
+  },
+  "limits": [
+    "TNG50 percentiles are simulation-ensemble diagnostics, not a Milky Way posterior; the seven-halo subset is only a Milky-Way-like validation subset.",
+    "The LZ output is a differential rate factor at one isotope and energy, not an absolute event rate or likelihood; detector response, isotope weak-response weights, backgrounds, and annual modulation are absent.",
+    "A thermal IDM relic at the published profile point nearly saturates the adopted total dark-matter density; the required reduced abundance needs a consistent freeze-out calculation and cannot be assumed from this overlay.",
+    "The inverse-Omega freeze-out multiplier is only a first-order target; compressed IDM coannihilation makes the actual abundance response parameter-dependent, and the present-day annihilation rate need not scale with it.",
+    "The ultralight star population, compact fraction, mass function, and local phase-space distribution are not derived.",
+    "No interaction connects the phi and H sectors here beyond a common cosmological abundance budget and gravity; this does not establish a shared microscopic explanation."
+  ]
+}

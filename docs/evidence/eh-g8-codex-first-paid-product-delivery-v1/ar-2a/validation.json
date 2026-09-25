@@ -1,0 +1,44 @@
+{
+  "schema": "casimirbot.ar2a.validation.v1",
+  "scope": "offline evidence preparation; no integrated acceptance",
+  "component_probe": {
+    "command": "node node_modules/tsx/dist/cli.mjs docs/evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2a/component-probe.ts",
+    "exit_code": 0,
+    "checks": 11,
+    "passed": 11,
+    "report": "component-results.json"
+  },
+  "existing_tests": {
+    "report": "tests.json",
+    "exit_code": 1,
+    "total": 134,
+    "passed": 133,
+    "failed": 1,
+    "unresolved": "Named-document follow-up precedence reason; original assertion preserved."
+  },
+  "discipline_quick": {
+    "exit_code": 0,
+    "sensitive_files": 0,
+    "scope": "Changed-file classifier only; no routing test battery claimed."
+  },
+  "docs_audit": {
+    "status": "PASS",
+    "exit_code": 0,
+    "active_gate": "G8"
+  },
+  "links_and_hashes": {
+    "status": "PASS: referenced sources and local Markdown targets verified"
+  },
+  "runtime_mutations": 0,
+  "api_calls": 0,
+  "native_effects": 0,
+  "budget": {
+    "near_start_shared_balance": 918.22485,
+    "AR2_guide_credit_cap": 700,
+    "review_checkpoint": 525,
+    "API_budget": 0,
+    "task_attributable_spend": null
+  },
+  "independent_review": "not performed for AR-2A; no independent acceptance claimed",
+  "casimir_verification": "Not applicable to offline evidence probe; no production adapter, physics, certificate or release-verifier change."
+}

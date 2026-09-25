@@ -172,6 +172,16 @@ to make the matrix appear complete.
 
 ## G1.6 — package/profile boundary
 
+The owner's 2026-09-21 clarification extends the specified connection affordance
+to Helix Ask/Helix Chat: the same three-dot **Configure connection** flow as
+Environment Home, with owner-scoped credentials and visible provider/payer.
+Qualified personal use with a user's own supported provider requires no
+CasimirBot subscription; provider charges and hosted-room eligibility remain
+separate. This is a target clarification, not evidence of a customer credential
+surface or admission of managed inference in the first offer. Follow the
+[shared connection menu contract](eh-g8-casimirbot-platform-market-launch-execution-v1.md#shared-connection-menu-helix-ask-and-environment-home)
+and its acceptance conditions when the implementation slice is admitted.
+
 Freeze the [launch guide's Environment Home contract](eh-g8-casimirbot-platform-market-launch-execution-v1.md#environment-home-package-source-and-execution-profiles):
 permanent first Home panel; Store as a default entry; tile overflow opens
 configuration, not a raw secret in renderer state. A listing identifies
@@ -234,7 +244,7 @@ including this packet and the canonical admission amendment. G0's checkpoint
 alone predates them. One implementer; independent read-only review of the
 result before any claim that these fixtures pass. Public code remains untouched.
 
-## G1 disposition before independent review
+## G1 disposition after independent review
 
 | Item | State | Meaning |
 | --- | --- | --- |
@@ -244,8 +254,11 @@ result before any claim that these fixtures pass. Public code remains untouched.
 | G1.4 | BLOCKED | Consolidated engineering matrix prepared; full D12 per-operation/customer acceptance not closed |
 | G1.5 | PASS | Owner explicitly retained paid no-model baseline |
 | G1.6 | PASS | Home/package/profile/C10 boundaries fixed without claiming implementation |
-| G1.7 | MISSING | Requires canonical amendment and independent review |
-| G1.8 | MISSING | Independent final artifact review pending |
+| G1.7 | PASS | Canonical work program admits only G1-T1 under the exact file/scope restrictions above |
+| G1.8 | PASS | Independent source/scope review retained; stale offer wording corrected; documentation audit passes |
+
+Review and validation are retained in the
+[G1 review record](../evidence/eh-g8-codex-first-paid-product-delivery-v1/g1/2026-09-21-release-freeze/review.md).
 
 G1 is not CFP-1 closure. Any accepted bounded lane advances only its own
 engineering evidence; D03/D07/D11/D12 commercial and signed-install conditions

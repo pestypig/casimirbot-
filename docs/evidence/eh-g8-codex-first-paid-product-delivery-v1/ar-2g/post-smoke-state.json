@@ -1,0 +1,54 @@
+{
+  "observed_at": "2026-09-25T04:56:21.0697560Z",
+  "remaining_casimirbot_processes": [],
+  "preserved_packages": [
+    {
+      "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/app.asar",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release-ar2e-20260925/win-unpacked/CasimirBot.exe",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release-ar2e-20260925/win-unpacked/resources/app.asar",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/resources/app.asar",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release/win-unpacked/resources/runtime/runtime-manifest.json",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release-ar2e-20260925/win-unpacked/resources/runtime/runtime-manifest.json",
+      "unchanged": true
+    },
+    {
+      "path": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/resources/runtime/runtime-manifest.json",
+      "unchanged": true
+    }
+  ],
+  "browser_initialization": "unavailable",
+  "browser_error": "failed to write kernel assets: The system cannot find the path specified. (os error 3)",
+  "browser_routes_attempted": [
+    "cua.getState",
+    "node_repl @oai/sky initialization"
+  ],
+  "authenticated_walkthrough_run": false,
+  "paid_provider_calls_started": false,
+  "production_deployment": false,
+  "friends_coordination_broker": "NOT_CONFIGURED",
+  "artifact": "release-ar2g-20260925/win-unpacked",
+  "unsigned": true
+}

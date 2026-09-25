@@ -1,0 +1,5 @@
+
+> @casimirbot/desktop@0.1.0-alpha.11 stage:runtime
+> node scripts/stage-runtime.mjs
+
+[desktop-stage] staged 7 allowlisted runtime roots; dependency closure=staged_verified service=c060c85947e2

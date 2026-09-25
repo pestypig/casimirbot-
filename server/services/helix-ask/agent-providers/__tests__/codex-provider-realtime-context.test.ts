@@ -169,7 +169,7 @@ describe("Codex provider Realtime conversation context", () => {
     ]);
   });
 
-  it("reattaches only the private speaker bound to a validated room transcript", () => {
+  it("does not restore voice authority from a stored transcript without a current room session", async () => {
     const currentText = "Check my current Minecraft status.";
     const current = bridgeTranscript({
       transcriptText: currentText,
@@ -199,7 +199,7 @@ describe("Codex provider Realtime conversation context", () => {
       account_session: null,
       account_policy: buildHelixAccountCapabilityPolicy("developer"),
     };
-    const bound = bindTrustedRealtimeTurnActorContext({
+    const bound = await bindTrustedRealtimeTurnActorContext({
       accountContext: baseAccountContext,
       realtimeConversationContext: realtimeContext,
       gatewayConversationThreadId:
@@ -207,20 +207,25 @@ describe("Codex provider Realtime conversation context", () => {
       nowMs: 401,
     });
     expect(bound.trusted_turn_actor_context).toMatchObject({
-      participant_id: "participant:room-guest",
-      resolution: "resolved",
-      resolution_source: "active_speaker_floor",
+      participant_id: null,
+      resolution: "unavailable",
+      resolution_source: "speaker_unavailable",
     });
+    await expect(codexProvider.runTurn({
+      runtime: "codex", route: "/ask/turn",
+      workstationAccountContext: baseAccountContext,
+      body: { turn_id: "ask:rejected-room-handoff", question: currentText, route_metadata: current.route_metadata },
+    })).rejects.toMatchObject({ code: "realtime_room_handoff_authority_unavailable", status: 409 });
 
     const mismatched = materializeRealtimeConversationContext({
       body: { route_metadata: current.route_metadata },
       question: "Check another participant instead.",
     });
-    expect(bindTrustedRealtimeTurnActorContext({
+    expect((await bindTrustedRealtimeTurnActorContext({
       accountContext: baseAccountContext,
       realtimeConversationContext: mismatched,
       gatewayConversationThreadId: "helix-ask:room:shared_realtime_room:test",
       nowMs: 402,
-    }).trusted_turn_actor_context).toBeUndefined();
+    })).trusted_turn_actor_context).toBeUndefined();
   });
 });

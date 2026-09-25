@@ -1,0 +1,69 @@
+{
+  "schema": "casimirbot.ar2h.oauth_transport_baseline.v1",
+  "observed_at": "2026-09-25T13:14:56Z",
+  "installed_room": {
+    "ok": true,
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "status": "waiting_for_participant",
+    "participants": [
+      {
+        "role": "owner",
+        "presence": "present",
+        "consent": {
+          "schema": "helix.shared_realtime_room.consent.v1",
+          "microphone_to_room": false,
+          "microphone_to_model": false,
+          "transcript_to_room": false,
+          "screen_to_model": false,
+          "screen_thumbnail_to_room": false,
+          "model_audio_output": false,
+          "consent_version": 0,
+          "consent_receipt_ref": null,
+          "updated_at": null
+        }
+      }
+    ],
+    "runtime_state": "idle",
+    "public_result_count": 0
+  },
+  "source_findings": {
+    "existing_oauth_route": "server/routes/helix-shared-live-rooms.ts (/api/v1/rooms)",
+    "existing_browser_join": "server/routes/agi.realtime-room/room-lifecycle-routes.ts (/api/agi/realtime/rooms/join)",
+    "oauth_invitation_join_implemented": false,
+    "shared_authority_transport_implemented": false
+  },
+  "initial_failures": [
+    {
+      "boundary": "test identity configuration",
+      "observed": "401 tenant_required instead of 403 account_not_linked",
+      "resolution": "Pin synthetic test's tenant_id claim and restore inherited configuration afterward."
+    },
+    {
+      "boundary": "release catalog evaluator",
+      "observed": "helix_room_command_request invalid_output_schema",
+      "resolution": "Require current content_role, reentry_required and three non-answer authority literals in the catalog evaluator."
+    }
+  ],
+  "verification": {
+    "command": "npx vitest run server/__tests__/helix-shared-live-room-live-acceptance.test.ts server/routes/__tests__/helix-shared-live-room-oauth-e2e.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed": 13,
+    "failed": 0,
+    "production_authentication_changed": false,
+    "casimir": {
+      "attempted": true,
+      "endpoint": "http://127.0.0.1:51996/api/agi/adapter/run",
+      "status": 401,
+      "error": "desktop_session_required",
+      "verdict": null,
+      "certificate_hash": null,
+      "integrity_status": "not_verified",
+      "trace_exported": false
+    }
+  },
+  "limits": [
+    "Tests use synthetic signed tokens and an in-memory account database; no real guest identity or hosted deployment is qualified.",
+    "The installed package remains unchanged and the live room still has only its owner.",
+    "No voice, provider inference, environment action, deployment or access-grant change occurred.",
+    "The release-evaluation patch is not fully verified until the required Casimir adapter gate can run."
+  ]
+}

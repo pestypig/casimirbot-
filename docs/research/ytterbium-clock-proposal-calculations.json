@@ -1,0 +1,88 @@
+{
+  "schema": "ytterbium_clock_proposal_calculation/v1",
+  "status": "analytic_design_only",
+  "constants": {
+    "ytterbium171ClockFrequencyHz": 518295836590863.6,
+    "standardGravityM_S2": 9.80665,
+    "lightSpeedM_S": 299792458
+  },
+  "model": "stationary_weak_field_constant_gravity",
+  "rows": [
+    {
+      "heightDifferenceM": 0.01,
+      "potentialDifferenceM2S2": 0.0980665,
+      "fractionalRateDifference": 1.0911369672198218e-18,
+      "frequencyDifferenceHz": 0.0005655317472604153,
+      "phaseRateRadS": 0.0035533407651302407,
+      "phaseAfterOneSecondRad": 0.0035533407651302407,
+      "secondsForHalfRadian": 140.71265129047467
+    },
+    {
+      "heightDifferenceM": 1,
+      "potentialDifferenceM2S2": 9.80665,
+      "fractionalRateDifference": 1.0911369672198217e-16,
+      "frequencyDifferenceHz": 0.05655317472604152,
+      "phaseRateRadS": 0.355334076513024,
+      "phaseAfterOneSecondRad": 0.355334076513024,
+      "secondsForHalfRadian": 1.407126512904747
+    },
+    {
+      "heightDifferenceM": 10,
+      "potentialDifferenceM2S2": 98.06649999999999,
+      "fractionalRateDifference": 1.0911369672198216e-15,
+      "frequencyDifferenceHz": 0.5655317472604152,
+      "phaseRateRadS": 3.55334076513024,
+      "phaseAfterOneSecondRad": 3.55334076513024,
+      "secondsForHalfRadian": 0.1407126512904747
+    },
+    {
+      "heightDifferenceM": 50,
+      "potentialDifferenceM2S2": 490.3325,
+      "fractionalRateDifference": 5.455684836099108e-15,
+      "frequencyDifferenceHz": 2.827658736302076,
+      "phaseRateRadS": 17.766703825651202,
+      "phaseAfterOneSecondRad": 17.766703825651202,
+      "secondsForHalfRadian": 0.028142530258094937
+    },
+    {
+      "heightDifferenceM": 100,
+      "potentialDifferenceM2S2": 980.665,
+      "fractionalRateDifference": 1.0911369672198217e-14,
+      "frequencyDifferenceHz": 5.655317472604152,
+      "phaseRateRadS": 35.533407651302404,
+      "phaseAfterOneSecondRad": 35.533407651302404,
+      "secondsForHalfRadian": 0.014071265129047468
+    },
+    {
+      "heightDifferenceM": 450,
+      "potentialDifferenceM2S2": 4412.992499999999,
+      "fractionalRateDifference": 4.910116352489197e-14,
+      "frequencyDifferenceHz": 25.448928626718683,
+      "phaseRateRadS": 159.9003344308608,
+      "phaseAfterOneSecondRad": 159.9003344308608,
+      "secondsForHalfRadian": 0.003126947806454993
+    }
+  ],
+  "oneCentimeterTenSecondPhaseRad": 0.035533407651302404,
+  "oneCentimeterOnePercentFrequencyBiasHz": 0.000005655317472604153,
+  "hundredMeterTenToMinusFourFrequencyBiasHz": 0.0005655317472604153,
+  "hundredMeterTenToMinusFourPhaseBiasRad": 0.0035533407651302407,
+  "idealHalfRadianMatchingProbabilities": {
+    "plus": 0.2602872306978985,
+    "minus": 0.7397127693021015
+  },
+  "nullResponse": {
+    "kappa0": 1,
+    "etaES": 0
+  },
+  "idealSuccessfulPairsAt100M_1S_C08": {
+    "uncertainty1e3": 1238,
+    "uncertainty1e4": 123751,
+    "uncertainty1e5": 12375032
+  },
+  "sources": [
+    "https://www.bipm.org/documents/20126/288516347/171Yb_518THz_2025/73007ecc-49f5-4d1d-d8ee-6793a4748598",
+    "https://chatgpt.com/share/6ab672dc-e820-83ea-a2a5-26643690422a"
+  ],
+  "claimBoundary": "These are calculated design values, not measured performance or a test of new physics."
+}

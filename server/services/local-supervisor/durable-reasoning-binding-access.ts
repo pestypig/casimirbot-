@@ -7,14 +7,35 @@ import { acceptPairingLedgerRow, type PairingDestination } from "./pairing-ledge
 import { DurableSteeringService } from "./durable-steering-service";
 import { createNativeDurableSteeringRepository, type DurableSteeringRepository } from "./durable-steering-repository";
 import { projectDurableSteering, deliverDurableSteering } from "./durable-steering-projection";
-import type { HelixReasoningTaskBindingProjection } from "@shared/helix-reasoning-task-binding";
+import type { HelixReasoningTaskBindingProjection, HelixReasoningSteeringDelivery } from "@shared/helix-reasoning-task-binding";
 import { PairingTransitionService } from "./pairing-transition-service";
 import { HelixReasoningTaskBindingError, type HelixReasoningTaskBindingStore } from "./reasoning-task-binding-store";
 import type { ReasoningPreparationTargetStore } from "./reasoning-binding-ports";
 import { dispatchAgentChatSteering, exactChatSteeringDispatchSchema, agentChatSteeringDispatchSchema } from "./exact-chat-steering-dispatch";
+import { requireCurrentRoomMissionSteering } from "./room-mission-steering";
+import { RoomExternalMissionError } from "./room-external-mission-store";
+import type { HelixReasoningTaskAssociation } from "./reasoning-task-binding-store";
+import { createNativeRoomMissionResultRepository, createRoomMissionResult,
+  projectRoomMissionResultReceipt, RoomMissionResultError,
+  roomMissionResultRequestSchema, type RoomMissionResultRepository,
+  type RoomMissionResultRequest, type RoomMissionResultRecord } from "./room-mission-result";
+import type { RoomMissionSteeringEnvelope } from "./room-mission-steering";
 
 type Args<K extends keyof HelixReasoningTaskBindingStore> =
   HelixReasoningTaskBindingStore[K] extends (...args: infer A) => unknown ? A[0] : never;
+
+function isSuppressedRoomMission(error: unknown): error is RoomExternalMissionError {
+  return error instanceof RoomExternalMissionError &&
+    ["room_mission_not_current", "room_mission_speaker_authority_revoked"].includes(error.code);
+}
+
+/** Preserve cursor progress while withholding every byte of a revoked room
+ * instruction. Only this task-scoped read may produce this marker. */
+function suppressRoomMissionDelivery(delivery: HelixReasoningSteeringDelivery): HelixReasoningSteeringDelivery {
+  return { event: { ...delivery.event, delivery_state: "revoked" },
+    instruction_text: "", content_role: "room_mission_suppressed_not_instruction",
+    raw_provider_content_included: false, hidden_reasoning_included: false };
+}
 
 /** Server-internal access layer. Public handlers still authenticate the browser
  * owner or exact MCP task and enforce origin, room, scopes and device trust.
@@ -36,7 +57,8 @@ export class DurableReasoningBindingAccess implements ReasoningPreparationTarget
     private readonly authorizeDestination: (destination: PairingDestination) => Promise<void>,
     private readonly repository: () => Promise<PairingLedgerRepository> = createNativePairingLedgerRepository,
     private readonly now: () => Date = () => new Date(),
-    private readonly steeringRepository: () => Promise<DurableSteeringRepository> = createNativeDurableSteeringRepository) {}
+    private readonly steeringRepository: () => Promise<DurableSteeringRepository> = createNativeDurableSteeringRepository,
+    private readonly resultRepository: () => Promise<RoomMissionResultRepository> = createNativeRoomMissionResultRepository) {}
 
   private ledgerRepository(): Promise<PairingLedgerRepository> {
     if (!this.initializedRepository) {
@@ -51,12 +73,16 @@ export class DurableReasoningBindingAccess implements ReasoningPreparationTarget
   }
 
   private async steering<T>(input: Args<"validateSteeringTarget">,
-    operation: (service: DurableSteeringService, binding: () => HelixReasoningTaskBindingProjection) => Promise<T>) {
+    operation: (service: DurableSteeringService, binding: () => HelixReasoningTaskBindingProjection) => Promise<T>,
+    verifyTask?: () => void) {
     const context = this.store.resolveDurableBindingContext(input);
     if (!context) throw new Error("steering_durable_context_required");
     let binding!: HelixReasoningTaskBindingProjection;
     const admit = async () => {
-      binding = await this.use(input, () => this.store.validateSteeringTarget(input));
+      binding = await this.use(input, () => {
+        verifyTask?.();
+        return this.store.validateSteeringTarget(input);
+      });
       const grant = await this.readGrant(input.profileRef, context.pairingId);
       acceptPairingLedgerRow(grant, context.destination, this.now());
       return grant;
@@ -154,10 +180,25 @@ export class DurableReasoningBindingAccess implements ReasoningPreparationTarget
     return { binding, event };
   }
   async dispatch(input: Args<"dispatch">) {
+    if (input.roomMission) {
+      if (input.origin !== "gpt_live_finalized") throw new Error("room_mission_origin_invalid");
+      const envelope = input.roomMission;
+      const association: HelixReasoningTaskAssociation = {
+        profileRef: input.profileRef,
+        authenticatedMcpClientRef: envelope.authenticatedMcpClientRef,
+        clientSessionRef: envelope.clientSessionRef,
+        clientContinuationRef: envelope.clientContinuationRef,
+        bindingId: input.bindingId, bindingEpoch: input.bindingEpoch,
+        helixConversationId: envelope.helixConversationId,
+        missionId: envelope.bindingMissionId, runId: envelope.runId,
+      };
+      await this.verifyTaskAssociation(association);
+      await requireCurrentRoomMissionSteering({ envelope, association });
+    }
     if (!this.store.resolveDurableBindingContext(input)) return this.use(input, () => this.store.dispatch(input));
     return this.steering(input, async (service, binding) => projectDurableSteering(await service.submit({
       clientEventRef: input.clientEventRef, origin: input.origin, instructionText: input.instructionText,
-      expiresInSeconds: input.expiresInSeconds }), binding(), this.now()));
+      expiresInSeconds: input.expiresInSeconds, roomMission: input.roomMission }), binding(), this.now()));
   }
   dispatchAgentPrompt(actor: Parameters<typeof dispatchAgentChatSteering>[0], request: Parameters<typeof dispatchAgentChatSteering>[1]) {
     return this.dispatchAgentValidated(actor, request);
@@ -178,6 +219,48 @@ export class DurableReasoningBindingAccess implements ReasoningPreparationTarget
     if (!this.store.resolveDurableBindingContext(input)) return this.use(input, () => this.store.read(input));
     return this.steering(input, async (service, binding) => (await service.list(input.afterCursor)).map(row => deliverDurableSteering(row, binding(), this.now())));
   }
+  async readForTask(input: Args<"readForTask">) {
+    if (!this.store.resolveDurableBindingContext(input)) {
+      const deliveries = await this.use(input, () => this.store.readForTask(input));
+      const admitted = [];
+      for (const delivery of deliveries) {
+        const envelope = this.store.readRoomMissionEnvelope({ ...input,
+          eventRef: delivery.event.steering_event_ref });
+        if (envelope) {
+          try {
+            await requireCurrentRoomMissionSteering({ envelope, association: input });
+          } catch (error) {
+            if (!isSuppressedRoomMission(error)) throw error;
+            admitted.push(suppressRoomMissionDelivery(delivery));
+            continue;
+          }
+        }
+        admitted.push(delivery);
+      }
+      await this.verifyTaskAssociation(input);
+      return admitted;
+    }
+    return this.steering(input, async (service, binding) => {
+      const rows = await service.list(input.afterCursor);
+      const admitted = [];
+      for (const row of rows) {
+        if (row.request.roomMission) {
+          try {
+            await requireCurrentRoomMissionSteering({
+              envelope: row.request.roomMission, association: input });
+          } catch (error) {
+            if (!isSuppressedRoomMission(error)) throw error;
+            admitted.push(suppressRoomMissionDelivery(deliverDurableSteering(row, binding(), this.now())));
+            continue;
+          }
+        }
+        admitted.push(deliverDurableSteering(row, binding(), this.now()));
+      }
+      await this.verifyTaskAssociation(input);
+      return admitted;
+    },
+    () => { this.store.verifyTaskAssociation(input); });
+  }
   async readForChatDisplay(input: Args<"readForChatDisplay">) {
     if (!this.store.resolveDurableBindingContext(input)) return this.use(input, () => this.store.readForChatDisplay(input));
     await this.use(input, () => this.store.readForChatDisplay(input));
@@ -187,8 +270,102 @@ export class DurableReasoningBindingAccess implements ReasoningPreparationTarget
     if (!this.store.resolveDurableBindingContext(input)) return this.use(input, () => this.store.acknowledge(input));
     return this.steering(input, async (service, binding) => projectDurableSteering(await service.acknowledge(input.eventRef), binding(), this.now()));
   }
+  async acknowledgeForTask(input: Args<"acknowledgeForTask">) {
+    if (!this.store.resolveDurableBindingContext(input)) {
+      const envelope = this.store.readRoomMissionEnvelope(input);
+      if (envelope) await requireCurrentRoomMissionSteering({ envelope, association: input });
+      await this.verifyTaskAssociation(input);
+      return this.use(input, () => this.store.acknowledgeForTask(input));
+    }
+    return this.steering(input, async (service, binding) => {
+      const row = await service.inspect(input.eventRef);
+      if (row.request.roomMission) await requireCurrentRoomMissionSteering({
+        envelope: row.request.roomMission, association: input });
+      await this.verifyTaskAssociation(input);
+      return projectDurableSteering(await service.acknowledge(input.eventRef), binding(), this.now());
+    },
+    () => { this.store.verifyTaskAssociation(input); });
+  }
   async inspectEvent(input: Args<"inspectEvent">) {
     if (!this.store.resolveDurableBindingContext(input)) return this.use(input, () => this.store.inspectEvent(input));
     return this.steering(input, async (service, binding) => projectDurableSteering(await service.inspect(input.eventRef), binding(), this.now()));
+  }
+
+  /** An authenticated MCP task may return an observation for one acknowledged
+   * room instruction. This cannot publish a room answer or supply terminal authority. */
+  async submitRoomMissionResult(input: HelixReasoningTaskAssociation & {
+    request: RoomMissionResultRequest;
+  }) {
+    const request = roomMissionResultRequestSchema.parse(input.request);
+    await this.verifyTaskAssociation(input);
+    let envelope: RoomMissionSteeringEnvelope | null = null;
+    let acknowledged = false;
+    if (!this.store.resolveDurableBindingContext(input)) {
+      const event = await this.use(input, () => this.store.inspectEvent({ ...input,
+        eventRef: request.steeringEventRef }));
+      envelope = this.store.readRoomMissionEnvelope({ ...input,
+        eventRef: request.steeringEventRef });
+      acknowledged = event.delivery_state === "acknowledged";
+    } else {
+      const row = await this.steering(input, async service =>
+        service.inspect(request.steeringEventRef),
+      () => { this.store.verifyTaskAssociation(input); });
+      envelope = row.request.roomMission ?? null;
+      acknowledged = Boolean(row.acknowledgedAt);
+    }
+    if (!envelope) throw new RoomMissionResultError("room_task_result_event_not_room_linked", 409);
+    if (!acknowledged) throw new RoomMissionResultError("room_task_result_pickup_unconfirmed", 409);
+    await requireCurrentRoomMissionSteering({ envelope, association: input });
+    await this.verifyTaskAssociation(input);
+    const repository = await this.resultRepository();
+    const committed = await repository.submit(createRoomMissionResult({
+      ownerProfileId: input.profileRef, envelope, request, now: this.now(),
+    }));
+    await requireCurrentRoomMissionSteering({ envelope, association: input });
+    await this.verifyTaskAssociation(input);
+    return projectRoomMissionResultReceipt(committed);
+  }
+
+  /** Server-only source admission. A stored task observation is never itself
+   * a room answer; callers must apply member and route-product authority. */
+  async readCurrentRoomMissionResultEvidence(input: {
+    ownerProfileId: string; steeringEventRef: string;
+  }): Promise<RoomMissionResultRecord> {
+    const repository = await this.resultRepository();
+    const result = await repository.read(input.ownerProfileId, input.steeringEventRef);
+    if (!result) throw new RoomMissionResultError("room_task_result_not_found", 404);
+    const envelope = result.envelope;
+    const task: HelixReasoningTaskAssociation = {
+      profileRef: envelope.ownerProfileId,
+      authenticatedMcpClientRef: envelope.authenticatedMcpClientRef,
+      clientSessionRef: envelope.clientSessionRef,
+      clientContinuationRef: envelope.clientContinuationRef,
+      bindingId: envelope.bindingId, bindingEpoch: envelope.bindingEpoch,
+      helixConversationId: envelope.helixConversationId,
+      missionId: envelope.bindingMissionId, runId: envelope.runId,
+    };
+    await this.verifyTaskAssociation(task);
+    let currentEnvelope: RoomMissionSteeringEnvelope | null;
+    let acknowledged: boolean;
+    if (!this.store.resolveDurableBindingContext(task)) {
+      const event = await this.use(task, () => this.store.inspectEvent({ ...task,
+        eventRef: input.steeringEventRef }));
+      currentEnvelope = this.store.readRoomMissionEnvelope({ ...task,
+        eventRef: input.steeringEventRef });
+      acknowledged = event.delivery_state === "acknowledged";
+    } else {
+      const row = await this.steering(task, async service =>
+        service.inspect(input.steeringEventRef),
+      () => { this.store.verifyTaskAssociation(task); });
+      currentEnvelope = row.request.roomMission ?? null;
+      acknowledged = Boolean(row.acknowledgedAt);
+    }
+    if (!acknowledged || !currentEnvelope ||
+        JSON.stringify(currentEnvelope) !== JSON.stringify(envelope)) {
+      throw new RoomMissionResultError("room_task_result_source_mismatch", 409);
+    }
+    await requireCurrentRoomMissionSteering({ envelope, association: task });
+    await this.verifyTaskAssociation(task);
+    return result;
   }
 }

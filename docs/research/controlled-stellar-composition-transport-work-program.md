@@ -2,9 +2,9 @@
 
 Status: canonical program-control document.
 
-Active program gate: **G1 — real calibrated solar baseline (image installed; science preparation and run-capacity checks pending)**
+Active program gate: **G1 — real calibrated solar baseline (image installed; source and execution preparation open)**
 
-Status date: **September 19, 2026**
+Status date: **September 24, 2026**
 
 This document is the sole current dependency and status roadmap for the solar
 restoration deep-mixing research branch. Dated audits, solver receipts, UI
@@ -36,6 +36,38 @@ cross-checked, with `BLOCK_SOURCE_BINDING` for unresolved resolution/systematics
 The [G1 structural comparison method decision](./controlled-stellar-composition-transport-g1-structural-comparison-method-v1.md)
 records the fixed-reference-kernel and source-matched re-inversion routes; it
 does not admit either route or close the source blocker.
+The [September 24 author-data intake](./controlled-stellar-composition-transport-g1-basu-author-intake-2026-09-24.md)
+recovers a strongly matching sound-speed solution and 76 numerical averaging
+kernels. Density, cross terms, exact BP04 mapping and systematic-error policy
+remain unbound; the structural comparison operator is still null.
+The [author follow-up plan](./controlled-stellar-composition-transport-g1-basu-followup-plan-2026-09-24.md)
+records her September 24 reply: density results and kernels may be available,
+inversion coefficients may be available, and the cross-term file is probably
+not. A Monday reminder is scheduled; source admission awaits actual files and
+numerical validation.
+The [sound-speed primary-term operator packet](./controlled-stellar-composition-transport-g1-sound-speed-operator-v1.md)
+records a tested convolution over the author kernels and non-running trial
+rendering/resource-stop components. It does not define the full structural
+operator or enable a science run.
+The [BP04 reference and no-run check packet](./controlled-stellar-composition-transport-g1-bp04-reference-and-no-run-checks-2026-09-24.md)
+confirms the historical BP04 radius convention but finds that the public
+model export lacks sound speed, Gamma1 and the outer kernel support. Exact
+reference binding therefore remains open; the runtime stop decision now
+fails closed on relaxed limits. A read-only MESA history parser is tested
+against restart-superseded rows; it is not yet an admitted calibration
+extractor or execution adapter.
+The outermost published sound-speed kernel has roughly 94% absolute weight
+beyond the public BP04 table's radius endpoint, so truncating that export
+cannot close the source gap.
+The pinned MESA default history omits an explicit surface Z/X output;
+history-only three-target calibration therefore needs custom columns, but
+the default final profile contains total H and metals in surface zone 1.
+No-run extractors now validate that profile and join it to the default
+history's L/R only when model number and age agree. This yields a candidate
+three-target path without custom columns; native format, installed constants,
+termination and surface convention remain unverified. The Docker engine was
+not reachable in a September 24 evening read-only
+check, so native validation remains pending.
 The [G1 no-run launcher preflight](./controlled-stellar-composition-transport-g1-launcher-preflight-v1.md)
 adds tested fail-closed host/input checks and a pure calibration objective;
 the execution adapter is not implemented and launch remains disabled.
@@ -44,9 +76,11 @@ namelist parse with selected zero-transport invariants. A read-only inventory
 hashes 3,552 installed MESA files and 885 SDK files; all 13 selected upstream
 source hashes match the installed image. MESA's native reader and the exact
 loaded microphysics subset await an execution attempt. The Docker socket
-startup issue was recoverably repaired on September 19. Free space was about
-14.4 GB at the last check, below the frozen 25 GB science-start threshold.
-G1 and its launch prerequisites remain open.
+startup issue was recoverably repaired on September 19. The September 24
+intake measured about 40.7 GB free on C:, above the frozen 25 GB science-start
+threshold, while available physical memory was about 2.05 GB, below the 4 GiB
+start threshold at that moment. Fresh checks are still required before any
+run. G1 and its launch prerequisites remain open.
 The bounded infrastructure response is specified in
 [`controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md`](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md):
 a Google Drive archival connector is the primary recovery path, and a narrow
@@ -217,7 +251,7 @@ promotes the lifetime-extension program or changes its active gate.
 | Gate | State | Required closure evidence | Downstream gate unlocked |
 | --- | --- | --- | --- |
 | G0 — Reduced-order ledger repair and preregistration | **closed: `PASS_REDUCED_ORDER_PREREGISTERED`** | Typed ledgers separate hydrogen-burning reference, gross circulation, net hydrogen delivery, and cumulative accessible fuel; numerical audit and adversarial controller tests pass; future-gate semantic contract is versioned; claim boundary remains diagnostic | G1 |
-| G1 — Real calibrated solar baseline | **active; image installed, science preparation and run-capacity checks pending** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
+| G1 — Real calibrated solar baseline | **active; sound-speed kernels received, full source binding and execution preparation pending** | Actual MESA or equivalent run from a frozen inlist; solver/version/runtime identities; complete hashes and logs; solar-age fit against frozen luminosity, radius, effective temperature, surface Z/X, surface helium, convection-zone depth, sound-speed/density residuals, and neutrino vector; no fixture fallback | G2 |
 | G2 — Conservative transport implementation | blocked by G1 | Species-conservative diffusion/advection implementation; boundary conditions; mass/species/energy closure tests; radiative-interior bridge; resolution and timestep convergence; zero-transport recovery of the G1 baseline | G3 |
 | G3 — Frozen transport-family campaign | blocked by G2 | Preregistered families, parameter bounds, sampling/optimization procedure, compute budget, seeds where applicable, first-failure rules, and retained artifacts for null as well as surviving candidates | G4 |
 | G4 — Evolutionary milestone closure | blocked by G3 | Each candidate evolved through central hydrogen exhaustion, TAMS, core contraction, shell ignition, early subgiant evolution, and a frozen radius threshold; physical `Delta t_TAMS` and `Delta t_R>R_star` outputs replace the hazard proxy | G5 |
@@ -283,15 +317,20 @@ Downstream gate unlocked:
 
 ## Immediate execution sequence
 
-1. Execute the frozen, no-delete archival and verification stages in the
-   [G1 runtime-capacity recovery packet](./controlled-stellar-composition-transport-g1-runtime-capacity-recovery.md),
-   then obtain separate owner confirmation for the exact local-release manifest.
-2. Measure at least the frozen 25 GB on the Docker data drive, or preregister a
-   different content-addressed runtime with adequate capacity.
-3. Verify the pinned image digest and create a new versioned G1 attempt.
-4. Freeze the solar calibration objective, tolerances, covariance policy,
-   microphysics, convergence policy, and exact inlists before viewing results.
-5. Execute the zero-transport baseline with no fixture fallback and retain all
-   declared inputs, outputs, logs, and hashes.
+1. Bind the author-provided sound-speed kernels to the published Table 3
+   convention, and obtain or defensibly resolve the missing density, cross-term,
+   BP04-reference and systematic-error inputs. Version the comparison operator
+   and acceptance policy before using a candidate stellar model.
+2. Finish and test the bounded execution adapter and calibration driver. Verify
+   the pinned image, native input parsing and data dependencies without fixture
+   fallback.
+3. Immediately before any run, recheck at least 25 GB free on the Docker data
+   drive and 4 GiB host-available RAM. The September 24 disk check passed;
+   available RAM did not.
+4. Create a new versioned G1 attempt and freeze the solar calibration objective,
+   tolerances, covariance policy, microphysics, convergence policy and exact
+   inlists before viewing results.
+5. Execute the zero-transport baseline and retain all declared inputs, outputs,
+   logs and hashes.
 6. Produce a new G1 result record that either admits one calibrated baseline or
    preserves its first hard failure.

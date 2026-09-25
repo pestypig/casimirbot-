@@ -1,0 +1,29 @@
+{
+  "classification": "gravity_only_point_nucleus_rate_upper_bound",
+  "inputs": {
+    "DM_mass_GeV": 1080.0,
+    "target": "pure_Xe131_point_nucleus",
+    "recoil_threshold_keV": 248.0,
+    "local_density_GeV_cm3": 0.4,
+    "speed_support_max_km_s": 798.0,
+    "exposure_tonne_year": 2.84,
+    "efficiency": 1.0,
+    "nuclear_mass_form_factor": 1.0
+  },
+  "outputs": {
+    "Xe131_mass_GeV": 122.02572741702,
+    "reduced_mass_GeV": 109.6380739650012,
+    "minimum_speed_km_s": 336.3534220478544,
+    "rate_maximizing_stream_speed_km_s": 582.5812162865416,
+    "maximum_recoil_keV_at_stream_speed": 744.0000000000002,
+    "integrated_cross_section_above_threshold_cm2": 1.1156562285885932e-86,
+    "predicted_events_in_exposure": 9.918020965428376e-47
+  },
+  "assumptions_and_limits": [
+    "Newtonian point-mass gravitational Rutherford scattering; halo speeds are nonrelativistic.",
+    "All local DM is placed in the single speed stream maximizing the rate kernel under the 798 km/s cutoff; this is more favorable than a realistic halo distribution.",
+    "Every target nucleus is treated as Xe-131 and pointlike, with unit efficiency; finite nuclear mass form factor and detector cuts can only reduce the high-q rate.",
+    "This is ordinary gravity-mediated nuclear recoil, not a coherent force-array search for ultraheavy passing objects.",
+    "The calculation does not model the ultralight boson-star component, gamma rays, or Casimir-DP apparatus response."
+  ]
+}

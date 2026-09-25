@@ -1,0 +1,174 @@
+{
+  "evidence_class": "shape-only reproduction of a published coherent-SI inelastic sideband screen",
+  "source": "https://arxiv.org/abs/2609.26698v1",
+  "inputs": {
+    "isotopes_A": [
+      128,
+      129,
+      130,
+      131,
+      132,
+      134,
+      136
+    ],
+    "natural_atom_fractions_rounded_and_renormalized": [
+      0.019135208784162857,
+      0.2644966738799391,
+      0.0407850444818466,
+      0.21271138895567843,
+      0.26958603831049127,
+      0.10455237637252543,
+      0.08873326921535624
+    ],
+    "halo_model": "truncated Standard Halo Model",
+    "v0_km_s": 238.0,
+    "earth_speed_km_s": 232.0,
+    "galactic_escape_speed_km_s": 544.0,
+    "helm_R_fm": "1.2 A^(1/3)",
+    "helm_skin_fm": 0.9,
+    "windows_keV": {
+      "low": [
+        14.0,
+        225.0
+      ],
+      "signal": [
+        225.0,
+        271.0
+      ],
+      "high": [
+        271.0,
+        800.0
+      ]
+    },
+    "masses_GeV": [
+      500.0,
+      700.0,
+      1000.0,
+      1500.0,
+      2000.0,
+      3000.0
+    ]
+  },
+  "outputs": {
+    "balanced_points": [
+      {
+        "mass_GeV": 500.0,
+        "delta_balanced_keV": 332.55286087282,
+        "low_sideband_over_signal": 0.5082699366844091,
+        "high_sideband_over_signal": 0.5082699367693675,
+        "sum_sideband_over_signal": 1.0165398734537767,
+        "zero_sideband_probability_conditional_on_Nsig_1": 0.3618448053969269,
+        "one_sided_gaussian_equivalent_sigma_conditional": 0.3535320430549914
+      },
+      {
+        "mass_GeV": 700.0,
+        "delta_balanced_keV": 336.0937045868486,
+        "low_sideband_over_signal": 1.2348443259243407,
+        "high_sideband_over_signal": 1.2348443261091175,
+        "sum_sideband_over_signal": 2.469688652033458,
+        "zero_sideband_probability_conditional_on_Nsig_1": 0.08461119842556536,
+        "one_sided_gaussian_equivalent_sigma_conditional": 1.374706688338288
+      },
+      {
+        "mass_GeV": 1000.0,
+        "delta_balanced_keV": 339.1969495136291,
+        "low_sideband_over_signal": 1.79640236964661,
+        "high_sideband_over_signal": 1.7964023693474735,
+        "sum_sideband_over_signal": 3.592804738994084,
+        "zero_sideband_probability_conditional_on_Nsig_1": 0.027521032760296528,
+        "one_sided_gaussian_equivalent_sigma_conditional": 1.9185440239469687
+      },
+      {
+        "mass_GeV": 1500.0,
+        "delta_balanced_keV": 341.97312426380813,
+        "low_sideband_over_signal": 2.20464382633506,
+        "high_sideband_over_signal": 2.2046438265929034,
+        "sum_sideband_over_signal": 4.409287652927963,
+        "zero_sideband_probability_conditional_on_Nsig_1": 0.012163840120342585,
+        "one_sided_gaussian_equivalent_sigma_conditional": 2.251914427164647
+      },
+      {
+        "mass_GeV": 2000.0,
+        "delta_balanced_keV": 343.43372035957873,
+        "low_sideband_over_signal": 2.3824805279085934,
+        "high_sideband_over_signal": 2.382480528101289,
+        "sum_sideband_over_signal": 4.7649610560098825,
+        "zero_sideband_probability_conditional_on_Nsig_1": 0.008523220164139303,
+        "one_sided_gaussian_equivalent_sigma_conditional": 2.3857045354243542
+      },
+      {
+        "mass_GeV": 3000.0,
+        "delta_balanced_keV": 344.9130363743752,
+        "low_sideband_over_signal": 2.5454617679421903,
+        "high_sideband_over_signal": 2.5454617679751106,
+        "sum_sideband_over_signal": 5.090923535917301,
+        "zero_sideband_probability_conditional_on_Nsig_1": 0.006152335359960204,
+        "one_sided_gaussian_equivalent_sigma_conditional": 2.5032841599292626
+      }
+    ],
+    "one_TeV_table1_reproduction": [
+      {
+        "delta_keV": 280.0,
+        "low_sideband_over_signal": 11.9598076727415,
+        "high_sideband_over_signal": 1.0484184061265776
+      },
+      {
+        "delta_keV": 295.0,
+        "low_sideband_over_signal": 9.590443842718653,
+        "high_sideband_over_signal": 1.1104181906005854
+      },
+      {
+        "delta_keV": 310.0,
+        "low_sideband_over_signal": 6.892599828887746,
+        "high_sideband_over_signal": 1.2010188486764481
+      },
+      {
+        "delta_keV": 325.0,
+        "low_sideband_over_signal": 4.097491814738842,
+        "high_sideband_over_signal": 1.3659628919947877
+      },
+      {
+        "delta_keV": 339.0,
+        "low_sideband_over_signal": 1.8233544040933374,
+        "high_sideband_over_signal": 1.7852846605569652
+      },
+      {
+        "delta_keV": 355.0,
+        "low_sideband_over_signal": 0.4069354485044546,
+        "high_sideband_over_signal": 6.17971639296689
+      }
+    ],
+    "natural_xenon_Helm_F2_at_248_keV": 0.00025549303547791556,
+    "integration_grid_convergence_max_relative_at_1_TeV": 2.2788201006477066e-07,
+    "published_LZ_response_context_not_used_in_shape_integrals": {
+      "WIMP_ROI_S1c_phd": [
+        3.0,
+        600.0
+      ],
+      "WIMP_ROI_min_S2_phd": 645.0,
+      "WIMP_ROI_S2c_phd": [
+        562.341325190349,
+        14125.375446227554
+      ],
+      "reported_average_NR_efficiency_energy_keV": [
+        14.0,
+        250.0
+      ],
+      "candidate_event_recoil_keV": 248.0,
+      "candidate_event_S1c_phd": 540.1,
+      "naive_linear_S1_upper_cut_proxy_keV": 275.50453619700056,
+      "high_energy_S1_background_validation_sideband_phd": [
+        800.0,
+        1700.0
+      ],
+      "caveat": "The candidate is 1.5 sigma below the NR-band median; event S1 divided by event recoil energy is not a calibrated mean-response model. The S1-space background sideband is not the true-recoil 271-800 keV sideband."
+    }
+  },
+  "interpretation_limits": [
+    "Each ratio divides by the signal-window integral; the published N_sig=1 normalization is used only to express shape ratios and is not a dark-matter event fit.",
+    "This is not the LZ detector likelihood or a reconstruction of the event acceptance, energy resolution, backgrounds, or released profile likelihood. LZ reports average NR efficiency only for 14-250 keV; the 271-800 keV sideband was not folded through that response here.",
+    "The result is conditional on coherent, momentum-independent SI nuclear scattering, natural xenon, the specified Helm form factor, and the truncated SHM.",
+    "The quoted 0.6-3.5 sigma halo/form-factor envelope is from the source preprint and was not independently scanned here.",
+    "A mediator with nontrivial q dependence, noncoherent operators, isotope-specific interactions, or a nonstandard velocity distribution requires a new calculation."
+  ]
+}

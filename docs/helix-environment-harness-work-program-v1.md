@@ -201,7 +201,7 @@ current primary row is CFP-1 closure while CFP-2/3 remain blocked.
 
 ### G1-T1 bounded contract-fixture lane — 2026-09-21
 
-Within active CFP-1, this program admits only the local reference-canvas
+Within active CFP-1, this program admits the local reference-canvas
 schema/fixture lane **G1-T1** defined by the exact file allowlist, CF-01–08
 fixtures and stop criteria in the
 [G1 release matrix and engineering admission](work-packets/eh-g8-g1-release-matrix-and-engineering-admission-v1.md).
@@ -212,6 +212,202 @@ call is admitted. This named exception permits executable contract preparation
 without depending on unresolved Minecraft commercial rights or signing access;
 it does not admit CFP-2/3 implementation or customer acceptance. Earlier broad
 child-implementation holds remain in force outside this exact lane.
+
+### AR-2B1 exact external-task preparation lane — 2026-09-21
+
+Within active CFP-1, a separate developer-only AR evaluation lane admits the
+first exact external-task mission-association slice in
+[AR-2B1](work-packets/eh-g8-ar2b1-external-mission-association-v1.md).
+Its file allowlist is limited to the browser Ready up identity check, its
+focused tests and linked documentation/evidence. It depends only on existing
+authenticated task, run, room and durable-goal records; it makes no provider
+call, native effect, customer-policy change or paid-offer claim. This parallel
+identity check does not depend on open D03/D07/D11/D12 commercial inputs and
+does not expand CFP-2/3 implementation authority. The Live transcript and
+result-return join, room capacity and full AR-2 acceptance remain unadmitted.
+G8 and CFP-1 status and capability maturity remain unchanged by this lane.
+
+### AR-2B2 Live room ingress lane — 2026-09-21
+
+The owner's continuation request admits the developer-only source-admission
+lane in [AR-2B2](work-packets/eh-g8-ar2b2-live-room-mission-ingress-v1.md).
+Its first allowlist covers current runtime/speaker/consent verification in
+the real Realtime ingress and backend consumer, with focused tests. These
+checks depend on existing room authority, not open commercial prerequisites;
+they introduce no funded call, native effect or customer-policy change.
+The external-task mission dispatch, durable pickup and terminal return still
+require the packet's next concrete contract/allowlist. This admission does
+not expand CFP-2/3 or promote full AR-2 acceptance.
+
+On 2026-09-24, the same developer-only lane admits the second packet's
+exact-task **pickup and acknowledgement** boundary. The
+[AR-2B2 caller freeze](work-packets/eh-g8-ar2b2-live-room-mission-ingress-v1.md#external-task-caller-and-contract-freeze--2026-09-24)
+limits this sublane to the real MCP read/ack callers, reasoning binding store,
+durable pairing access and focused tests. Each operation must verify the
+authenticated client and exact continuation, conversation, mission, run and
+binding epoch before text disclosure or receipt mutation. This is transport
+qualification only. Live handoff dispatch, mission revision and authenticated
+decision return still need their own schema/route freeze and evidence; no
+funded provider call, native action, offer change or CFP-2/3 admission follows.
+
+The same lane also admits the owner-selected room mission association in
+[AR-2B2](work-packets/eh-g8-ar2b2-live-room-mission-ingress-v1.md#owner-selected-room-mission-association-contract)
+as preparation for a later Live handoff. Only the named migration, store,
+authenticated browser selector/revoker, exact task-target resolver and focused
+tests are in scope. Its server-authored revision fences later work; selecting
+a principal alone is not evidence of Live dispatch, provider completion,
+guest consent or an authorized room result. All other holds remain.
+
+The 2026-09-24 [AR-2B2 dispatch and correlated-result contract](work-packets/eh-g8-ar2b2-live-room-mission-ingress-v1.md#next-live-dispatch-contract-freeze)
+admits only developer implementation and deterministic qualification of the
+explicit owner handoff action, private mission-linked steering envelope,
+mission/consent-aware MCP pickup, and exact task-authenticated result
+observation. Migration 093 may persist the bounded result encrypted, and a
+server-only evidence read may revalidate the exact event, current task,
+mission and speaker before supplying it to a future solver adapter. An
+authenticated owner HTTP intake may confirm current room membership and
+mission identity and return only a nonterminal source receipt. No
+external task text, queue acknowledgement or result receipt may publish a
+room answer or confer terminal authority. Task pickup advances past a revoked
+room event using a text-free cursor marker, while ack and result remain
+denied. A room-visible terminal route, installed/domain proof and live
+multi-member acceptance remain open. This sublane changes no paid no-model
+offer, CFP-1 status, CFP-2/3 admission or capability maturity and authorizes
+no funded provider call.
+
+The [AR-2B2 private association qualification](evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/private-association-qualification.md)
+deterministically verifies the owner HTTP dispatch → exact MCP task pickup,
+acknowledgement and encrypted result → owner HTTP source-intake path. Its
+receipt has no terminal authority. The owner-authorized Ask re-entry and room
+publication slice is qualified under AR-2C below; general member UI access,
+installed/domain proof and controlled live multi-member acceptance remain open
+under AR-2. These component results do not promote overall G8/CFP-1 or AR-2 maturity.
+
+### AR-2C room result answer lane — 2026-09-24
+
+The owner's continuation admits [AR-2C](work-packets/eh-g8-ar2c-room-result-answer-v1.md)
+for developer-only source admission, exact private-result observation re-entry,
+and existing Ask solver/terminal qualification before room publication. Its
+packet freezes the HTTP caller, implementation surfaces and denial evidence.
+Current and target maturity are `deterministically verified` for this bounded
+developer API slice. The [qualification record](evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2c/room-result-answer-qualification.md)
+records 82 passing final source/HTTP/MCP/provider/projection fixtures, including
+the exact task report in the captured fake-provider input. Source use and final
+publication recheck authority; receipts alone cannot publish an answer.
+This independent AR lane does not depend on commercial closure and authorizes
+no funded provider calls, environment effects or new mission principal. G8,
+CFP-1 and full AR-2 remain open; installed/domain and live evidence are separate.
+The owner UI follows under AR-2D below. This result does not qualify guest
+raw-source access or live reasoning.
+
+### AR-2D developer owner result-sharing UI — 2026-09-24
+
+[AR-2D](work-packets/eh-g8-ar2d-room-result-owner-ui-v1.md) is
+`deterministically verified` for private receipt discovery and the explicit
+developer-owner result-sharing UI. Its [qualification record](evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2d/owner-ui-qualification.md)
+records 101 passing focused fixtures, including discovery through the actual
+HTTP/MCP result path, exact Ask submission, unchanged retries, disclosure,
+failure handling and attributed public projection. Discovery cannot call a
+model, and the browser cannot turn a receipt or HTTP answer into room authority.
+
+Installed/domain room acceptance remains open. At the AR-2D check the package reported a
+September 21 source and the reachable domain reports a September 1 source;
+neither is today's patched tree. Browser automation was unavailable, no EXE was
+running, and no deployment or paid call was made. AR-2E below supplies a fresh
+developer package and startup qualification. Mission selection and
+dispatch still need their own browser journey before claiming full onboarding;
+controlled multi-member evaluation retains its separate prerequisites. G8,
+CFP-1 and full AR-2 remain open.
+
+### AR-2E developer package startup — 2026-09-25
+
+[AR-2E](work-packets/eh-g8-ar2e-developer-package-smoke-v1.md) is
+`deterministically verified` for the isolated developer package's identity,
+service boundary and disposable-profile startup. The [qualification](evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2e/developer-package-qualification.md)
+binds the fresh `release-ar2e-20260925/win-unpacked` EXE/ASAR/service/renderer
+hashes to unchanged qualified AR-2D implementation. Runtime-tree, service access
+controls, full API readiness, four local listeners and profile/protocol
+isolation checks passed. Existing main and NAV rollback packages are preserved.
+
+This unsigned developer package is not a signed release or authenticated room
+acceptance. Browser control remains unavailable; no paid call, real task/room
+walkthrough or deployment was made. AR-2F below adds the developer-owner mission
+selection/dispatch UI. Next live prerequisite: functioning browser control and
+the user's approved keyed account/room/task connection. Domain parity, signing,
+three-member capacity and G8/CFP-1/full AR-2 remain open.
+
+### AR-2F developer owner mission workflow — 2026-09-25
+
+[AR-2F](work-packets/eh-g8-ar2f-room-mission-owner-workflow-v1.md) is
+`deterministically verified`. Its [evidence record](evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2f/owner-mission-workflow-qualification.md)
+tracks private current-task/handoff discovery, explicit owner task selection and
+revocation, and review/send of one attributed utterance through the existing
+mission dispatch boundary. The personal voice shortcut now waits for server
+attribution and cannot consume shared-room speech. Queued instructions remain
+distinct from task pickup, returned observations and supported room answers.
+All 124 focused cases and 101 full-discipline cases pass, along with client/server
+builds and the docs audit. No live reasoning probability is inferred.
+
+The current slice offers the latest current paired task and volatile captured
+speech; other task selection uses existing pairing and reconnect requires new
+speech. It adds no automatic dispatcher, provider loop or program permission.
+AR-2E's existing package predates this source; AR-2G below packages it. Domain
+parity, controlled multi-member live evaluation, G8, CFP-1 and full AR-2 remain open.
+
+### AR-2G owner workflow developer package — 2026-09-25
+
+[AR-2G](work-packets/eh-g8-ar2g-owner-workflow-package-v1.md) is
+`deterministically verified` for package identity, isolated service access and
+disposable-profile startup. The [qualification](evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2g/developer-package-qualification.md)
+identifies `release-ar2g-20260925/win-unpacked`, containing unchanged qualified
+AR-2F source. Actual ASAR/service/renderer checks, runtime-tree verification and
+startup passed. Main, AR-2E and NAV package identities stayed unchanged.
+
+This is an unsigned developer package. Both supported browser-control entry
+points failed during kernel initialization; no signed-in owner/guest walkthrough
+or paid provider call occurred. Friends coordination was not configured in the
+disposable smoke. Next: restore supported browser access, establish approved
+keyed account/room/task readiness, and follow the recorded installed acceptance
+sequence. Domain parity, signing, three-member evaluation and full AR-2/G8/CFP-1
+remain open. The existing three-development-package retention limit is now full.
+
+### AR-2H installed owner/guest acceptance — pending
+
+[AR-2H](work-packets/eh-g8-ar2h-installed-room-acceptance-v1.md) carries the
+deterministically verified AR-2G implementation toward `live accepted` installed
+behavior; complete live acceptance is pending. Both browser-control entry points failed
+during initialization at the initial checkpoint, which detected no local
+CasimirBot/Node listener. Source inspection adds a topology prerequisite: the
+Friends & Parties domain broker proxies only its own API, not assisted Shared
+Live Rooms or room missions. Prove the actual owner/guest room and selected-task
+authority path before provider calls. Same-service, two-EXE and domain evidence
+remain distinct. Full AR-2, G8 and CFP-1 stay open.
+
+On owner-requested resume, browser/native control recovered, the hash-verified
+AR-2G EXE opened its saved local owner session, and authenticated MCP presence
+for this task succeeded. The owner completed device-registration MFA and then
+Full Harness trust; the installed panel confirms both. Finite registration for
+this exact task subsequently succeeded. On the owner's later return the UI
+showed an unconfirmed submitted pairing request; the old registration replay
+returned `pairing_registration_expired`. After same-task registration renewal
+and owner recovery/approval, the one-hour chat-only invitation was accepted at
+`2026-09-25T12:31:10.764Z`; the installed UI confirms the active binding.
+Refreshing the existing connector corrected stale steering schemas, and an
+empty queue read succeeds with fresh task presence. The room recognizes the
+paired candidate; owner-authorized room selection is confirmed at revision 1.
+A source-only presentation repair synchronizes the adjacent results panel;
+the running AR-2G package is unchanged. Shared-authority transport is the next
+implementation prerequisite before guest and voice acceptance.
+The OAuth baseline now passes 13 targeted synthetic tests after fixture and
+catalog-evaluator corrections. That release-evaluation patch remains pending
+Casimir verification (`401 desktop_session_required` at the installed adapter).
+OAuth invitation joining and native/shared-service task transport are still
+unimplemented; no real guest or capability maturity advancement is claimed.
+Pairing expires at `2026-09-25T13:30:35.074Z`. Guest admission, supported shared
+authority transport and live room acceptance remain pending. The observed
+domain sign-in returns `auth0_not_configured`. The earlier control failures are
+historical; the AR-2H packet records current prerequisites without promoting
+the full workflow to `live accepted`.
 
 The owner explicitly retained paid no-model hosted collaboration for the first
 launch on 2026-09-21; free personal MCP remains free and assisted-room AR-1–3

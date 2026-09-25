@@ -18,6 +18,8 @@ export const HELIX_SHARED_LIVE_ROOM_LIST_CAPABILITY = "room.list" as const;
 export const HELIX_SHARED_LIVE_ROOM_INSPECT_CAPABILITY =
   "room.inspect" as const;
 export const HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY = "room.create" as const;
+export const HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY = "room.join" as const;
+export const HELIX_SHARED_LIVE_ROOM_JOIN_RECEIPT_SCHEMA = "helix.shared_live_room.join_receipt.v1" as const;
 export const HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY =
   "room.presence.set" as const;
 export const HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY =
@@ -99,6 +101,11 @@ export const helixSharedLiveRoomCreateRequestSchema = z
     title: z.string().trim().min(1).max(120).optional(),
   })
   .strict();
+
+export const helixSharedLiveRoomJoinRequestSchema = z.object({
+  room_id: helixSharedLiveRoomIdSchema,
+  invite_code: z.string().regex(/^helix_live_[A-Za-z0-9_-]{32}$/u),
+}).strict();
 
 export const helixSharedLiveRoomPresenceSetRequestSchema = z
   .object({
@@ -342,6 +349,12 @@ export type HelixSharedLiveRoomCreateReceipt = NonAuthoritativeReceipt & {
   room: HelixSharedRealtimeRoom;
 };
 
+export type HelixSharedLiveRoomJoinReceipt = NonAuthoritativeReceipt & {
+  schema: typeof HELIX_SHARED_LIVE_ROOM_JOIN_RECEIPT_SCHEMA;
+  operation: typeof HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY;
+  room: HelixSharedRealtimeRoom;
+};
+
 export type HelixSharedLiveRoomPresenceSetReceipt = NonAuthoritativeReceipt & {
   schema: typeof HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_RECEIPT_SCHEMA;
   operation: typeof HELIX_SHARED_LIVE_ROOM_PRESENCE_SET_CAPABILITY;
@@ -469,6 +482,7 @@ export type HelixSharedLiveRoomAgentReceipt =
   | HelixSharedLiveRoomListReceipt
   | HelixSharedLiveRoomInspectReceipt
   | HelixSharedLiveRoomCreateReceipt
+  | HelixSharedLiveRoomJoinReceipt
   | HelixSharedLiveRoomPresenceSetReceipt
   | HelixSharedLiveRoomConsentRevokeReceipt
   | HelixSharedLiveRoomFloorInspectReceipt
@@ -481,6 +495,10 @@ export type HelixSharedLiveRoomAgentReceipt =
   | HelixSharedLiveRoomChatBindingUnbindReceipt;
 
 export const helixSharedLiveRoomControlErrorCodeSchema = z.enum([
+  "room_invite_expired",
+  "room_invite_redeemed",
+  "room_full",
+  "room_personal_session_blocked",
   "invalid_request",
   "unauthorized",
   "insufficient_scope",

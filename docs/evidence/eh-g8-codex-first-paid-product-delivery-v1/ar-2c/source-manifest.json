@@ -1,0 +1,84 @@
+{
+  "schema": "casimirbot.ar2c.source_snapshot.v1",
+  "captured_at": "2026-09-25T03:40:57.5170291Z",
+  "base_commit": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "scope": "Local working tree with pre-existing changes; not a clean release or deployment",
+  "files": [
+    {
+      "path": "server/index.ts",
+      "sha256": "acf0215e7e87b4e2a44162e7d56ec51724ffa6d9871b124c4c21de44dd88ce7c"
+    },
+    {
+      "path": "server/routes/agent-connections.ts",
+      "sha256": "f981441d649f9bdb4511d69b6d3cc5000cc6c927998776172925879d550a8b0d"
+    },
+    {
+      "path": "server/routes/agi.plan.ts",
+      "sha256": "0aa9a57cd5795d9c269a9d8a89500e0cfb1f0bad41fc03cd9bc3201b36e58f31"
+    },
+    {
+      "path": "server/services/local-supervisor/browser-reasoning-access.ts",
+      "sha256": "ac34d310eb5e0eff572486773c9846fcc55cc6322c4bc4fba5825e3e55058805"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/mission-result-ask.ts",
+      "sha256": "4f016f7a991de36ebf64e45c3b1d0fa3e437a13ef765b043019f0ebd98a92428"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/public-terminal-results.ts",
+      "sha256": "9f15ab278768fd441119faee2cad1dcac36e4d084e4bd9a2c2bd32abf0a0f00f"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/mission-result-ask.test.ts",
+      "sha256": "51f30b44d0ef163345afb9e62e57b2d86765579a2256e1e9e32c17b343d4fde0"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/voice-handoff-authority.test.ts",
+      "sha256": "8469a0c8fdd448f7f260f118fd4557fcce33e08c09b8f677d163acc9f8cab618"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/public-terminal-results.test.ts",
+      "sha256": "294456a451aef313b5ad964dc9b8f4a6408a2fb8fdc474f137183275c4b0900e"
+    },
+    {
+      "path": "server/services/helix-ask/agent-providers/codex-provider.ts",
+      "sha256": "5df3c7ca2b903d38c505b32cabac0cbf65da79b933a90c93a8c9cf5d27bc5bfa"
+    },
+    {
+      "path": "server/services/helix-ask/agent-providers/__tests__/codex-provider-bound-room-evidence.test.ts",
+      "sha256": "264e5869fa26a06ff0be2b8341b1d21d67482476cd49dfaace355732af9fcb4b"
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/room-mission-result.ts",
+      "sha256": "845cebd9b0671c866ff8582a439e6c02466290eab64821c3020579d64b63532b"
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/account-policy.ts",
+      "sha256": "33fce9e1bf5bb42bc3348b56097079375ee41a9a52ee7861cc5e1be53e47e1c7"
+    },
+    {
+      "path": "server/services/helix-ask/workstation-tool-gateway/registry.ts",
+      "sha256": "df89568360536c3187fa1e509c083222665641946ed6ef0375dfb345de5f589a"
+    },
+    {
+      "path": "server/services/helix-ask/ask-turn-solver.ts",
+      "sha256": "29ef063bb50326e04158d2d3ae79536b2510248d87713b71f76a079803161c9d"
+    },
+    {
+      "path": "server/services/helix-ask/committed-ask-route.ts",
+      "sha256": "55cb48f30fcecbd4484b825fea02b8f95d28f8e6c9eb2d54c297ce0fe5f51ac8"
+    },
+    {
+      "path": "server/services/helix-ask/route-product-contract.ts",
+      "sha256": "9edfb429a8d82622770a399de67f06a24dc85d7cea800ceff096721422fc635e"
+    },
+    {
+      "path": "shared/helix-ask-source-target-intent.ts",
+      "sha256": "7f652ca114d46ed8bd9ec8b913c68f48c817fd637a799cb4b90dcd29df96c663"
+    },
+    {
+      "path": "shared/helix-route-product-contract.ts",
+      "sha256": "c859a8811f13452440eaf3ed9e921f8769553726cc9e7538492e675e8f8d5ee7"
+    }
+  ]
+}

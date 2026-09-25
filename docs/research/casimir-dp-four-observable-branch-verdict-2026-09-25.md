@@ -1,0 +1,36 @@
+# Four-observable bosonic branch verdict
+
+Date: September 25, 2026. This packet cross-checks the current candidate branches against boson-star structure/population, astrophysical photons, xenon recoils, and the registered Casimir-DP interferometer benchmark. It reads the existing source-screen JSONs; it is a synthesis, not a new field solve or a joint likelihood.
+
+## Branch comparison
+
+| Candidate | Star structure and population | Astrophysical photons | Xenon recoil | Casimir-DP response | Gate result |
+| --- | --- | --- | --- | --- | --- |
+| Ultralight single field, `m=1e-17 eV` | Free complex-scalar maximum is `8.46e6 Msun`, about `2.10` times the reference Sgr A* mass. This is a scale match only; the image-model solution and local star population are not reproduced. | Its constituent rest energy cannot power the tens-of-GeV line/continuum interpretations through ordinary pair annihilation. | Maximum standard elastic Xe-129 recoil at the adopted `798 km/s` cap is `1.18e-53 keV`; keV NR is inaccessible. Coherent-field response is a different, uncomputed channel. | No matter coupling or detector phase/noise response follows from the star mass match. The 10-year encounter estimate for a 10% compact fraction is `3.96e-18` at the stated local-density/speed benchmark. | Fails ordinary LZ recoils and the specified high-energy photons. Retain only as a gravitational structure benchmark. |
+| Heavy single field, IDM-like `m=1080 GeV`, `delta=369 keV` | The optimistic repulsive-quartic complex-scalar proxy with `lambda_2=4.06` reaches only `1.75e-7 Msun`, about `2.29e13` below the Sgr A* reference. IDM's real neutral state also lacks the assumed exact complex-scalar charge. | The benchmark does not provide a profile/channel fit to the supplied 43 GeV line or 0.5–0.8 TeV `b bbar` continuum interpretation. | The inelastic electroweak process can reach the LZ recoil window in the cited benchmark, subject to an extreme halo tail and detector-response assumptions. Gravity-only scattering predicts at most `9.92e-47` events in the screen's already generous exposure. | The existing same-kernel exponent ceiling is `7e-19`. Against the registered one-sigma magnitude precision `5.816e-3`, this is about `8.31e15` times too small. | Can represent a heavy recoil comparator, but fails the tested galactic-scale star and measurable interferometer gates. |
+| Two-component `phi + H` (`m_phi=1e-17 eV`, `m_H=1080 GeV`) | Separates roles: light field for stars, heavy state for particle recoils. At 10% cosmic `phi`, an all-compact co-tracing illustration gives only `3.96e-18` close-passage probability in ten years; no formation or local population model fixes this fraction. | The `0.81` density-squared factor at `f_H=0.9` assumes co-tracing and fixed spectrum/cross section. The A0866 benchmark-specific photon spectrum and likelihood are absent. | The 10% target requires `Omega_H h^2=0.10782`; leaving the published heavy thermal point unchanged gives a total about `10.27 sigma` above the adopted central abundance. The seven-halo TNG50 fold spans `1.95/6.60/8.75` at its 16th/50th/84th percentiles, but is not a Milky Way posterior or LZ likelihood. | Its shared-H-kernel exponent ceiling is `6.3e-19`, about `9.23e15` below one-sigma precision and `4.62e16` below the registered SNR-5 visibility-loss target `0.02908`. | Best architecture for role separation, but no shared microscopic mechanism, measurable Casimir-DP prediction, or complete four-channel model is established. |
+
+The sensitivity values are **design forecasts**, not measured instrument performance. For small decoherence exponent `D`, visibility loss is approximately `D`. Thus, under the existing heavy-particle kernel, a new shared interaction would need roughly `9e15` times more interferometer response for a one-sigma-scale effect, or `5e16` for the registered SNR-5 target, while still reproducing the xenon spectrum. This factor is a required response gain, not a proposed coupling multiplier: increasing a microscopic coupling also changes the LZ rate and other constraints and therefore requires a new joint profile.
+
+## Decision
+
+No tested candidate passes all four gates. The two-component architecture is the strongest base for continued model construction because it avoids demanding that a single particle mass both make Sgr A*-scale stars and deliver the xenon recoil energy. It is **not** selected as a four-observable prediction model: its two sectors are separately produced in the current overlay, the abundance is not closed at the published heavy benchmark, its photon channel is not fitted, and the same scattering kernel yields an immeasurably small Casimir-DP effect.
+
+This rejects the tested combination of free/repulsive-quartic star scalings, ordinary ultralight-particle recoils, gravity-only heavy-particle scattering, and the screened IDM-to-interferometer kernel. It is not a universal exclusion of all bosonic dark sectors or UV completions.
+
+## Next falsifiable gate
+
+Continue from the two-component benchmark and specify one symmetry-consistent operator or mediator connecting the light-star and heavy-recoil sectors or the heavy component to interferometer matter. Freeze its charges, masses, couplings, potential, cosmological production and the local component fractions before calculating. The same point must simultaneously:
+
+1. preserve the light-field star branch and a cosmologically consistent `phi/H` abundance;
+2. reproduce an allowed xenon spectrum after halo-tail and detector response, rather than simply rescale one event;
+3. predict a channel-specific gamma spectrum consistent with the appropriate line/continuum and dwarf constraints;
+4. reach the registered Casimir-DP design sensitivity with an authenticated target response, while respecting LZ, stellar, cosmological, and apparatus bounds.
+
+If no allowed parameter region supplies the required interferometer response without breaking the xenon/abundance/astrophysical gates, close the **measurable-overlap** branch and retain the two-component null-Casimir prediction. Do not infer gravity as the cause merely because the star is gravitationally bound or the laboratory sits in Earth's gravitational field.
+
+## Reproduction and evidence limits
+
+Run `python -B docs/research/casimir-dp-four-observable-branch-verdict-2026-09-25.py`. It consumes the five listed upstream JSON artifacts, writes the adjacent JSON verdict and asserts the ultralight recoil bound, gravity-only event rate, shared-H Casimir exponent, and design-sensitivity gap.
+
+Inputs and their limitations are inherited from the source packets: [free-field mass/recoil scaling](casimir-dp-bosonic-compatibility-screen-2026-09-24.md), [gravity-only xenon screen](casimir-dp-idm-gravity-only-xenon-screen-2026-09-25.md), [heavy-field star scale](casimir-dp-idm-heavy-field-bosonstar-scale-2026-09-25.md), [conditional two-component overlay](casimir-dp-bosonic-two-component-observable-overlay-2026-09-25.md), [compact-object encounter screen](casimir-dp-boson-star-local-encounter-screen-2026-09-25.md), and [registered Stage-4.2R precision](casimir-dp-lz-shared-scattering-work-program.md). None is a measured shared residual, star-population inference, gamma likelihood, or complete LZ recast.

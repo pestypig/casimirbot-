@@ -1,0 +1,123 @@
+{
+  "evidence_class": "conditional_one_raw_xenon_window_event_universal_scalar_force_screen",
+  "inputs": {
+    "yukawa_parent_sha256": "ad4c2b1971e7e06a0d6b4658db81407ef2e85e7ddf10515a76ac2630a03a3526",
+    "force_screen_sha256": "8d9c3bb9f1adf98b246cbe094bf4fcad6777644fc85f627af640700dcb4a50f4",
+    "alpha_chi_perturbative_ceiling": 1.0,
+    "gravitational_nucleon_alpha": 5.8211267538885185e-39,
+    "xe_window_keV_true_energy": [
+      200,
+      270
+    ],
+    "xe_efficiency": 1,
+    "exposure_tonne_year": 2.84
+  },
+  "rows": [
+    {
+      "mediator_eV": 0.001,
+      "range_micrometers": 197.3269804,
+      "alpha_mix_for_one_raw_window_event": 4.5876093584567764e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.1046159625800196e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.6154786720184954e+17,
+      "D_born_at_one_raw_window_event": 1073.5371869215135,
+      "alpha_for_old_DP_comparator": 2.405322235956698e-13,
+      "xenon_count_at_old_DP_comparator": 2.7489932423088126e-05
+    },
+    {
+      "mediator_eV": 0.01,
+      "range_micrometers": 19.73269804,
+      "alpha_mix_for_one_raw_window_event": 4.5876093584567764e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.1046159625800196e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.6154786720184954e+17,
+      "D_born_at_one_raw_window_event": 691.387443288362,
+      "alpha_for_old_DP_comparator": 2.997236885777704e-13,
+      "xenon_count_at_old_DP_comparator": 4.268440945612599e-05
+    },
+    {
+      "mediator_eV": 0.1,
+      "range_micrometers": 1.9732698039999998,
+      "alpha_mix_for_one_raw_window_event": 4.5876093584567764e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.1046159625800196e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.6154786720184954e+17,
+      "D_born_at_one_raw_window_event": 313.2791857411903,
+      "alpha_for_old_DP_comparator": 4.4526241949428574e-13,
+      "xenon_count_at_old_DP_comparator": 9.420180486080833e-05
+    },
+    {
+      "mediator_eV": 1.0,
+      "range_micrometers": 0.1973269804,
+      "alpha_mix_for_one_raw_window_event": 4.5876093584567764e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.1046159625800196e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.6154786720184954e+17,
+      "D_born_at_one_raw_window_event": 31.037280561343746,
+      "alpha_for_old_DP_comparator": 1.414620611205511e-12,
+      "xenon_count_at_old_DP_comparator": 0.000950839254870171
+    },
+    {
+      "mediator_eV": 10.0,
+      "range_micrometers": 0.01973269804,
+      "alpha_mix_for_one_raw_window_event": 4.587609358456785e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.104615962580027e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.615478672018508e+17,
+      "D_born_at_one_raw_window_event": 0.027207721804023758,
+      "alpha_for_old_DP_comparator": 4.777885340667339e-11,
+      "xenon_count_at_old_DP_comparator": 1.084672393179942
+    },
+    {
+      "mediator_eV": 1000.0,
+      "range_micrometers": 0.00019732698039999998,
+      "alpha_mix_for_one_raw_window_event": 4.587609358545158e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.104615962661112e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.615478672157802e+17,
+      "D_born_at_one_raw_window_event": 3.0160585600284213e-10,
+      "alpha_for_old_DP_comparator": 4.5379732107160316e-07,
+      "xenon_count_at_old_DP_comparator": 97847784.23488712
+    },
+    {
+      "mediator_eV": 1000000.0,
+      "range_micrometers": 1.973269804e-07,
+      "alpha_mix_for_one_raw_window_event": 4.587697739598637e-11,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 2.1046970549918446e-21,
+      "minimum_yukawa_strength_relative_to_gravity": 3.615617979089538e+17,
+      "D_born_at_one_raw_window_event": 3.0162334476588325e-22,
+      "alpha_for_old_DP_comparator": 0.45379290704100345,
+      "xenon_count_at_old_DP_comparator": 9.784211081224833e+19
+    },
+    {
+      "mediator_eV": 1000000000.0,
+      "range_micrometers": 1.9732698039999998e-10,
+      "alpha_mix_for_one_raw_window_event": 9.264886886833476e-10,
+      "minimum_universal_nucleon_alpha_at_alpha_chi_le_1": 8.583812902581889e-19,
+      "minimum_yukawa_strength_relative_to_gravity": 1.4745964596712989e+20,
+      "D_born_at_one_raw_window_event": 1.23014300439629e-31,
+      "alpha_for_old_DP_comparator": 453792.90703658684,
+      "xenon_count_at_old_DP_comparator": 2.3990271551093116e+29
+    }
+  ],
+  "micrometer_force_check_at_0p1_eV": {
+    "lambda_micrometers": 1.9732698039999998,
+    "new_curve_yukawa_strength_visual_range": [
+      100000000.0,
+      10000000000.0
+    ],
+    "source_figure": "Figure 2, red curve labeled new",
+    "source_url": "https://arxiv.org/abs/2109.06534",
+    "status": "approximate_visual_read_not_digitized_or_tabulated",
+    "minimum_universal_yukawa_strength": 3.6154786720184954e+17,
+    "minimum_excess_over_visual_bound_even_using_1e10": 36154786.72018495,
+    "interpretation": "excluded in this simple unscreened universal-scalar mapping, conditional on the plotted curve read"
+  },
+  "checks": {
+    "one_event_coupling_reconstructs_unit_count": true,
+    "old_DP_comparator_did_not_reach_one_raw_window_event_for_mediators_le_1eV": true,
+    "universal_force_exclusion_margin_exceeds_one": true
+  },
+  "limitations": [
+    "The 200--270 keV unit-efficiency bin is a diagnostic recoil window, not the LZ observed spectrum, event count, background model, or likelihood.",
+    "Born xenon normalization is not a detector-folded or profile-likelihood fit.",
+    "The Figure 2 force range is a conservative visual read, not digitized source data.",
+    "The force exclusion applies only to one unscreened scalar with universal equal-sign nucleon coupling and alpha_chi <= 1.",
+    "Nonuniversal, screened, multiple-mediator, inelastic, or nonperturbative models are not excluded by this screen.",
+    "No full-phase Casimir-DP result at the xenon-normalized coupling is claimed."
+  ]
+}

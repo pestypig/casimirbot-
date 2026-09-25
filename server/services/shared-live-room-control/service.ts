@@ -13,6 +13,10 @@ import {
   HELIX_SHARED_LIVE_ROOM_AGENT_API_VERSION,
   HELIX_SHARED_LIVE_ROOM_CREATE_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_CREATE_RECEIPT_SCHEMA,
+  HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY,
+  HELIX_SHARED_LIVE_ROOM_JOIN_RECEIPT_SCHEMA,
+  helixSharedLiveRoomJoinRequestSchema,
+  type HelixSharedLiveRoomJoinReceipt,
   HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
   HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_RECEIPT_SCHEMA,
   HELIX_SHARED_LIVE_ROOM_CONSENT_GRANT_CAPABILITY,
@@ -75,6 +79,7 @@ import {
 import type { HelixWorkstationGatewayAccountContext } from "../helix-ask/workstation-tool-gateway/account-policy";
 import {
   createSharedRealtimeRoom,
+  joinSharedRealtimeRoom,
   isSharedRealtimeRoomDomainError,
   listSharedRealtimeRooms,
   readSharedRealtimeRoom,
@@ -88,6 +93,7 @@ import {
   listSharedRealtimeRoomSourceBindings,
 } from "../helix-ask/realtime-room/source-link-store";
 import { runWithSharedRealtimeProfileAdmissionLock } from "../helix-ask/realtime-room/profile-admission-lock";
+import { assertNoPersonalRealtimeSession } from "../helix-ask/realtime-room/personal-session-admission";
 import {
   readSharedRealtimeRoomRuntime,
   readSharedRealtimeRoomSpeakerFloor,
@@ -205,6 +211,7 @@ type SharedLiveRoomIdempotencyStore = Pick<
 
 type SharedLiveRoomDomainStore = {
   createRoom: typeof createSharedRealtimeRoom;
+  joinRoom: typeof joinSharedRealtimeRoom;
   listRooms: typeof listSharedRealtimeRooms;
   readRoom: typeof readSharedRealtimeRoom;
   readMembership: typeof readSharedRealtimeRoomMembership;
@@ -214,6 +221,7 @@ type SharedLiveRoomDomainStore = {
 };
 
 export type SharedLiveRoomControlDependencies = {
+  assertJoinAdmission?: (profileId: string, sessionId: string | null) => void;
   idempotencyStore?: SharedLiveRoomIdempotencyStore;
   domainStore?: Partial<SharedLiveRoomDomainStore>;
   deferredSourceBindingStore?: SharedLiveRoomDeferredSourceBindingStore;
@@ -429,6 +437,10 @@ const isReceiptForOperation = (value: RecordLike, operation: string): boolean =>
   value.raw_content_included === false;
 
 const roomErrorCode = (code: string): HelixSharedLiveRoomControlErrorCode => {
+  if (code === "shared_realtime_room_invite_expired") return "room_invite_expired";
+  if (code === "shared_realtime_room_invite_redeemed") return "room_invite_redeemed";
+  if (code === "shared_realtime_room_full") return "room_full";
+  if (code === "shared_realtime_room_personal_session_blocked") return "room_personal_session_blocked";
   if (code === "shared_realtime_room_not_found") return "room_not_found";
   if (code === "shared_realtime_room_closed") return "room_closed";
   if (code === "shared_realtime_room_runtime_conflict") {
@@ -571,12 +583,16 @@ export class SharedLiveRoomControlService {
     room: HelixSharedRealtimeRoom,
   ) => void | Promise<void>;
 
+  private readonly assertJoinAdmission: (profileId: string, sessionId: string | null) => void;
+
   constructor(dependencies: SharedLiveRoomControlDependencies = {}) {
+    this.assertJoinAdmission = dependencies.assertJoinAdmission ?? assertNoPersonalRealtimeSession;
     this.idempotencyStore =
       dependencies.idempotencyStore ?? new HelixAgentRunStore();
     this.domainStore = {
       createRoom:
         dependencies.domainStore?.createRoom ?? createSharedRealtimeRoom,
+      joinRoom: dependencies.domainStore?.joinRoom ?? joinSharedRealtimeRoom,
       listRooms: dependencies.domainStore?.listRooms ?? listSharedRealtimeRooms,
       readRoom: dependencies.domainStore?.readRoom ?? readSharedRealtimeRoom,
       readMembership:
@@ -1392,6 +1408,78 @@ export class SharedLiveRoomControlService {
             operation: HELIX_SHARED_LIVE_ROOM_CONSENT_REVOKE_CAPABILITY,
             ...reservation,
           });
+        }
+      }
+      throw normalizeControlError(error);
+    }
+  }
+
+  async joinRoom(input: {
+    actor: SharedLiveRoomControlActor;
+    idempotencyKey: string;
+    request: unknown;
+  }): Promise<SharedLiveRoomControlMutationResult<HelixSharedLiveRoomJoinReceipt>> {
+    const attempt: {
+      reservation: { keyHash: string; requestHash: string } | null;
+      joinAttempted: boolean;
+      committed: boolean;
+    } = { reservation: null, joinAttempted: false, committed: false };
+    try {
+      this.requireRead(input.actor);
+      this.requireManage(input.actor);
+      const request = helixSharedLiveRoomJoinRequestSchema.parse(input.request);
+      // The invitation is accepted only by this exact operation. Persist its
+      // digest for request identity, never its one-time plaintext.
+      assertNoProtectedControlInput({ room_id: request.room_id });
+      return await this.withProfileAdmissionLock(input.actor.profileId, async () => {
+        this.assertJoinAdmission(input.actor.profileId, input.actor.sessionId);
+        const idempotency = await this.acquireIdempotency({
+          actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY,
+          idempotencyKey: input.idempotencyKey,
+          request: { room_id: request.room_id, invitation_sha256: sha256(request.invite_code) },
+        });
+        let joined: HelixSharedRealtimeRoom;
+        if (idempotency.replay) {
+          if (idempotency.replay.room_id !== request.room_id) {
+            throw new SharedLiveRoomControlError(409, "idempotency_conflict", "The saved join belongs to another room.");
+          }
+          // A retry returns current membership, never an old room snapshot or
+          // renewed consent. Leaving and rejoining creates another participant.
+          joined = await this.domainStore.readRoom({ roomId: request.room_id, profileId: input.actor.profileId });
+          const self = joined.participants.find(p => p.participant_id === joined.self_participant_id);
+          if (joined.status === "closed" || !self || self.presence === "left" ||
+              joined.self_participant_id !== idempotency.replay.participant_ref) {
+            throw new SharedLiveRoomControlError(409, "room_forbidden", "The original joined membership is no longer current.");
+          }
+        } else {
+          attempt.reservation = idempotency;
+          attempt.joinAttempted = true;
+          joined = await this.domainStore.joinRoom({ profileId: input.actor.profileId,
+            roomId: request.room_id, inviteCode: request.invite_code });
+          attempt.committed = true;
+        }
+        const receipt: HelixSharedLiveRoomJoinReceipt = {
+          ...receiptBase, schema: HELIX_SHARED_LIVE_ROOM_JOIN_RECEIPT_SCHEMA,
+          operation: HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY,
+          content_role: "room_control_receipt_not_assistant_answer",
+          room: await this.projectSafeRoom(joined),
+        };
+        if (attempt.reservation) await this.completeIdempotency({
+          actor: input.actor, operation: HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY,
+          ...attempt.reservation,
+          receipt: { ...receiptBase, operation: HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY,
+            room_id: joined.room_id, participant_ref: joined.self_participant_id },
+        });
+        return { status: 201, body: receipt, idempotencyReplayed: Boolean(idempotency.replay) };
+      });
+    } catch (error) {
+      if (attempt.reservation) {
+        if (attempt.committed || (attempt.joinAttempted && !isSharedRealtimeRoomDomainError(error))) {
+          await this.markIdempotencyOutcomeUnknown({ actor: input.actor,
+            operation: HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY, ...attempt.reservation }).catch(() => undefined);
+        } else {
+          await this.abandonIdempotency({ actor: input.actor,
+            operation: HELIX_SHARED_LIVE_ROOM_JOIN_CAPABILITY, ...attempt.reservation }).catch(() => undefined);
         }
       }
       throw normalizeControlError(error);

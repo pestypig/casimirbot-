@@ -81,6 +81,7 @@ import {
   type WorkstationContextFeedQueryToolContractSpec,
 } from "../workstation-context-feed-query-tool-contracts";
 import { buildWorkstationGatewayObservationPacket } from "./observation-packet";
+import { roomMissionResultManifest, executeRoomMissionResultRead } from "./room-mission-result";
 import {
   buildMoralSubstrateReflectionGatewayObservation,
   moralLivingSubstrateReflectionManifest,
@@ -5857,6 +5858,7 @@ const rawCapabilities = new Map<string, HelixWorkstationCapabilityManifest>([
   ...sharedLiveRoomGatewayManifests.map(
     (manifest) => [manifest.capability_id, manifest] as const,
   ),
+  [roomMissionResultManifest.capability_id, roomMissionResultManifest],
 ]);
 
 const capabilities = new Map<string, HelixWorkstationCapabilityManifest>(
@@ -7288,9 +7290,12 @@ export const callWorkstationGatewayCapability = async (
     };
   }
 
-  if (SHARED_LIVE_ROOM_GATEWAY_CAPABILITIES.has(manifest.capability_id)) {
+  if (SHARED_LIVE_ROOM_GATEWAY_CAPABILITIES.has(manifest.capability_id) ||
+      manifest.capability_id === roomMissionResultManifest.capability_id) {
     const args = readArguments(input.arguments);
-    const gatewayResult = await executeSharedLiveRoomGatewayCapability({
+    const gatewayResult = manifest.capability_id === roomMissionResultManifest.capability_id
+      ? await executeRoomMissionResultRead({ args, turnId, accountContext: input.accountContext })
+      : await executeSharedLiveRoomGatewayCapability({
       capabilityId: manifest.capability_id,
       args,
       accountContext: input.accountContext,

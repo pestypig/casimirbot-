@@ -1,0 +1,86 @@
+{
+  "classification": "illustrative_Maxwell_proxy_average_not_source_distribution_or_gamma_fit",
+  "inputs": {
+    "m_X_GeV": 420.0,
+    "alpha_eff": 0.2,
+    "mediator_mass_GeV": 0.4,
+    "distribution": "untruncated Maxwell speed PDF f(v)=4/sqrt(pi)*v^2/a^3*exp(-v^2/a^2), a=mean_speed*sqrt(pi)/2",
+    "mean_relative_speed_proxies": {
+      "milky_way": 0.001,
+      "dwarf": 0.0001
+    },
+    "quadrature_orders": [
+      8,
+      16,
+      24
+    ],
+    "integrand": "v_relative^2 * S1(v_relative), appropriate for a short-distance p-wave sigma*v proportional to v^2*S1"
+  },
+  "averages": {
+    "milky_way": {
+      "mean_relative_speed": 0.001,
+      "quadrature": {
+        "8": {
+          "Cassel_Hulthen_avg_v2S1": 11.41444107443188,
+          "exact_Yukawa_avg_v2S1": 38.41027578351042
+        },
+        "16": {
+          "Cassel_Hulthen_avg_v2S1": 11.411847310038574,
+          "exact_Yukawa_avg_v2S1": 38.100692011484654
+        },
+        "24": {
+          "Cassel_Hulthen_avg_v2S1": 11.411827121298272,
+          "exact_Yukawa_avg_v2S1": 38.066514932336986
+        }
+      }
+    },
+    "dwarf": {
+      "mean_relative_speed": 0.0001,
+      "quadrature": {
+        "8": {
+          "Cassel_Hulthen_avg_v2S1": 0.35696325578268395,
+          "exact_Yukawa_avg_v2S1": 5.1899837244648905
+        },
+        "16": {
+          "Cassel_Hulthen_avg_v2S1": 0.35696325578268395,
+          "exact_Yukawa_avg_v2S1": 5.189983723508281
+        },
+        "24": {
+          "Cassel_Hulthen_avg_v2S1": 0.3569632557826836,
+          "exact_Yukawa_avg_v2S1": 5.1899837233915855
+        }
+      }
+    }
+  },
+  "derived_24_point": {
+    "paper_representative_rate_ratio_dwarf_over_halo": 0.024074074074074074,
+    "Cassel_Maxwell_proxy_rate_ratio_dwarf_over_halo": 0.031280114217334336,
+    "exact_Yukawa_Maxwell_proxy_rate_ratio_dwarf_over_halo": 0.1363398706873154,
+    "exact_over_Cassel_proxy_ratio": 4.358675602653671,
+    "exact_proxy_ratio_over_paper_point_ratio": 5.663348474703871,
+    "dwarf_rate_if_proxy_ratio_anchored_to_paper_halo_rate_cm3_s": 3.681176508557516e-25,
+    "quadrature_convergence_16_to_24": {
+      "milky_way": {
+        "Cassel_16_to_24_relative_change": 1.7691036126032955e-06,
+        "exact_16_to_24_relative_change": 0.0008970199055010619
+      },
+      "dwarf": {
+        "Cassel_16_to_24_relative_change": 8.881784197001252e-16,
+        "exact_16_to_24_relative_change": 2.248468078391852e-11
+      }
+    }
+  },
+  "limits": [
+    "The source supplies representative speeds, not the relative-speed distributions; matching their mean with an untruncated Maxwell law is an explicit proxy assumption.",
+    "The proxy is not truncated at an escape speed, though its Maxwell tail above the Galactic relative escape cap is negligible for the chosen mean; it is still not a source-specific halo or dwarf model.",
+    "The paper quotes fixed-velocity factors and reports omitting narrow resonances; the exact Yukawa average can retain unresolved narrow structure between quadrature nodes.",
+    "The halo-anchored dwarf rate is a ratio illustration, not a gamma-spectrum refit, dwarf-likelihood test, relic calculation, or exclusion.",
+    "No xenon recoil or Casimir-DP material response is included; those bridges remain open."
+  ],
+  "checks": {
+    "Cassel_proxy_converges_within_1e_minus_3": true,
+    "exact_proxy_converges_within_1e_minus_3": true,
+    "exact_dwarf_over_halo_exceeds_Cassel_proxy": true,
+    "rate_convention_is_explicit": true
+  }
+}

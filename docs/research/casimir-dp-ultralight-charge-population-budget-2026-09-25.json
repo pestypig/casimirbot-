@@ -1,0 +1,331 @@
+{
+  "classification": "conditional homogeneous-field charge budget and illustrative object mass budget; not a cosmological formation or Galactic population model",
+  "source_references": {
+    "IDM_profile_and_relic": "https://arxiv.org/abs/2609.06571",
+    "boson_star_charge_and_SgrA_scale": "https://arxiv.org/abs/1809.08682",
+    "complex_scalar_U1_charge_review": "https://arxiv.org/abs/1202.5809",
+    "present_entropy_density": "https://pdg.lbl.gov/2017/download/rpp-2016-booklet.pdf"
+  },
+  "inputs": {
+    "m_phi_eV": 1e-17,
+    "Omega_DM_h2": 0.1198,
+    "Omega_DM_h2_sigma": 0.0012,
+    "present_entropy_density_cm-3": 2891.2,
+    "IDM_profile_Omega_H_h2": 0.12014,
+    "M_MW_halo_normalization_Msun": 1000000000000.0,
+    "M_SgrA_imaging_reference_Msun": 4020000.0,
+    "free_field_Kaup_max_at_m_phi_Msun": 8458760.485,
+    "phi_fraction_grid": [
+      0.01,
+      0.1,
+      0.5,
+      1.0
+    ],
+    "net_charge_asymmetry_grid": [
+      -1.0,
+      -0.5,
+      0.0,
+      0.5,
+      1.0
+    ],
+    "oscillation_condition": "3 H(T_osc)=m_phi; standard radiation-era harmonic approximation"
+  },
+  "derived_background": {
+    "m_phi_GeV": 1.0000000000000002e-26,
+    "T_osc_keV": 115.63511245579362,
+    "a_osc": 2.0305251148500606e-09,
+    "rho_DM0_GeV_cm3": 1.2623925e-06,
+    "real_oscillation_amplitude_for_all_DM_GeV": 4813703737792768.0
+  },
+  "rows": [
+    {
+      "global_phi_fraction": 0.01,
+      "global_H_fraction_if_only_two_components": 0.99,
+      "required_Omega_H_h2_for_Planck_central": 0.118602,
+      "required_H_abundance_ratio_to_published_IDM_profile_for_Planck_1sigma": {
+        "minus_1sigma": 0.9773098052272349,
+        "central": 0.9871982686865324,
+        "plus_1sigma": 0.99708673214583
+      },
+      "conditional_LZ_rate_ratio_if_local_components_co_trace": 0.99,
+      "milky_way_mass_budget_normalized_to_Mhalo_1e12_Msun": {
+        "one_SgrA_reference_star_fraction_of_total_halo": 4.02e-06,
+        "one_SgrA_reference_star_fraction_of_phi_budget": 0.000402,
+        "number_if_all_phi_mass_in_4p02e6_Msun_stars": 2487.5621890547263,
+        "minimum_count_if_all_phi_mass_in_free_field_stars_no_heavier_than_Kaup_limit": 1182.2063076183674
+      },
+      "complex_condensate_charge_scenarios": [
+        {
+          "epsilon_net_U1_charge_to_energy": -1.0,
+          "real_component_amplitude_A_GeV": 340380255561629.7,
+          "real_component_amplitude_B_GeV": -340380255561629.7,
+          "reconstructed_epsilon": -1.0,
+          "net_U1_charge_density_today_per_cm3": -1.2623924999999997e+18,
+          "net_U1_charge_yield_nQ_over_s0": -436632713060320.94,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -2487.562189054727,
+          "energy_normalization_relative_error": 2.5364822934718335e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": -0.5,
+          "real_component_amplitude_A_GeV": 464968076043825.56,
+          "real_component_amplitude_B_GeV": -124587820482195.95,
+          "reconstructed_epsilon": -0.5000000000000001,
+          "net_U1_charge_density_today_per_cm3": -6.311962499999999e+17,
+          "net_U1_charge_yield_nQ_over_s0": -218316356530160.47,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -1243.7810945273634,
+          "energy_normalization_relative_error": 2.5364822934718335e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.0,
+          "real_component_amplitude_A_GeV": 481370373779276.8,
+          "real_component_amplitude_B_GeV": 0.0,
+          "reconstructed_epsilon": 0.0,
+          "net_U1_charge_density_today_per_cm3": 0.0,
+          "net_U1_charge_yield_nQ_over_s0": 0.0,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 0.0,
+          "energy_normalization_relative_error": 2.5364822934718335e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.5,
+          "real_component_amplitude_A_GeV": 464968076043825.56,
+          "real_component_amplitude_B_GeV": 124587820482195.95,
+          "reconstructed_epsilon": 0.5000000000000001,
+          "net_U1_charge_density_today_per_cm3": 6.311962499999999e+17,
+          "net_U1_charge_yield_nQ_over_s0": 218316356530160.47,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 1243.7810945273634,
+          "energy_normalization_relative_error": 2.5364822934718335e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 1.0,
+          "real_component_amplitude_A_GeV": 340380255561629.7,
+          "real_component_amplitude_B_GeV": 340380255561629.7,
+          "reconstructed_epsilon": 1.0,
+          "net_U1_charge_density_today_per_cm3": 1.2623924999999997e+18,
+          "net_U1_charge_yield_nQ_over_s0": 436632713060320.94,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 2487.562189054727,
+          "energy_normalization_relative_error": 2.5364822934718335e-16
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.1,
+      "global_H_fraction_if_only_two_components": 0.9,
+      "required_Omega_H_h2_for_Planck_central": 0.10782,
+      "required_H_abundance_ratio_to_published_IDM_profile_for_Planck_1sigma": {
+        "minus_1sigma": 0.8884634592974863,
+        "central": 0.8974529715332112,
+        "plus_1sigma": 0.9064424837689363
+      },
+      "conditional_LZ_rate_ratio_if_local_components_co_trace": 0.9,
+      "milky_way_mass_budget_normalized_to_Mhalo_1e12_Msun": {
+        "one_SgrA_reference_star_fraction_of_total_halo": 4.02e-06,
+        "one_SgrA_reference_star_fraction_of_phi_budget": 4.02e-05,
+        "number_if_all_phi_mass_in_4p02e6_Msun_stars": 24875.621890547263,
+        "minimum_count_if_all_phi_mass_in_free_field_stars_no_heavier_than_Kaup_limit": 11822.063076183675
+      },
+      "complex_condensate_charge_scenarios": [
+        {
+          "epsilon_net_U1_charge_to_energy": -1.0,
+          "real_component_amplitude_A_GeV": 1076376878124945.4,
+          "real_component_amplitude_B_GeV": -1076376878124945.4,
+          "reconstructed_epsilon": -1.0,
+          "net_U1_charge_density_today_per_cm3": -1.2623924999999998e+19,
+          "net_U1_charge_yield_nQ_over_s0": -4366327130603209.5,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -24875.621890547267,
+          "energy_normalization_relative_error": 4.058371669554933e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": -0.5,
+          "real_component_amplitude_A_GeV": 1470358159564862.0,
+          "real_component_amplitude_B_GeV": -393981281439916.7,
+          "reconstructed_epsilon": -0.5000000000000001,
+          "net_U1_charge_density_today_per_cm3": -6.311962499999999e+18,
+          "net_U1_charge_yield_nQ_over_s0": -2183163565301604.8,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -12437.810945273633,
+          "energy_normalization_relative_error": 4.058371669554933e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.0,
+          "real_component_amplitude_A_GeV": 1522226779269109.8,
+          "real_component_amplitude_B_GeV": 0.0,
+          "reconstructed_epsilon": 0.0,
+          "net_U1_charge_density_today_per_cm3": 0.0,
+          "net_U1_charge_yield_nQ_over_s0": 0.0,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 0.0,
+          "energy_normalization_relative_error": 4.058371669554933e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.5,
+          "real_component_amplitude_A_GeV": 1470358159564862.0,
+          "real_component_amplitude_B_GeV": 393981281439916.7,
+          "reconstructed_epsilon": 0.5000000000000001,
+          "net_U1_charge_density_today_per_cm3": 6.311962499999999e+18,
+          "net_U1_charge_yield_nQ_over_s0": 2183163565301604.8,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 12437.810945273633,
+          "energy_normalization_relative_error": 4.058371669554933e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 1.0,
+          "real_component_amplitude_A_GeV": 1076376878124945.4,
+          "real_component_amplitude_B_GeV": 1076376878124945.4,
+          "reconstructed_epsilon": 1.0,
+          "net_U1_charge_density_today_per_cm3": 1.2623924999999998e+19,
+          "net_U1_charge_yield_nQ_over_s0": 4366327130603209.5,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 24875.621890547267,
+          "energy_normalization_relative_error": 4.058371669554933e-16
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.5,
+      "global_H_fraction_if_only_two_components": 0.5,
+      "required_Omega_H_h2_for_Planck_central": 0.0599,
+      "required_H_abundance_ratio_to_published_IDM_profile_for_Planck_1sigma": {
+        "minus_1sigma": 0.4935908107208257,
+        "central": 0.4985849841851174,
+        "plus_1sigma": 0.5035791576494091
+      },
+      "conditional_LZ_rate_ratio_if_local_components_co_trace": 0.5,
+      "milky_way_mass_budget_normalized_to_Mhalo_1e12_Msun": {
+        "one_SgrA_reference_star_fraction_of_total_halo": 4.02e-06,
+        "one_SgrA_reference_star_fraction_of_phi_budget": 8.04e-06,
+        "number_if_all_phi_mass_in_4p02e6_Msun_stars": 124378.10945273632,
+        "minimum_count_if_all_phi_mass_in_free_field_stars_no_heavier_than_Kaup_limit": 59110.31538091837
+      },
+      "complex_condensate_charge_scenarios": [
+        {
+          "epsilon_net_U1_charge_to_energy": -1.0,
+          "real_component_amplitude_A_GeV": 2406851868896384.0,
+          "real_component_amplitude_B_GeV": -2406851868896384.0,
+          "reconstructed_epsilon": -1.0,
+          "net_U1_charge_density_today_per_cm3": -6.3119625e+19,
+          "net_U1_charge_yield_nQ_over_s0": -2.183163565301605e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -124378.10945273633,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": -0.5,
+          "real_component_amplitude_A_GeV": 3287820796058514.0,
+          "real_component_amplitude_B_GeV": -880968927162130.0,
+          "reconstructed_epsilon": -0.5000000000000001,
+          "net_U1_charge_density_today_per_cm3": -3.15598125e+19,
+          "net_U1_charge_yield_nQ_over_s0": -1.0915817826508024e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -62189.054726368166,
+          "energy_normalization_relative_error": 3.2466973356439464e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.0,
+          "real_component_amplitude_A_GeV": 3403802555616297.0,
+          "real_component_amplitude_B_GeV": 0.0,
+          "reconstructed_epsilon": 0.0,
+          "net_U1_charge_density_today_per_cm3": 0.0,
+          "net_U1_charge_yield_nQ_over_s0": 0.0,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 0.0,
+          "energy_normalization_relative_error": 3.2466973356439464e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.5,
+          "real_component_amplitude_A_GeV": 3287820796058514.0,
+          "real_component_amplitude_B_GeV": 880968927162130.0,
+          "reconstructed_epsilon": 0.5000000000000001,
+          "net_U1_charge_density_today_per_cm3": 3.15598125e+19,
+          "net_U1_charge_yield_nQ_over_s0": 1.0915817826508024e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 62189.054726368166,
+          "energy_normalization_relative_error": 3.2466973356439464e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 1.0,
+          "real_component_amplitude_A_GeV": 2406851868896384.0,
+          "real_component_amplitude_B_GeV": 2406851868896384.0,
+          "reconstructed_epsilon": 1.0,
+          "net_U1_charge_density_today_per_cm3": 6.3119625e+19,
+          "net_U1_charge_yield_nQ_over_s0": 2.183163565301605e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 124378.10945273633,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 1.0,
+      "global_H_fraction_if_only_two_components": 0.0,
+      "required_Omega_H_h2_for_Planck_central": 0.0,
+      "required_H_abundance_ratio_to_published_IDM_profile_for_Planck_1sigma": {
+        "minus_1sigma": 0.0,
+        "central": 0.0,
+        "plus_1sigma": 0.0
+      },
+      "conditional_LZ_rate_ratio_if_local_components_co_trace": 0.0,
+      "milky_way_mass_budget_normalized_to_Mhalo_1e12_Msun": {
+        "one_SgrA_reference_star_fraction_of_total_halo": 4.02e-06,
+        "one_SgrA_reference_star_fraction_of_phi_budget": 4.02e-06,
+        "number_if_all_phi_mass_in_4p02e6_Msun_stars": 248756.21890547263,
+        "minimum_count_if_all_phi_mass_in_free_field_stars_no_heavier_than_Kaup_limit": 118220.63076183674
+      },
+      "complex_condensate_charge_scenarios": [
+        {
+          "epsilon_net_U1_charge_to_energy": -1.0,
+          "real_component_amplitude_A_GeV": 3403802555616296.5,
+          "real_component_amplitude_B_GeV": -3403802555616296.5,
+          "reconstructed_epsilon": -1.0,
+          "net_U1_charge_density_today_per_cm3": -1.2623925e+20,
+          "net_U1_charge_yield_nQ_over_s0": -4.36632713060321e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -248756.21890547266,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": -0.5,
+          "real_component_amplitude_A_GeV": 4649680760438256.0,
+          "real_component_amplitude_B_GeV": -1245878204821959.5,
+          "reconstructed_epsilon": -0.5000000000000002,
+          "net_U1_charge_density_today_per_cm3": -6.3119625e+19,
+          "net_U1_charge_yield_nQ_over_s0": -2.183163565301605e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": -124378.10945273633,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.0,
+          "real_component_amplitude_A_GeV": 4813703737792768.0,
+          "real_component_amplitude_B_GeV": 0.0,
+          "reconstructed_epsilon": 0.0,
+          "net_U1_charge_density_today_per_cm3": 0.0,
+          "net_U1_charge_yield_nQ_over_s0": 0.0,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 0.0,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 0.5,
+          "real_component_amplitude_A_GeV": 4649680760438256.0,
+          "real_component_amplitude_B_GeV": 1245878204821959.5,
+          "reconstructed_epsilon": 0.5000000000000002,
+          "net_U1_charge_density_today_per_cm3": 6.3119625e+19,
+          "net_U1_charge_yield_nQ_over_s0": 2.183163565301605e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 124378.10945273633,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        },
+        {
+          "epsilon_net_U1_charge_to_energy": 1.0,
+          "real_component_amplitude_A_GeV": 3403802555616296.5,
+          "real_component_amplitude_B_GeV": 3403802555616296.5,
+          "reconstructed_epsilon": 1.0,
+          "net_U1_charge_density_today_per_cm3": 1.2623925e+20,
+          "net_U1_charge_yield_nQ_over_s0": 4.36632713060321e+16,
+          "net_charge_in_1e12_Msun_halo_in_units_of_reference_star_charge": 248756.21890547266,
+          "energy_normalization_relative_error": 1.6233486678219732e-16
+        }
+      ]
+    }
+  ],
+  "validity_limits": [
+    "The homogeneous-field calculation assumes a canonical complex scalar with quadratic potential and negligible self-interaction at oscillation onset. A charged initial orbit is an explicit initial condition, not predicted by the IDM portal.",
+    "epsilon is the net conserved U(1) charge divided by the maximum charge compatible with the same nonrelativistic energy density; epsilon=0 is a real-line oscillation and epsilon=+/-1 is circular motion in field space.",
+    "A nonzero homogeneous charge is necessary input for a net-charged boson-star population in this scenario, but does not prove fragmentation, capture, stability, or an object mass function.",
+    "The Milky Way halo mass is a round normalization scenario. Counts assume all phi mass is in equal-mass stars; the minimum count assumes every star is at the free-field Kaup upper mass. These are mass-budget diagnostics, not predicted populations or observational exclusions.",
+    "Cosmic H fraction is not asserted to equal local H fraction. The conditional LZ scaling holds only at fixed local total density, velocity distribution, detector response, and cross section if the components co-trace.",
+    "Quartic/self-interacting star solutions can change the Kaup mass cap and must replace this screen with a model-specific stable mass-charge curve."
+  ],
+  "falsification_tests": [
+    "Any formation model must supply the chosen epsilon and reproduce the required Omega_phi while satisfying the star's charge and mass-radius stability curve.",
+    "Reject an all-in-SgrA-mass-star interpretation of an appreciable phi halo fraction if its required object count violates lensing, dynamics, or structure-formation limits once the actual selection functions are applied.",
+    "A joint detector prediction must use a predicted local unbound-H fraction, not substitute 1-f_phi from cosmology without a co-clustering calculation."
+  ]
+}

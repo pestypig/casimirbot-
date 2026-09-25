@@ -1,0 +1,265 @@
+{
+  "classification": "numerical homogeneous-field toy in radiation domination with one Gaussian temporary quadratic U(1)-breaking pulse; not a UV completion or population model",
+  "equations": {
+    "dimensionless_time": "u=m_phi*t, natural units",
+    "background": "H/m_phi=1/(2u); pulse centered at u=1.5 where 3H=m_phi",
+    "field": "phi=(x+i*y)/sqrt(2)",
+    "potential": "V=m_phi^2*(x^2+y^2)/2 + g(u)*m_phi^2*x*y",
+    "pulse_profile": "g(u)=g0*exp(-(u-1.5)^2/(2*sigma^2)); g=0 after pulse",
+    "equations_of_motion": "x''+(3H/m)x'+x+g*y=0; y''+(3H/m)y'+y+g*x=0",
+    "initial_state": "x=1,y=0,x'=y'=0 at u=0.001; amplitude scale cancels from epsilon",
+    "late_epsilon": "|a^3*(x*y'-y*x')| / <a^3*rho>/m_phi, averaged over the final oscillation",
+    "mass_stability": "the instantaneous eigenvalues are m_phi^2*(1+/-g); require |g0|<1",
+    "possible_source_embedding_for_budget_only": "a real field S with delta_V=mu*S*x*y; its own dynamics do not generate the prescribed Gaussian",
+    "source_tradeoff": "for quadratic S and phi energy scales, R_S*B=|mu*S0|/m_phi^2=g0, where B is the characteristic S backreaction scale"
+  },
+  "inputs": {
+    "m_phi_eV": 1e-17,
+    "hbar_eV_seconds": 6.582119569e-16,
+    "u_initial": 0.001,
+    "u_pulse_center": 1.5,
+    "u_final": 30.0,
+    "sigma_grid": [
+      0.1,
+      0.2,
+      0.3
+    ],
+    "target_epsilon_grid": [
+      0.1,
+      0.5,
+      0.9
+    ],
+    "g0_stability_ceiling_used": 0.999,
+    "integrator": "SciPy solve_ivp DOP853; rtol=2e-9, atol=2e-11, max_step=0.12"
+  },
+  "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+  "profiles": [
+    {
+      "sigma_in_u_units": 0.1,
+      "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 15.499707099871674,
+      "max_epsilon_at_g0_0p999": 0.42559148572495575,
+      "mass_matrix_min_eigenvalue_over_m2_at_g0_0p999": 0.0010000000000000009,
+      "target_fits": [
+        {
+          "g0_peak": 0.2237608528121849,
+          "sigma_in_u_units": 0.1,
+          "pulse_fwhm_in_u_units": 0.23548200450309495,
+          "mass_matrix_min_eigenvalue_over_m2": 0.7762391471878151,
+          "epsilon_signed_late_time": -0.0999999966634133,
+          "epsilon_absolute_late_time": 0.0999999966634133,
+          "comoving_energy_action_for_initial_x0_1": 0.37104312538063383,
+          "energy_window_coefficient_of_variation": 0.019936137659477018,
+          "post_pulse_comoving_charge_relative_spread": 1.6569125752387192e-13,
+          "solver_function_evaluations": 4304,
+          "target_epsilon_absolute": 0.1,
+          "reachable_with_positive_definite_g0_lt_1": true,
+          "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+          "energy_action_ratio_to_no_pulse": 1.0025821515802655,
+          "initial_x_amplitude_factor_to_restore_same_final_phi_abundance": 0.9987114191568783,
+          "source_embedding_tradeoff_for_deltaV_muSxy": {
+            "product_source_energy_fraction_times_backreaction_scale": 0.2237608528121849,
+            "minimum_possible_max_of_these_two_scales": 0.4730336698504504,
+            "backreaction_scale_if_source_energy_fraction_is_0p01": 22.37608528121849,
+            "source_energy_fraction_if_backreaction_scale_is_0p1": 2.237608528121849,
+            "definitions": {
+              "source_energy_fraction": "R_S=M_S^2*S0^2/(m_phi^2*F_phi^2)",
+              "backreaction_scale": "B=abs(mu)*F_phi^2/(M_S^2*abs(S0))",
+              "pulse_amplitude": "g0=abs(mu)*abs(S0)/m_phi^2"
+            }
+          },
+          "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 15.499707099871674
+        },
+        {
+          "target_epsilon_absolute": 0.5,
+          "reachable_with_positive_definite_g0_lt_1": false,
+          "max_epsilon_at_g0_0p999": 0.42559148572495575
+        },
+        {
+          "target_epsilon_absolute": 0.9,
+          "reachable_with_positive_definite_g0_lt_1": false,
+          "max_epsilon_at_g0_0p999": 0.42559148572495575
+        }
+      ]
+    },
+    {
+      "sigma_in_u_units": 0.2,
+      "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 30.99941419974335,
+      "max_epsilon_at_g0_0p999": 0.7330479144004062,
+      "mass_matrix_min_eigenvalue_over_m2_at_g0_0p999": 0.0010000000000000009,
+      "target_fits": [
+        {
+          "g0_peak": 0.11522855004714701,
+          "sigma_in_u_units": 0.2,
+          "pulse_fwhm_in_u_units": 0.4709640090061899,
+          "mass_matrix_min_eigenvalue_over_m2": 0.884771449952853,
+          "epsilon_signed_late_time": -0.10000000000031312,
+          "epsilon_absolute_late_time": 0.10000000000031312,
+          "comoving_energy_action_for_initial_x0_1": 0.37097253494492166,
+          "energy_window_coefficient_of_variation": 0.01993620447546899,
+          "post_pulse_comoving_charge_relative_spread": 5.910654474605155e-14,
+          "solver_function_evaluations": 4124,
+          "target_epsilon_absolute": 0.1,
+          "reachable_with_positive_definite_g0_lt_1": true,
+          "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+          "energy_action_ratio_to_no_pulse": 1.0023914117280053,
+          "initial_x_amplitude_factor_to_restore_same_final_phi_abundance": 0.9988064344399018,
+          "source_embedding_tradeoff_for_deltaV_muSxy": {
+            "product_source_energy_fraction_times_backreaction_scale": 0.11522855004714701,
+            "minimum_possible_max_of_these_two_scales": 0.33945331055558586,
+            "backreaction_scale_if_source_energy_fraction_is_0p01": 11.522855004714701,
+            "source_energy_fraction_if_backreaction_scale_is_0p1": 1.15228550047147,
+            "definitions": {
+              "source_energy_fraction": "R_S=M_S^2*S0^2/(m_phi^2*F_phi^2)",
+              "backreaction_scale": "B=abs(mu)*F_phi^2/(M_S^2*abs(S0))",
+              "pulse_amplitude": "g0=abs(mu)*abs(S0)/m_phi^2"
+            }
+          },
+          "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 30.99941419974335
+        },
+        {
+          "g0_peak": 0.6148992773348799,
+          "sigma_in_u_units": 0.2,
+          "pulse_fwhm_in_u_units": 0.4709640090061899,
+          "mass_matrix_min_eigenvalue_over_m2": 0.3851007226651201,
+          "epsilon_signed_late_time": -0.49999999999997297,
+          "epsilon_absolute_late_time": 0.49999999999997297,
+          "comoving_energy_action_for_initial_x0_1": 0.3953461514017363,
+          "energy_window_coefficient_of_variation": 0.017347149582129226,
+          "post_pulse_comoving_charge_relative_spread": 8.888048765569388e-14,
+          "solver_function_evaluations": 4178,
+          "target_epsilon_absolute": 0.5,
+          "reachable_with_positive_definite_g0_lt_1": true,
+          "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+          "energy_action_ratio_to_no_pulse": 1.0682504754257822,
+          "initial_x_amplitude_factor_to_restore_same_final_phi_abundance": 0.9675278003332234,
+          "source_embedding_tradeoff_for_deltaV_muSxy": {
+            "product_source_energy_fraction_times_backreaction_scale": 0.6148992773348799,
+            "minimum_possible_max_of_these_two_scales": 0.7841551360125621,
+            "backreaction_scale_if_source_energy_fraction_is_0p01": 61.48992773348799,
+            "source_energy_fraction_if_backreaction_scale_is_0p1": 6.148992773348799,
+            "definitions": {
+              "source_energy_fraction": "R_S=M_S^2*S0^2/(m_phi^2*F_phi^2)",
+              "backreaction_scale": "B=abs(mu)*F_phi^2/(M_S^2*abs(S0))",
+              "pulse_amplitude": "g0=abs(mu)*abs(S0)/m_phi^2"
+            }
+          },
+          "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 30.99941419974335
+        },
+        {
+          "target_epsilon_absolute": 0.9,
+          "reachable_with_positive_definite_g0_lt_1": false,
+          "max_epsilon_at_g0_0p999": 0.7330479144004062
+        }
+      ]
+    },
+    {
+      "sigma_in_u_units": 0.3,
+      "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 46.49912129961501,
+      "max_epsilon_at_g0_0p999": 0.910607219635752,
+      "mass_matrix_min_eigenvalue_over_m2_at_g0_0p999": 0.0010000000000000009,
+      "target_fits": [
+        {
+          "g0_peak": 0.08053567958368646,
+          "sigma_in_u_units": 0.3,
+          "pulse_fwhm_in_u_units": 0.7064460135092848,
+          "mass_matrix_min_eigenvalue_over_m2": 0.9194643204163135,
+          "epsilon_signed_late_time": -0.10000000000209926,
+          "epsilon_absolute_late_time": 0.10000000000209926,
+          "comoving_energy_action_for_initial_x0_1": 0.37087768588955144,
+          "energy_window_coefficient_of_variation": 0.01993627309745473,
+          "post_pulse_comoving_charge_relative_spread": 1.09824097714011e-13,
+          "solver_function_evaluations": 4073,
+          "target_epsilon_absolute": 0.1,
+          "reachable_with_positive_definite_g0_lt_1": true,
+          "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+          "energy_action_ratio_to_no_pulse": 1.00213512354072,
+          "initial_x_amplitude_factor_to_restore_same_final_phi_abundance": 0.9989341447257932,
+          "source_embedding_tradeoff_for_deltaV_muSxy": {
+            "product_source_energy_fraction_times_backreaction_scale": 0.08053567958368646,
+            "minimum_possible_max_of_these_two_scales": 0.2837880892209651,
+            "backreaction_scale_if_source_energy_fraction_is_0p01": 8.053567958368646,
+            "source_energy_fraction_if_backreaction_scale_is_0p1": 0.8053567958368646,
+            "definitions": {
+              "source_energy_fraction": "R_S=M_S^2*S0^2/(m_phi^2*F_phi^2)",
+              "backreaction_scale": "B=abs(mu)*F_phi^2/(M_S^2*abs(S0))",
+              "pulse_amplitude": "g0=abs(mu)*abs(S0)/m_phi^2"
+            }
+          },
+          "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 46.49912129961501
+        },
+        {
+          "g0_peak": 0.4275970609169787,
+          "sigma_in_u_units": 0.3,
+          "pulse_fwhm_in_u_units": 0.7064460135092848,
+          "mass_matrix_min_eigenvalue_over_m2": 0.5724029390830213,
+          "epsilon_signed_late_time": -0.4999999996273391,
+          "epsilon_absolute_late_time": 0.4999999996273391,
+          "comoving_energy_action_for_initial_x0_1": 0.39248921835230655,
+          "energy_window_coefficient_of_variation": 0.017349064941964795,
+          "post_pulse_comoving_charge_relative_spread": 9.914493245311333e-14,
+          "solver_function_evaluations": 4073,
+          "target_epsilon_absolute": 0.5,
+          "reachable_with_positive_definite_g0_lt_1": true,
+          "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+          "energy_action_ratio_to_no_pulse": 1.060530860406154,
+          "initial_x_amplitude_factor_to_restore_same_final_phi_abundance": 0.9710427380092335,
+          "source_embedding_tradeoff_for_deltaV_muSxy": {
+            "product_source_energy_fraction_times_backreaction_scale": 0.4275970609169787,
+            "minimum_possible_max_of_these_two_scales": 0.653909061656878,
+            "backreaction_scale_if_source_energy_fraction_is_0p01": 42.759706091697865,
+            "source_energy_fraction_if_backreaction_scale_is_0p1": 4.275970609169787,
+            "definitions": {
+              "source_energy_fraction": "R_S=M_S^2*S0^2/(m_phi^2*F_phi^2)",
+              "backreaction_scale": "B=abs(mu)*F_phi^2/(M_S^2*abs(S0))",
+              "pulse_amplitude": "g0=abs(mu)*abs(S0)/m_phi^2"
+            }
+          },
+          "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 46.49912129961501
+        },
+        {
+          "g0_peak": 0.9733444789451609,
+          "sigma_in_u_units": 0.3,
+          "pulse_fwhm_in_u_units": 0.7064460135092848,
+          "mass_matrix_min_eigenvalue_over_m2": 0.02665552105483915,
+          "epsilon_signed_late_time": -0.9000000013835724,
+          "epsilon_absolute_late_time": 0.9000000013835724,
+          "comoving_energy_action_for_initial_x0_1": 0.4890143635181504,
+          "energy_window_coefficient_of_variation": 0.008712142390978672,
+          "post_pulse_comoving_charge_relative_spread": 3.645137802350404e-14,
+          "solver_function_evaluations": 4085,
+          "target_epsilon_absolute": 0.9,
+          "reachable_with_positive_definite_g0_lt_1": true,
+          "unbroken_reference_energy_action_for_initial_x0_1": 0.3700875033490246,
+          "energy_action_ratio_to_no_pulse": 1.3213479490469784,
+          "initial_x_amplitude_factor_to_restore_same_final_phi_abundance": 0.8699442111210229,
+          "source_embedding_tradeoff_for_deltaV_muSxy": {
+            "product_source_energy_fraction_times_backreaction_scale": 0.9733444789451609,
+            "minimum_possible_max_of_these_two_scales": 0.9865822210769667,
+            "backreaction_scale_if_source_energy_fraction_is_0p01": 97.33444789451609,
+            "source_energy_fraction_if_backreaction_scale_is_0p1": 9.733444789451609,
+            "definitions": {
+              "source_energy_fraction": "R_S=M_S^2*S0^2/(m_phi^2*F_phi^2)",
+              "backreaction_scale": "B=abs(mu)*F_phi^2/(M_S^2*abs(S0))",
+              "pulse_amplitude": "g0=abs(mu)*abs(S0)/m_phi^2"
+            }
+          },
+          "pulse_fwhm_seconds_at_m_phi_1e-17_eV": 46.49912129961501
+        }
+      ]
+    }
+  ],
+  "validity_limits": [
+    "This is a toy time-dependent U(1)-breaking mass mixing with a prescribed Gaussian profile; no field in a UV theory generates the pulse.",
+    "Radiation domination and H=1/(2t) are assumed; changes in relativistic degrees of freedom and the detailed thermal history are not modeled.",
+    "The calculation is homogeneous and linear; it omits perturbations, nonlinear fragmentation, self-interaction, and star formation.",
+    "The S-source energy/backreaction relation is an envelope-level algebraic diagnostic. The source field is not dynamically evolved, and quartics needed to stabilize a complete trilinear potential are not modeled.",
+    "The late comoving energy is an oscillation-window average; its window variation is reported. Charge conservation is checked after the pulse by comoving-charge spread.",
+    "Matching the final phi abundance is an amplitude rescaling, not a coupled H/phi relic calculation. No xenon, gamma-ray, or Casimir-DP observable is calculated."
+  ],
+  "falsification_tests": [
+    "Reject a fitted pulse if |g0|>=1 under the positive-definite mass-matrix assumption.",
+    "Do not approximate a dynamical S source as prescribed if both its energy fraction and the defined backreaction scale are claimed negligible while their product must equal the fitted g0.",
+    "Reject a claimed post-pulse conserved-charge solution if the reported comoving charge spread fails numerical convergence checks.",
+    "Do not accept a full dark-sector model until it derives this time profile and passes perturbation, fragmentation, star-stability, local-population, and detector calculations."
+  ]
+}

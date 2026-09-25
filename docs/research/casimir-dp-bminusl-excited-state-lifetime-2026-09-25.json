@@ -1,0 +1,431 @@
+{
+  "classification": "conditional_B-L_Zprime_excited_state_lifetime_and_notation_fork",
+  "inputs": {
+    "notation_audit_sha256": "120104e6d58dd732f63ca7ff41383924dcba20bb0d26f390f6e65c5ae9b2c71b",
+    "carbon_screen_sha256": "572cd0d93eb367f6bc0e123be29fbdbd9f1bf06ab0bc5f61d030e8808514f5e3",
+    "gBL": 0.5,
+    "mZprime_relation": "2*mS on the source's resonant thermal-relic branch",
+    "source_reported_reference_sigma_p_cm2": "order 1e-45",
+    "active_neutrino_flavors": 3,
+    "age_universe_s": 4.3549488e+17,
+    "assumed_neutrino_coupling": "B-L charge magnitude 1; massless light neutrinos"
+  },
+  "rows": [
+    {
+      "mS_TeV": 1.0,
+      "quoted_sqrt_mass_squared_difference_keV": 100.0,
+      "literal_read_physical_gap_eV": 0.0050048828125,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 2000.0,
+        "effective_coefficient_GeV_minus2": 6.25e-08,
+        "phase_integral_GeV5": 1.2527785418938252e-57,
+        "quadrature_error_GeV5": 3.619017855879743e-68,
+        "width_per_nu_flavor_GeV": 6.576176803558294e-75,
+        "width_three_flavors_GeV": 1.9728530410674884e-74,
+        "lifetime_s": 3.33634560303513e+49,
+        "lifetime_years": 1.0572241244692658e+42,
+        "universe_age_over_lifetime": 1.3053050607341846e-32
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 338.7888862032438,
+      "literal_read_independent_carbon_D_upper": 3.720157195373122e-27,
+      "physical_gap_read_delta_keV": 100.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 2000.0,
+        "effective_coefficient_GeV_minus2": 6.25e-08,
+        "phase_integral_GeV5": 3.9999993949796754e-21,
+        "quadrature_error_GeV5": 4.440891426793132e-36,
+        "width_per_nu_flavor_GeV": 2.0997089554030625e-38,
+        "width_three_flavors_GeV": 6.299126866209188e-38,
+        "lifetime_s": 10449257030063.781,
+        "lifetime_years": 331116.9743600204,
+        "universe_age_over_lifetime": 41677.11433904136
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 460.51086451175166
+    },
+    {
+      "mS_TeV": 1.0,
+      "quoted_sqrt_mass_squared_difference_keV": 200.0,
+      "literal_read_physical_gap_eV": 0.02001953125,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 2000.0,
+        "effective_coefficient_GeV_minus2": 6.25e-08,
+        "phase_integral_GeV5": 1.2828452268992479e-54,
+        "quadrature_error_GeV5": 3.7058742843940206e-65,
+        "width_per_nu_flavor_GeV": 6.73400504684354e-72,
+        "width_three_flavors_GeV": 2.020201514053062e-71,
+        "lifetime_s": 3.258150002964069e+46,
+        "lifetime_years": 1.032445434052041e+39,
+        "universe_age_over_lifetime": 1.3366323821917744e-29
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 338.7889044793718,
+      "literal_read_independent_carbon_D_upper": 3.720157195373122e-27,
+      "physical_gap_read_delta_keV": 200.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 2000.0,
+        "effective_coefficient_GeV_minus2": 6.25e-08,
+        "phase_integral_GeV5": 1.2799996143935795e-19,
+        "quadrature_error_GeV5": 1.421085043411074e-34,
+        "width_per_nu_flavor_GeV": 6.719067649429786e-37,
+        "width_three_flavors_GeV": 2.015720294828936e-36,
+        "lifetime_s": 326539331170.379,
+        "lifetime_years": 10347.40700086125,
+        "universe_age_over_lifetime": 1333667.4587992313
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 582.2328489123022
+    },
+    {
+      "mS_TeV": 1.0,
+      "quoted_sqrt_mass_squared_difference_keV": 300.0,
+      "literal_read_physical_gap_eV": 0.0450439453125,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 2000.0,
+        "effective_coefficient_GeV_minus2": 6.25e-08,
+        "phase_integral_GeV5": 7.3975320120284045e-53,
+        "quadrature_error_GeV5": 2.1369938529339988e-63,
+        "width_per_nu_flavor_GeV": 3.883166640732904e-70,
+        "width_three_flavors_GeV": 1.1649499922198713e-69,
+        "lifetime_s": 5.650130574667362e+44,
+        "lifetime_years": 1.790418338107892e+37,
+        "universe_age_over_lifetime": 7.707695853128823e-28
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 338.7889349395852,
+      "literal_read_independent_carbon_D_upper": 3.720157195373122e-27,
+      "physical_gap_read_delta_keV": 300.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 2000.0,
+        "effective_coefficient_GeV_minus2": 6.25e-08,
+        "phase_integral_GeV5": 9.719995632219543e-19,
+        "quadrature_error_GeV5": 1.0791362950146091e-33,
+        "width_per_nu_flavor_GeV": 5.102291240609982e-36,
+        "width_three_flavors_GeV": 1.5306873721829945e-35,
+        "lifetime_s": 43001070555.72615,
+        "lifetime_years": 1362.621699867105,
+        "universe_age_over_lifetime": 10127535.765316155
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 703.9548333128528
+    },
+    {
+      "mS_TeV": 2.0,
+      "quoted_sqrt_mass_squared_difference_keV": 100.0,
+      "literal_read_physical_gap_eV": 0.00244140625,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 4000.0,
+        "effective_coefficient_GeV_minus2": 1.5625e-08,
+        "phase_integral_GeV5": 3.9130408516631038e-59,
+        "quadrature_error_GeV5": 3.379134837002636e-70,
+        "width_per_nu_flavor_GeV": 1.283788775288176e-77,
+        "width_three_flavors_GeV": 3.8513663258645286e-77,
+        "lifetime_s": 1.709034927370221e+52,
+        "lifetime_years": 5.415604885575015e+44,
+        "universe_age_over_lifetime": 2.5481918071160675e-35
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 320.32970368401146,
+      "literal_read_independent_carbon_D_upper": 1.8790496777067895e-27,
+      "physical_gap_read_delta_keV": 100.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 4000.0,
+        "effective_coefficient_GeV_minus2": 1.5625e-08,
+        "phase_integral_GeV5": 3.999999694979611e-21,
+        "quadrature_error_GeV5": 4.4408917598599674e-36,
+        "width_per_nu_flavor_GeV": 1.3123181955507647e-39,
+        "width_three_flavors_GeV": 3.9369545866522945e-39,
+        "lifetime_s": 167188099941913.84,
+        "lifetime_years": 5297871.192420014,
+        "universe_age_over_lifetime": 2604.819841551546
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 442.05168511283387
+    },
+    {
+      "mS_TeV": 2.0,
+      "quoted_sqrt_mass_squared_difference_keV": 200.0,
+      "literal_read_physical_gap_eV": 0.010009765625,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 4000.0,
+        "effective_coefficient_GeV_minus2": 1.5625e-08,
+        "phase_integral_GeV5": 4.0088913340602407e-56,
+        "quadrature_error_GeV5": 1.1580857138815178e-66,
+        "width_per_nu_flavor_GeV": 1.3152353607116589e-74,
+        "width_three_flavors_GeV": 3.945706082134977e-74,
+        "lifetime_s": 1.668172801517565e+49,
+        "lifetime_years": 5.286120622346329e+41,
+        "universe_age_over_lifetime": 2.610610121468369e-32
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 320.3297128963686,
+      "literal_read_independent_carbon_D_upper": 1.8790496777067895e-27,
+      "physical_gap_read_delta_keV": 200.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 4000.0,
+        "effective_coefficient_GeV_minus2": 1.5625e-08,
+        "phase_integral_GeV5": 1.2799998063934961e-19,
+        "quadrature_error_GeV5": 1.4210852565738022e-34,
+        "width_per_nu_flavor_GeV": 4.199417910806125e-38,
+        "width_three_flavors_GeV": 1.2598253732418376e-37,
+        "lifetime_s": 5224628515031.891,
+        "lifetime_years": 165558.4871800102,
+        "universe_age_over_lifetime": 83354.22867808273
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 563.7736695133844
+    },
+    {
+      "mS_TeV": 2.0,
+      "quoted_sqrt_mass_squared_difference_keV": 300.0,
+      "literal_read_physical_gap_eV": 0.0224609375,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 4000.0,
+        "effective_coefficient_GeV_minus2": 1.5625e-08,
+        "phase_integral_GeV5": 2.31172586222514e-54,
+        "quadrature_error_GeV5": 1.402573781029659e-66,
+        "width_per_nu_flavor_GeV": 7.584300358649891e-73,
+        "width_three_flavors_GeV": 2.275290107594967e-72,
+        "lifetime_s": 2.8928704726613733e+47,
+        "lifetime_years": 9.166953357230503e+39,
+        "universe_age_over_lifetime": 1.5054074633329673e-30
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 320.32972805218213,
+      "literal_read_independent_carbon_D_upper": 1.8790496777067895e-27,
+      "physical_gap_read_delta_keV": 300.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 4000.0,
+        "effective_coefficient_GeV_minus2": 1.5625e-08,
+        "phase_integral_GeV5": 9.719997800800874e-19,
+        "quadrature_error_GeV5": 1.0791365357755015e-33,
+        "width_per_nu_flavor_GeV": 3.188932736848477e-37,
+        "width_three_flavors_GeV": 9.56679821054543e-37,
+        "lifetime_s": 688016975391.4705,
+        "lifetime_years": 21801.942333747513,
+        "universe_age_over_lifetime": 632971.1265513623
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 685.495653913935
+    },
+    {
+      "mS_TeV": 3.0,
+      "quoted_sqrt_mass_squared_difference_keV": 100.0,
+      "literal_read_physical_gap_eV": 0.00146484375,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 6000.0,
+        "effective_coefficient_GeV_minus2": 6.944444444444444e-09,
+        "phase_integral_GeV5": 1.8902408906486148e-60,
+        "quadrature_error_GeV5": 2.1677473966771464e-71,
+        "width_per_nu_flavor_GeV": 1.2249865204594963e-79,
+        "width_three_flavors_GeV": 3.674959561378489e-79,
+        "lifetime_s": 1.7910726523834253e+54,
+        "lifetime_years": 5.675566749003173e+46,
+        "universe_age_over_lifetime": 2.431475235917851e-37
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 314.1766426956809,
+      "literal_read_independent_carbon_D_upper": 1.2569612722976876e-27,
+      "physical_gap_read_delta_keV": 100.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 6000.0,
+        "effective_coefficient_GeV_minus2": 6.944444444444444e-09,
+        "phase_integral_GeV5": 3.999999840454331e-21,
+        "quadrature_error_GeV5": 1.9560225997682864e-35,
+        "width_per_nu_flavor_GeV": 2.592233566968986e-40,
+        "width_three_flavors_GeV": 7.776700700906958e-40,
+        "lifetime_s": 846389725173859.4,
+        "lifetime_years": 26820471.936201084,
+        "universe_age_over_lifetime": 514.5323330934148
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 435.8986253131946
+    },
+    {
+      "mS_TeV": 3.0,
+      "quoted_sqrt_mass_squared_difference_keV": 200.0,
+      "literal_read_physical_gap_eV": 0.0068359375,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 6000.0,
+        "effective_coefficient_GeV_minus2": 6.944444444444444e-09,
+        "phase_integral_GeV5": 5.907002783281938e-57,
+        "quadrature_error_GeV5": 5.681942751348812e-67,
+        "width_per_nu_flavor_GeV": 3.828082876439177e-76,
+        "width_three_flavors_GeV": 1.148424862931753e-75,
+        "lifetime_s": 5.731432487622094e+50,
+        "lifetime_years": 1.816181359679473e+43,
+        "universe_age_over_lifetime": 7.598360112249737e-34
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 314.17664923348275,
+      "literal_read_independent_carbon_D_upper": 1.2569612722976876e-27,
+      "physical_gap_read_delta_keV": 200.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 6000.0,
+        "effective_coefficient_GeV_minus2": 6.944444444444444e-09,
+        "phase_integral_GeV5": 1.2799998703934816e-19,
+        "quadrature_error_GeV5": 1.4210853276280595e-34,
+        "width_per_nu_flavor_GeV": 8.295146905238527e-39,
+        "width_three_flavors_GeV": 2.488544071571558e-38,
+        "lifetime_s": 26449680534865.027,
+        "lifetime_years": 838139.7994418152,
+        "universe_age_over_lifetime": 16465.033648551867
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 557.6206097137451
+    },
+    {
+      "mS_TeV": 3.0,
+      "quoted_sqrt_mass_squared_difference_keV": 300.0,
+      "literal_read_physical_gap_eV": 0.01513671875,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 6000.0,
+        "effective_coefficient_GeV_minus2": 6.944444444444444e-09,
+        "phase_integral_GeV5": 3.0442518568013873e-55,
+        "quadrature_error_GeV5": 1.0292010791793763e-66,
+        "width_per_nu_flavor_GeV": 1.972853041067094e-74,
+        "width_three_flavors_GeV": 5.918559123201282e-74,
+        "lifetime_s": 1.1121152010119322e+49,
+        "lifetime_years": 3.524080414898257e+41,
+        "universe_age_over_lifetime": 3.915915182201771e-32
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 314.17665933735844,
+      "literal_read_independent_carbon_D_upper": 1.2569612722976876e-27,
+      "physical_gap_read_delta_keV": 300.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 6000.0,
+        "effective_coefficient_GeV_minus2": 6.944444444444444e-09,
+        "phase_integral_GeV5": 9.71999856663514e-19,
+        "quadrature_error_GeV5": 1.079136620800185e-33,
+        "width_per_nu_flavor_GeV": 6.299126890080113e-38,
+        "width_three_flavors_GeV": 1.889738067024034e-37,
+        "lifetime_s": 3483085663488.5615,
+        "lifetime_years": 110372.32436841083,
+        "universe_age_over_lifetime": 125031.34349093799
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 679.3425941142957
+    },
+    {
+      "mS_TeV": 5.0,
+      "quoted_sqrt_mass_squared_difference_keV": 100.0,
+      "literal_read_physical_gap_eV": 0.0009765625,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 10000.0,
+        "effective_coefficient_GeV_minus2": 2.5e-09,
+        "phase_integral_GeV5": 2.4892061111422083e-61,
+        "quadrature_error_GeV5": 2.8546682435493585e-72,
+        "width_per_nu_flavor_GeV": 2.090643661584207e-81,
+        "width_three_flavors_GeV": 6.271930984752621e-81,
+        "lifetime_s": 1.0494566322559133e+56,
+        "lifetime_years": 3.3255273919940467e+48,
+        "universe_age_over_lifetime": 4.149717735966465e-39
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 309.25419426162375,
+      "literal_read_independent_carbon_D_upper": 7.5623226243810445e-28,
+      "physical_gap_read_delta_keV": 100.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 10000.0,
+        "effective_coefficient_GeV_minus2": 2.5e-09,
+        "phase_integral_GeV5": 3.999999920454328e-21,
+        "quadrature_error_GeV5": 1.6550960459577808e-35,
+        "width_per_nu_flavor_GeV": 3.3595347699825e-41,
+        "width_three_flavors_GeV": 1.00786043099475e-40,
+        "lifetime_s": 6530784785849269.0,
+        "lifetime_years": 206948081.7885159,
+        "universe_age_over_lifetime": 66.68339170257435
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 430.97617747348306
+    },
+    {
+      "mS_TeV": 5.0,
+      "quoted_sqrt_mass_squared_difference_keV": 200.0,
+      "literal_read_physical_gap_eV": 0.00390625,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 10000.0,
+        "effective_coefficient_GeV_minus2": 2.5e-09,
+        "phase_integral_GeV5": 2.54894705780962e-58,
+        "quadrature_error_GeV5": 2.923180281394543e-69,
+        "width_per_nu_flavor_GeV": 2.1408191094622268e-78,
+        "width_three_flavors_GeV": 6.42245732838668e-78,
+        "lifetime_s": 1.024859992437416e+53,
+        "lifetime_years": 3.247585343744188e+45,
+        "universe_age_over_lifetime": 4.249310961629658e-36
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 309.2541978276975,
+      "literal_read_independent_carbon_D_upper": 7.5623226243810445e-28,
+      "physical_gap_read_delta_keV": 200.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 10000.0,
+        "effective_coefficient_GeV_minus2": 2.5e-09,
+        "phase_integral_GeV5": 1.279999936145388e-19,
+        "quadrature_error_GeV5": 5.296307347064899e-34,
+        "width_per_nu_flavor_GeV": 1.0750510941428683e-39,
+        "width_three_flavors_GeV": 3.225153282428605e-39,
+        "lifetime_s": 204087030680400.16,
+        "lifetime_years": 6467127.749904941,
+        "universe_age_over_lifetime": 2133.868470466328
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 552.6981618740336
+    },
+    {
+      "mS_TeV": 5.0,
+      "quoted_sqrt_mass_squared_difference_keV": 300.0,
+      "literal_read_physical_gap_eV": 0.0087890625,
+      "literal_read_lifetime": {
+        "mZprime_GeV": 10000.0,
+        "effective_coefficient_GeV_minus2": 2.5e-09,
+        "phase_integral_GeV5": 2.4864063823642173e-56,
+        "quadrature_error_GeV5": 1.03251313837966e-68,
+        "width_per_nu_flavor_GeV": 2.0882922149933996e-76,
+        "width_three_flavors_GeV": 6.264876644980199e-76,
+        "lifetime_s": 1.0506383352773585e+51,
+        "lifetime_years": 3.3292719829054127e+43,
+        "universe_age_over_lifetime": 4.145050350604554e-34
+      },
+      "literal_read_carbon_open": true,
+      "literal_read_xenon_vmin_km_s": 309.25420377115375,
+      "literal_read_independent_carbon_D_upper": 7.5623226243810445e-28,
+      "physical_gap_read_delta_keV": 300.0,
+      "physical_gap_read_lifetime": {
+        "mZprime_GeV": 10000.0,
+        "effective_coefficient_GeV_minus2": 2.5e-09,
+        "phase_integral_GeV5": 9.719999076165948e-19,
+        "quadrature_error_GeV5": 2.1185229388259594e-33,
+        "width_per_nu_flavor_GeV": 8.163668877490453e-39,
+        "width_three_flavors_GeV": 2.4491006632471357e-38,
+        "lifetime_s": 26875659574862.504,
+        "lifetime_years": 851638.260668191,
+        "universe_age_over_lifetime": 16204.062965856643
+      },
+      "physical_gap_read_carbon_open": false,
+      "physical_gap_read_xenon_vmin_km_s": 674.4201462745841
+    }
+  ],
+  "checks": {
+    "all_literal_gaps_are_below_one_eV": true,
+    "literal_read_excited_state_survives_cosmic_age": true,
+    "physical_100_to_300keV_excited_state_decays_within_universe_age": true,
+    "literal_read_keeps_carbon_open": true,
+    "physical_gap_read_keeps_carbon_closed": true,
+    "literal_carbon_D_remains_below_one_sigma": true
+  },
+  "branch_verdict": {
+    "literal_q_reading": "P can survive cosmologically in the tree-level Zprime estimate and C-12 scattering is open, but the eV-scale gap makes the xenon spectrum effectively elastic and the generous independent-carbon D ceiling remains below 4e-27 per hold.",
+    "physical_100_to_300keV_gap_reading": "the high-recoil xenon shift is retained, but ground-state S upscattering on carbon is closed and primordial P is depleted well before the present halo age.",
+    "decision": "Neither reading yields a measurable shared xenon/Casimir-DP channel; resolve the source notation before using this model for any recoil-spectrum claim."
+  },
+  "limitations": [
+    "This is a tree-level off-shell Zprime-to-light-neutrino decay estimate, not a full branching-ratio calculation.",
+    "It assumes gBL=0.5 and mZprime=2mS on the resonant benchmark; width scales as gBL^4/mZprime^4 at fixed gap.",
+    "Majorana-neutrino current normalization, scalar/sterile-neutrino channels and radiative corrections can alter the width by order-one factors; they do not change the qualitative lifetime split between sub-eV and 100-keV gaps.",
+    "The carbon D ceiling transfers the source's order-1e-45 cm2 nucleon normalization, takes all local density in the scattering state, F_C^2=1 and D<=2 per event; it is a conservative independent-nucleus event-count bound, not a material response.",
+    "No LZ likelihood, gamma spectrum, boson-star solution or late-time P repopulation is computed."
+  ]
+}

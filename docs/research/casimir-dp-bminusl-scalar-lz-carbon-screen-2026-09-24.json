@@ -1,0 +1,265 @@
+{
+  "classification": "reproducible kinematic / free-field structure screen of a published bosonic B-L model; no joint prediction",
+  "source": "https://arxiv.org/html/2609.06909v1",
+  "inputs": {
+    "source_model": "real split components S (light) and P (heavy) of complex B-L scalar phi_1; off-diagonal Zprime derivative current",
+    "source_reported_DM_mass_regime": "few TeV, resonant mS approximately mZprime/2, gBL about 0.5",
+    "source_reported_splitting_scale": "O(100 keV), not a precise benchmark in the text extraction",
+    "source_reported_nucleon_cross_section_cm2": "order 1e-45",
+    "recoil_target_Xe131_GeV": 122.02572741702,
+    "recoil_energy_keV": 248.0,
+    "carbon_target_C12_GeV": 11.17792922904,
+    "speed_cap_km_s": 798.0,
+    "free_field_Kaup_coefficient": 0.633,
+    "frozen_configuration_path": "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json",
+    "frozen_configuration_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+    "frozen_C_sphere_mass_kg": 3.0925052683774525e-16,
+    "frozen_hold_s": 0.25,
+    "registered_one_sigma_D": 0.005816,
+    "exothermic_upscatter_normalization_sigma_p_times_fP_cm2": 1e-45,
+    "exothermic_ceiling_assumes_fP_local": 1.0
+  },
+  "outputs": [
+    {
+      "m_S_GeV": 1000.0,
+      "m_Zprime_resonance_GeV_if_mZprime_approx_2mS": 2000.0,
+      "B_L_split_to_reach_Xe131_248keV_at_vcap_max_keV": 376.59801997171934,
+      "maximum_endothermic_C12_splitting_at_vcap_keV": 39.16229684893074,
+      "C12_minimum_speed_km_s_by_diagnostic_splitting_keV": {
+        "100.0": 1275.1721345949184,
+        "200.0": 1803.3657271043835,
+        "300.0": 2208.6629255144576
+      },
+      "Xe131_minimum_speed_for_248keV_by_diagnostic_splitting_km_s": {
+        "100.0": 460.9430947231857,
+        "200.0": 582.8011272974162,
+        "300.0": 704.6591598716466
+      },
+      "free_field_Kaup_star_max_mass_kg": 168199914.61751607,
+      "free_field_Kaup_star_max_mass_solar": 8.458760485072245e-23,
+      "carbon_channel_open_for_all_delta_ge_100keV": false
+    },
+    {
+      "m_S_GeV": 2000.0,
+      "m_Zprime_resonance_GeV_if_mZprime_approx_2mS": 4000.0,
+      "B_L_split_to_reach_Xe131_248keV_at_vcap_max_keV": 391.72921017142977,
+      "maximum_endothermic_C12_splitting_at_vcap_keV": 39.37995704510832,
+      "C12_minimum_speed_km_s_by_diagnostic_splitting_keV": {
+        "100.0": 1271.6431972294715,
+        "200.0": 1798.3750560214032,
+        "300.0": 2202.550626700775
+      },
+      "Xe131_minimum_speed_for_248keV_by_diagnostic_splitting_km_s": {
+        "100.0": 442.50452404075384,
+        "200.0": 564.3625566149842,
+        "300.0": 686.2205891892147
+      },
+      "free_field_Kaup_star_max_mass_kg": 84099957.30875804,
+      "free_field_Kaup_star_max_mass_solar": 4.2293802425361227e-23,
+      "carbon_channel_open_for_all_delta_ge_100keV": false
+    },
+    {
+      "m_S_GeV": 3000.0,
+      "m_Zprime_resonance_GeV_if_mZprime_approx_2mS": 6000.0,
+      "B_L_split_to_reach_Xe131_248keV_at_vcap_max_keV": 396.772940238,
+      "maximum_endothermic_C12_splitting_at_vcap_keV": 39.453049101313304,
+      "C12_minimum_speed_km_s_by_diagnostic_splitting_keV": {
+        "100.0": 1270.4647065008153,
+        "200.0": 1796.7084184498067,
+        "300.0": 2200.509420882494
+      },
+      "Xe131_minimum_speed_for_248keV_by_diagnostic_splitting_km_s": {
+        "100.0": 436.3583338132765,
+        "200.0": 558.2163663875069,
+        "300.0": 680.0743989617372
+      },
+      "free_field_Kaup_star_max_mass_kg": 56066638.205838695,
+      "free_field_Kaup_star_max_mass_solar": 2.8195868283574155e-23,
+      "carbon_channel_open_for_all_delta_ge_100keV": false
+    },
+    {
+      "m_S_GeV": 5000.0,
+      "m_Zprime_resonance_GeV_if_mZprime_approx_2mS": 10000.0,
+      "B_L_split_to_reach_Xe131_248keV_at_vcap_max_keV": 400.80792429125603,
+      "maximum_endothermic_C12_splitting_at_vcap_keV": 39.511718393171414,
+      "C12_minimum_speed_km_s_by_diagnostic_splitting_keV": {
+        "100.0": 1269.5211262470473,
+        "200.0": 1795.3739944577405,
+        "300.0": 2198.875091941949
+      },
+      "Xe131_minimum_speed_for_248keV_by_diagnostic_splitting_km_s": {
+        "100.0": 431.4413816312947,
+        "200.0": 553.2994142055252,
+        "300.0": 675.1574467797556
+      },
+      "free_field_Kaup_star_max_mass_kg": 33639982.92350321,
+      "free_field_Kaup_star_max_mass_solar": 1.691752097014449e-23,
+      "carbon_channel_open_for_all_delta_ge_100keV": false
+    }
+  ],
+  "exothermic_excited_population_carbon_ceiling": [
+    {
+      "m_S_GeV": 1000.0,
+      "delta_keV_release": 100.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 98.89456356730783,
+      "expected_C_collisions_per_hold": 1.860078597686561e-27,
+      "D_upper": 3.720157195373122e-27,
+      "fraction_of_registered_one_sigma_D": 6.396418836611283e-25
+    },
+    {
+      "m_S_GeV": 1000.0,
+      "delta_keV_release": 200.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 197.78912713461565,
+      "expected_C_collisions_per_hold": 1.860078597686561e-27,
+      "D_upper": 3.720157195373122e-27,
+      "fraction_of_registered_one_sigma_D": 6.396418836611283e-25
+    },
+    {
+      "m_S_GeV": 1000.0,
+      "delta_keV_release": 300.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 296.68369070192347,
+      "expected_C_collisions_per_hold": 1.860078597686561e-27,
+      "D_upper": 3.720157195373122e-27,
+      "fraction_of_registered_one_sigma_D": 6.396418836611283e-25
+    },
+    {
+      "m_S_GeV": 2000.0,
+      "delta_keV_release": 100.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 99.44420983014045,
+      "expected_C_collisions_per_hold": 9.395248388533946e-28,
+      "D_upper": 1.879049677706789e-27,
+      "fraction_of_registered_one_sigma_D": 3.230828194131343e-25
+    },
+    {
+      "m_S_GeV": 2000.0,
+      "delta_keV_release": 200.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 198.8884196602809,
+      "expected_C_collisions_per_hold": 9.395248388533946e-28,
+      "D_upper": 1.879049677706789e-27,
+      "fraction_of_registered_one_sigma_D": 3.230828194131343e-25
+    },
+    {
+      "m_S_GeV": 2000.0,
+      "delta_keV_release": 300.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 298.33262949042137,
+      "expected_C_collisions_per_hold": 9.395248388533946e-28,
+      "D_upper": 1.879049677706789e-27,
+      "fraction_of_registered_one_sigma_D": 3.230828194131343e-25
+    },
+    {
+      "m_S_GeV": 3000.0,
+      "delta_keV_release": 100.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 99.62878549551863,
+      "expected_C_collisions_per_hold": 6.284806361488438e-28,
+      "D_upper": 1.2569612722976876e-27,
+      "fraction_of_registered_one_sigma_D": 2.161212641502214e-25
+    },
+    {
+      "m_S_GeV": 3000.0,
+      "delta_keV_release": 200.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 199.25757099103726,
+      "expected_C_collisions_per_hold": 6.284806361488438e-28,
+      "D_upper": 1.2569612722976876e-27,
+      "fraction_of_registered_one_sigma_D": 2.161212641502214e-25
+    },
+    {
+      "m_S_GeV": 3000.0,
+      "delta_keV_release": 300.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 298.8863564865559,
+      "expected_C_collisions_per_hold": 6.284806361488438e-28,
+      "D_upper": 1.2569612722976876e-27,
+      "fraction_of_registered_one_sigma_D": 2.161212641502214e-25
+    },
+    {
+      "m_S_GeV": 5000.0,
+      "delta_keV_release": 100.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 99.77694008500791,
+      "expected_C_collisions_per_hold": 3.781161312190522e-28,
+      "D_upper": 7.562322624381044e-28,
+      "fraction_of_registered_one_sigma_D": 1.3002617992402069e-25
+    },
+    {
+      "m_S_GeV": 5000.0,
+      "delta_keV_release": 200.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 199.55388017001582,
+      "expected_C_collisions_per_hold": 3.781161312190522e-28,
+      "D_upper": 7.562322624381044e-28,
+      "fraction_of_registered_one_sigma_D": 1.3002617992402069e-25
+    },
+    {
+      "m_S_GeV": 5000.0,
+      "delta_keV_release": 300.0,
+      "sigma_p_fP_cm2_assumed_max": 1e-45,
+      "f_P_local_assumed": 1.0,
+      "carbon_peak_keV": 299.33082025502375,
+      "expected_C_collisions_per_hold": 3.781161312190522e-28,
+      "D_upper": 7.562322624381044e-28,
+      "fraction_of_registered_one_sigma_D": 1.3002617992402069e-25
+    }
+  ],
+  "ultralight_star_component_portal_diagnostic": [
+    {
+      "m_S_GeV": 1000.0,
+      "m_phi_GeV": 1e-26,
+      "kappa_no_cancellation_estimate": 1.5791367041742972e-56,
+      "freezeout_temperature_GeV": 50.0,
+      "portal_sigma_v_order_of_magnitude_GeV_minus2": 1.2402510672119927e-120,
+      "Gamma_over_H_at_T_equals_m_over_20_order_of_magnitude": 5.167133393147473e-109
+    },
+    {
+      "m_S_GeV": 2000.0,
+      "m_phi_GeV": 1e-26,
+      "kappa_no_cancellation_estimate": 3.947841760435743e-57,
+      "freezeout_temperature_GeV": 100.0,
+      "portal_sigma_v_order_of_magnitude_GeV_minus2": 1.9378922925187385e-122,
+      "Gamma_over_H_at_T_equals_m_over_20_order_of_magnitude": 1.6147291853585854e-110
+    },
+    {
+      "m_S_GeV": 3000.0,
+      "m_phi_GeV": 1e-26,
+      "kappa_no_cancellation_estimate": 1.7545963379714413e-57,
+      "freezeout_temperature_GeV": 150.0,
+      "portal_sigma_v_order_of_magnitude_GeV_minus2": 1.701304618946492e-123,
+      "Gamma_over_H_at_T_equals_m_over_20_order_of_magnitude": 2.1263923428590425e-111
+    },
+    {
+      "m_S_GeV": 5000.0,
+      "m_phi_GeV": 1e-26,
+      "kappa_no_cancellation_estimate": 6.3165468166971894e-58,
+      "freezeout_temperature_GeV": 250.0,
+      "portal_sigma_v_order_of_magnitude_GeV_minus2": 7.937606830156755e-125,
+      "Gamma_over_H_at_T_equals_m_over_20_order_of_magnitude": 1.6534826858071918e-112
+    }
+  ],
+  "interpretation_limits": [
+    "The B-L preprint proposes endothermic upscattering of S to P. The tree-level Zprime transition cannot upscatter an isolated C12 nucleus when delta exceeds its maximum halo kinetic energy transfer.",
+    "The preprint's O(100 keV) splitting is not a precisely tabulated LZ best-fit interval in the extracted text. The computed C12 threshold is below 40 keV over this heavy-mass grid, so the stated scale lies above it.",
+    "The present-day P fraction is not inferred here. If P survives, the inverse transition is exothermic and carbon is open; the separate table deliberately assumes all local dark matter is P to bound this possibility.",
+    "The exothermic carbon ceiling transfers the paper's order-1e-45 cm2 nucleon normalization as sigma_p*fP, assumes F_C^2=1, maximum supported incident speed, and D per event <=2. It is a conditional upper screen, not a joint fit.",
+    "This does not bound collective solid excitations, virtual two-vertex elastic amplitudes, loops, or other apparatus couplings; each requires a separately derived response.",
+    "The free-field Kaup mass applies to a minimally coupled scalar without self-interactions. It is a structural scale comparator, not a star stability or formation solution for the B-L scalar potential.",
+    "No LZ likelihood, collider recast, gamma-ray yield, relic-density integration, or Casimir-DP response is recomputed. The paper's own thermal-rel relic and LZ statements remain model-dependent preprint results."
+  ]
+}

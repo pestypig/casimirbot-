@@ -1,0 +1,42 @@
+{
+  "schema": "casimirbot.ar2h.source_checkpoint.v1",
+  "date": "2026-09-25",
+  "capability": "OAuth REST invitation join",
+  "maturity": "implemented",
+  "transport": "POST /api/v1/rooms/join",
+  "classification": ["source admission", "tool admission", "evidence normalization"],
+  "verification": {
+    "unique_passing_tests": 67,
+    "suites": [
+      { "path": "server/services/shared-live-room-control/__tests__/service.test.ts", "passed": 31 },
+      { "path": "server/services/shared-live-room-control/__tests__/sensitive-text.test.ts", "passed": 4 },
+      { "path": "server/services/helix-ask/realtime-room/__tests__/personal-session-admission.test.ts", "passed": 3 },
+      { "path": "server/services/helix-ask/runtime-goals/__tests__/runtime-goal-account-binding.test.ts", "passed": 6 },
+      { "path": "server/routes/__tests__/helix-shared-live-room-transports.test.ts", "filter": "Shared Live Room REST facade", "passed": 18, "excluded": 9 },
+      { "path": "server/services/helix-ask/realtime-room/__tests__/room-lifecycle-route.test.ts", "passed": 5 }
+    ],
+    "discipline_quick": "passed with warnings about other existing dirty-worktree changes",
+    "environment_docs_audit": "passed",
+    "full_typecheck": "not run",
+    "full_transport_suite": "not passing: older exact MCP catalog assertion expects an obsolete tool list"
+  },
+  "deterministic_evidence": [
+    "Two independent simulated account profiles share real room persistence; concurrent service joins yield one new membership and one replay.",
+    "Guest remains a participant, media consent stays false, runtime stays idle and guest invitation creation is denied.",
+    "Scope and identity forgery checks, invitation redaction, changed-request conflict and owner-scoped receipts pass.",
+    "Current-membership replay rejects closed, left or replaced membership; uncertain join or receipt-save outcomes prohibit automatic retry.",
+    "Personal-session admission excludes the same profile across cookie and OAuth sessions."
+  ],
+  "repairs_found_by_tests": [
+    "Removed a service initialization import cycle by extracting the unchanged opaque profile-reference function.",
+    "Added one-time invitation patterns to existing secret redaction so query strings and unrelated operations reject invitation material."
+  ],
+  "limitations": [
+    "OAuth principals are simulated in these join tests; no real JWT-to-join or remote-account acceptance was performed.",
+    "The profile admission lock and personal-session registry remain process-local.",
+    "No EXE rebuild, runtime restart, deployment, provider configuration, guest UI, task delivery or paid media call occurred.",
+    "The earlier release-evaluator Casimir check remains unresolved after desktop_session_required; no PASS, certificate hash or integrity result exists.",
+    "The last installed pairing expired at 2026-09-25T13:30:35.074Z; this checkpoint does not renew it."
+  ],
+  "next": "Compose verified OAuth/account authentication with real join persistence, then qualify narrowly scoped native guest transport to the same authoritative room."
+}

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { z } from "zod";
 import { pairingState, type PairingLedgerRow } from "./pairing-ledger-contract";
+import { roomMissionSteeringEnvelopeSchema } from "./room-mission-steering";
 
 const ref = z.string().trim().min(3).max(320);
 const hash = (value: string) => crypto.createHash("sha256").update(value).digest("hex");
@@ -9,6 +10,7 @@ export const durableSteeringRequestSchema = z.object({
   origin: z.enum(["typed", "gpt_live_finalized", "agent_submitted"]),
   instructionText: z.string().trim().min(1).max(4000),
   expiresInSeconds: z.number().int().min(30).max(3600).default(600),
+  roomMission: roomMissionSteeringEnvelopeSchema.optional(),
 }).strict();
 export type DurableSteeringRequest = z.input<typeof durableSteeringRequestSchema>;
 export const durableSteeringRecordSchema = z.object({
@@ -42,7 +44,8 @@ const eventId = (owner: string, pairing: string, event: string) =>
 function requestDigest(owner: string, pairing: string, chat: string,
   environment: PairingLedgerRow["approval"]["environment"], request: z.output<typeof durableSteeringRequestSchema>) {
   return hash(JSON.stringify([owner, pairing, chat, environment?.roomId ?? null, environment?.runId ?? null,
-    request.clientEventRef, request.origin, request.instructionText, request.expiresInSeconds]));
+    request.clientEventRef, request.origin, request.instructionText, request.expiresInSeconds,
+    request.roomMission ?? null]));
 }
 function requireAccepted(grant: PairingLedgerRow, now: Date) {
   const state = pairingState(grant, now);

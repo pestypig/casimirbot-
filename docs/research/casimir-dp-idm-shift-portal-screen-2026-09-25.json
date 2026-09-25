@@ -1,0 +1,48 @@
+{
+  "classification": "shift_symmetric_derivative_portal_freezeout_scale_diagnostic",
+  "operator": "(c/Lambda^2)*(dphi_dagger dphi)*(H2_dagger H2)",
+  "inputs": {
+    "m_H_GeV": 1080.0,
+    "x_freezeout": 20.0,
+    "T_GeV": 54.0,
+    "g_star": 106.75,
+    "M_Pl_GeV": 1.2209e+19,
+    "Wilson_c": 1.0,
+    "n_H_equilibrium_GeV3_one_real_degree_MB": 0.0018431761083614235,
+    "H_radiation_GeV": 4.096372630664047e-15,
+    "assumed_sigma_v": "c^2*m_H^2/(64*pi*Lambda^4)"
+  },
+  "outputs": [
+    {
+      "target_Gamma_over_H": 1.0,
+      "sigma_v_GeV_minus2": 2.2224531948310173e-12,
+      "Lambda_GeV_for_c1": 7147.781369876741,
+      "Lambda_over_mH": 6.618316083219205,
+      "dimensionless_amplitude_estimate_c_mH2_over_Lambda2": 0.022829951587763603,
+      "eft_energy_expansion_mH_over_Lambda": 0.1510958357724117
+    },
+    {
+      "target_Gamma_over_H": 20.0,
+      "sigma_v_GeV_minus2": 4.444906389662034e-11,
+      "Lambda_GeV_for_c1": 3379.977126775077,
+      "Lambda_over_mH": 3.129608450717664,
+      "dimensionless_amplitude_estimate_c_mH2_over_Lambda2": 0.10209864734653734,
+      "eft_energy_expansion_mH_over_Lambda": 0.31952878954256586
+    },
+    {
+      "target_Gamma_over_H": 100.0,
+      "sigma_v_GeV_minus2": 2.2224531948310173e-10,
+      "Lambda_GeV_for_c1": 2260.3269345728954,
+      "Lambda_over_mH": 2.092895309789718,
+      "dimensionless_amplitude_estimate_c_mH2_over_Lambda2": 0.22829951587763608,
+      "eft_energy_expansion_mH_over_Lambda": 0.47780698600756777
+    }
+  ],
+  "interpretation_limits": [
+    "This operator preserves a constant shift symmetry of phi in the zero-mass limit, so it avoids the direct nonderivative portal threshold used in the prior naturalness screen; a UV completion and matching are still required.",
+    "Gamma/H=1 is only a contact scale. Gamma/H~x is an order-of-magnitude freeze-out relevance criterion, not a relic-density solution.",
+    "HH annihilation produces relativistic phi phi-dagger quanta. It does not produce the cold coherent charged field or boson-star seeds.",
+    "At the potentially relevant scale the EFT cutoff is only a few times m_H; resolved-mediator kinematics may be necessary.",
+    "The calculation says nothing about a xenon response, gamma-ray spectrum, local halo fraction, or Casimir-DP decoherence rate."
+  ]
+}

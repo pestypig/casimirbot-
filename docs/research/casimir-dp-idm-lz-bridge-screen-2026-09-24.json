@@ -1,0 +1,126 @@
+{
+  "source_benchmark": {
+    "arxiv": "2609.06571v1",
+    "m_H_GeV": 1080.0,
+    "delta_keV": 369.0,
+    "adopted_lab_speed_cap_km_s": 798.0
+  },
+  "idm_splitting_coupling": {
+    "absolute_lambda5": 1.31472081107512e-05,
+    "relation": "m_H^2 = m_A^2 + lambda5*v^2; lambda5 < 0 for m_A > m_H"
+  },
+  "targets": [
+    {
+      "target": "Xe-131 (representative isotope)",
+      "target_mass_GeV": 122.02572741702,
+      "reduced_mass_GeV": 109.6380739650012,
+      "threshold_speed_km_s": 777.8004409891607,
+      "threshold_speed_over_adopted_cap": 0.9746872694099759,
+      "kinematically_open_below_cap": true,
+      "recoil_at_threshold_keV": 331.5403247286246,
+      "momentum_transfer_at_threshold_MeV": 284.4519266698169
+    },
+    {
+      "target": "C-12",
+      "target_mass_GeV": 11.17792922904,
+      "reduced_mass_GeV": 11.063423520573457,
+      "threshold_speed_km_s": 2448.5225881804045,
+      "threshold_speed_over_adopted_cap": 3.0683240453388527,
+      "kinematically_open_below_cap": false,
+      "recoil_at_threshold_keV": 365.2199969638041,
+      "momentum_transfer_at_threshold_MeV": 90.35931915515528
+    }
+  ],
+  "lz_candidate_recoil": {
+    "recoil_energy_keV": 248.0,
+    "xe131_minimum_speed_km_s": 786.0095622467645
+  },
+  "higgs_elastic_conditional_screen": {
+    "model_inputs": {
+      "lambda_L": -0.000192,
+      "m_H_GeV": 1080.0,
+      "m_h_GeV": 125.1,
+      "f_N_scan": [
+        0.26,
+        0.3,
+        0.33
+      ],
+      "local_density_GeV_cm3": 0.3,
+      "speed_km_s": 798.0,
+      "speed_interpreted_as_support_cap": true
+    },
+    "frozen_design": {
+      "config_path": "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json",
+      "config_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+      "radius_m": 2.76302362398029e-07,
+      "mass_kg": 3.0925052683774525e-16,
+      "hold_time_s": 0.25,
+      "branch_separation_m": 2.5e-07,
+      "object_nucleons_approx": 186235020076.269,
+      "diosi_only_exponent_at_hold": 0.029511464722144533,
+      "minimum_primary_signal_snr": 5,
+      "registered_one_sigma_magnitude_precision": 0.005816050749546031
+    },
+    "rows": [
+      {
+        "f_N": 0.26,
+        "sigma_nucleon_cm2": 8.425653021518582e-52,
+        "fully_coherent_object_cross_section_upper_cm2": 3.8678982662310004e-23,
+        "single_hold_decoherence_exponent_upper": 4.2869205784060255e-19,
+        "fraction_of_registered_one_sigma_precision": 7.370844518061744e-17
+      },
+      {
+        "f_N": 0.3,
+        "sigma_nucleon_cm2": 1.1217585383678584e-51,
+        "fully_coherent_object_cross_section_upper_cm2": 5.149568697644823e-23,
+        "single_hold_decoherence_exponent_upper": 5.707438639889679e-19,
+        "fraction_of_registered_one_sigma_precision": 9.813254535881019e-17
+      },
+      {
+        "f_N": 0.33,
+        "sigma_nucleon_cm2": 1.3573278314251088e-51,
+        "fully_coherent_object_cross_section_upper_cm2": 6.230978124150236e-23,
+        "single_hold_decoherence_exponent_upper": 6.906000754266512e-19,
+        "fraction_of_registered_one_sigma_precision": 1.1874037988416035e-16
+      }
+    ],
+    "assumptions": [
+      "Zero-momentum Higgs exchange with an isoscalar nucleon matrix element f_N.",
+      "Born, elastic, short-range contact scattering with nucleon amplitudes summed coherently.",
+      "The object bound uses |sum_j exp(i q.r_j)| <= A_obj at every transfer; it is deliberately generous.",
+      "The visibility factor is bounded by 2, so D <= 2 times the total single-hold collision probability.",
+      "This bound excludes internal excitations, absorption, multiple scattering, and non-Higgs IDM loops.",
+      "The Stage-4.2R 0.005816 magnitude-uncertainty requirement is a design benchmark, not measured performance."
+    ]
+  },
+  "two_component_naturalness_screen": {
+    "m_phi_eV": 1e-17,
+    "idm_lambda3_reconstructed": 0.584000555019377,
+    "idm_lambda4_reconstructed": -0.5843714078112641,
+    "idm_lambda5_reconstructed": -1.314720811301374e-05,
+    "lambda_phi_H1_no_cancellation_scale": 3.299007795034178e-57,
+    "kappa_threshold_naturalness_scale_at_mH": 1.3538551990520388e-56,
+    "delta_lambda_phi_H1_over_kappa_one_loop_scale": 0.0036982267176465925,
+    "scope": "Naturalness diagnostics only; not mathematical exclusions or bounds if mass counterterms are fine-tuned."
+  },
+  "thermal_conversion_momentum_screen": {
+    "production_process": "H H -> phi phi* near nonrelativistic freeze-out",
+    "freezeout_temperature_GeV": 54.0,
+    "typical_phi_momentum_at_production_GeV": 1080.0,
+    "phi_mass_eV": 1e-17,
+    "cmb_temperature_today_eV": 0.0002348,
+    "entropy_dof_today": 3.91,
+    "entropy_dof_at_production_assumption": 106.75,
+    "typical_phi_momentum_today_eV": 0.0015595442895289411,
+    "momentum_over_phi_mass_today": 155954428952894.1,
+    "nonrelativistic_today": false,
+    "scope": "Free-streaming redshift estimate with adiabatic SM entropy evolution; not a Boltzmann abundance or structure-formation calculation."
+  },
+  "scope": [
+    "Thresholds use v_thr = sqrt(2 delta / reduced_mass), minimized over recoil energy.",
+    "The speed cap is the benchmark 544 + 254 = 798 km/s used by the source paper.",
+    "C-12 independent-nucleus ground-state upscattering is kinematically closed under this cap.",
+    "This does not exclude a separately calculated collective, electronic, or inelastic material channel.",
+    "No LZ likelihood, detector response, exact material channel, or boson-star population is computed."
+  ]
+}

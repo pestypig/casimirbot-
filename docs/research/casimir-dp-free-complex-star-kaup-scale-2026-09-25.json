@@ -1,0 +1,21 @@
+{
+  "status": "scaling screen only; not the selected member's solved ADM mass",
+  "inputs": {
+    "kaup_coefficient": "0.633",
+    "unreduced_planck_mass_GeV": "1.220890E+19",
+    "solar_mass_GeV": "1.115449E+57",
+    "boson_mass_eV": "1E-17",
+    "reference_target_mass_solar": "4.02E+6"
+  },
+  "outputs": {
+    "free_complex_kaup_max_solar": "8458767.045371863706901884353296295931056",
+    "target_mass_fraction_of_kaup_max": "0.4752465670749859325242950591779704567978",
+    "boson_mass_for_kaup_cap_at_target_eV": "2.104170906808921320124846854053804957974E-17"
+  },
+  "formula": "M_Kaup=0.633*M_Pl^2/m; uses the unreduced Planck mass",
+  "limitations": [
+    "Kaup value is the maximum mass of the free complex scalar family, not the mass at shat_0=6/5.",
+    "The selected NHM2 member is preregistered but not implemented or solved; its dimensionless ADM mass is not available here.",
+    "This scaling does not establish stability, astrophysical fit, formation, or a connection to xenon or Casimir-DP observables."
+  ]
+}

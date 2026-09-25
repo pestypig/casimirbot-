@@ -1,0 +1,79 @@
+{
+  "classification": "conditional simulation-calibrated halo-integral screen; not LZ likelihood or dark-matter evidence",
+  "source": "https://arxiv.org/html/2403.04122",
+  "recoil_benchmark_source": "https://arxiv.org/html/2609.06571",
+  "model": {
+    "form": "f_gal(v) proportional exp(-(v/v0)^2)/(1+exp(-k*(vdamp-v)))",
+    "k_per_km_s": 0.035,
+    "Staudt_Fire2_MW_central_v0_km_s": 257.0,
+    "Staudt_Fire2_MW_central_vdamp_km_s": 455.0,
+    "paper_reported_parameter_intervals_km_s": {
+      "v0": [
+        249.0,
+        265.0
+      ],
+      "vdamp": [
+        447.0,
+        463.0
+      ]
+    },
+    "density_GeV_cm3": 0.42,
+    "density_uncertainty_GeV_cm3": 0.06
+  },
+  "inputs": {
+    "vmin_km_s": 786.009560806017,
+    "v_lab_magnitude_km_s_fixed_to_IDM_source": 254.0,
+    "IDM_SHM_v0_km_s": 238.0,
+    "IDM_SHM_vesc_km_s": 544.0,
+    "source_SHM_eta_per_km_s": 7.555099680798103e-08
+  },
+  "central_tail_diagnostic": {
+    "paper_systematic_table_max_galactic_speed_km_s": 591.0999999999999,
+    "eta_contribution_at_or_below_table_max_per_km_s": 4.533616922836418e-08,
+    "eta_contribution_above_table_max_per_km_s": 1.126740071379998e-08,
+    "fraction_of_central_eta_from_un_tabulated_tail": 0.1990581287595937,
+    "relative_eta_quadrature_change_600x200_vs_1200x300": 6.402296592433743e-06
+  },
+  "outputs": [
+    {
+      "case": "central",
+      "v0_km_s": 257.0,
+      "vdamp_km_s": 455.0,
+      "k_per_km_s": 0.035,
+      "lab_boost_km_s": 254.0,
+      "eta_per_km_s": 5.660362150765367e-08,
+      "eta_ratio_to_IDM_source_SHM": 0.749210783433028,
+      "rho_times_eta_ratio_vs_rho_0p3_SHM": 1.0488950968062392,
+      "minimum_galactic_speed_that_can_contribute_km_s": 532.009560806017
+    },
+    {
+      "case": "parameter low corner (diagnostic only)",
+      "v0_km_s": 249.0,
+      "vdamp_km_s": 447.0,
+      "k_per_km_s": 0.035,
+      "lab_boost_km_s": 254.0,
+      "eta_per_km_s": 3.397999524964264e-08,
+      "eta_ratio_to_IDM_source_SHM": 0.4497623682716661,
+      "rho_times_eta_ratio_vs_rho_0p3_SHM": 0.6296673155803325,
+      "minimum_galactic_speed_that_can_contribute_km_s": 532.009560806017
+    },
+    {
+      "case": "parameter high corner (diagnostic only)",
+      "v0_km_s": 265.0,
+      "vdamp_km_s": 463.0,
+      "k_per_km_s": 0.035,
+      "lab_boost_km_s": 254.0,
+      "eta_per_km_s": 9.182316904899161e-08,
+      "eta_ratio_to_IDM_source_SHM": 1.2153799807879122,
+      "rho_times_eta_ratio_vs_rho_0p3_SHM": 1.7015319731030771,
+      "minimum_galactic_speed_that_can_contribute_km_s": 532.009560806017
+    }
+  ],
+  "method_limits": [
+    "Assumes the paper's isotropic Galactic-frame speed distribution and applies a fixed-magnitude 254 km/s lab boost; no annual modulation, velocity anisotropy, or streams are modeled.",
+    "The paper's quoted total galaxy-to-galaxy systematic band is not propagated. Its tabulated residuals stop at v/v0=2.30, while the threshold requires Galactic-frame speeds of at least 532 km/s; tail extrapolation is therefore a material limitation.",
+    "The plus/minus parameter corner cases vary v0 and vdamp independently and are diagnostic envelopes, not joint posterior intervals.",
+    "The rho-times-eta comparison assumes rho=0.42 GeV/cm^3 for this model and rho=0.30 GeV/cm^3 for the source SHM; the ratio is a conditional normalization comparison, not a detector prediction."
+  ],
+  "falsification_test": "A common-convention Milky Way velocity model with adequately quantified high-speed tail uncertainty must provide a robust, non-negligible halo integral at vmin=786 km/s before this inelastic xenon benchmark can be treated as a stable prediction."
+}

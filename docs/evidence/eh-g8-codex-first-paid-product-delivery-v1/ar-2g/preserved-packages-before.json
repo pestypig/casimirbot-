@@ -1,0 +1,38 @@
+[
+  {
+    "path": "apps/desktop/release/win-unpacked/CasimirBot.exe",
+    "sha256": "8ab009a01ac588d915ce2df4551b4e67232a58ed606fa947d51e341684826d51"
+  },
+  {
+    "path": "apps/desktop/release/win-unpacked/resources/app.asar",
+    "sha256": "338f9ef407f0ad9841c93347c52bc685c48906d98eb44f9514fac97b378ce72c"
+  },
+  {
+    "path": "apps/desktop/release-ar2e-20260925/win-unpacked/CasimirBot.exe",
+    "sha256": "1dee5df3fcce62761401b34a395d31f30bfefccc6fcf9e620c9d644b090eb9c6"
+  },
+  {
+    "path": "apps/desktop/release-ar2e-20260925/win-unpacked/resources/app.asar",
+    "sha256": "93886ef91b0fddef30b0eeb8549974e52617ec6ee2a0aec6221e20150e95b82c"
+  },
+  {
+    "path": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/CasimirBot.exe",
+    "sha256": "88fe1151c42a11ccb537e6e68793fb9444d79e8b92081249a7ac4ae227da4c48"
+  },
+  {
+    "path": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/resources/app.asar",
+    "sha256": "c6e41100c9660dd46e5118cc63f69eb1e4b28c2aa9d1ae954a8be74f9b22d215"
+  },
+  {
+    "path": "apps/desktop/release/win-unpacked/resources/runtime/runtime-manifest.json",
+    "sha256": "72e24730b548e06ff0621f4555e6dff2939d05bf4aacf06535238164dcb630a4"
+  },
+  {
+    "path": "apps/desktop/release-ar2e-20260925/win-unpacked/resources/runtime/runtime-manifest.json",
+    "sha256": "5f4966da39055f5045a14a9a54da467122d54edb1f3a0fccda657b67edf61764"
+  },
+  {
+    "path": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked/resources/runtime/runtime-manifest.json",
+    "sha256": "71dc5248039f98ee2bb145bc4afe6b05c0a6259fb2b4a1ef24af610d14fe98d3"
+  }
+]

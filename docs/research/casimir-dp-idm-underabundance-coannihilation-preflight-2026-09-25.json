@@ -1,0 +1,217 @@
+{
+  "classification": "IDM_subdominant_relic_and_coannihilator_weight_preflight_not_relic_solution",
+  "inputs": {
+    "m_H_GeV": 1080.0,
+    "m_A_minus_m_H_GeV": 0.000369,
+    "profile_bestfit_m_Hplus_minus_m_H_GeV": 8.17,
+    "paper_scanned_m_Hplus_minus_m_H_GeV": [
+      0.5,
+      10.0
+    ],
+    "paper_profile_Omega_H_h2": 0.12014,
+    "adopted_Omega_DM_h2": 0.1198,
+    "adopted_Omega_DM_sigma": 0.0012,
+    "freezeout_x_values_for_diagnostic_only": [
+      20.0,
+      25.0,
+      30.0
+    ]
+  },
+  "abundance_targets": [
+    {
+      "f_phi": 0.0,
+      "required_f_H": 1.0,
+      "required_Omega_H_h2": 0.1198,
+      "target_over_published_IDM_relic": 0.9971699683702347,
+      "fixed_profile_plus_phi_total_Omega_h2": 0.12014,
+      "fixed_profile_plus_phi_planck_central_sigma": 0.2833333333333276,
+      "approx_sigma_eff_multiplier_inverse_Omega_only": 1.002838063439065
+    },
+    {
+      "f_phi": 0.007178631051753035,
+      "required_f_H": 0.992821368948247,
+      "required_Omega_H_h2": 0.11893999999999999,
+      "target_over_published_IDM_relic": 0.9900116530714166,
+      "fixed_profile_plus_phi_total_Omega_h2": 0.12100000000000001,
+      "fixed_profile_plus_phi_planck_central_sigma": 1.0000000000000056,
+      "approx_sigma_eff_multiplier_inverse_Omega_only": 1.010089120564991
+    },
+    {
+      "f_phi": 0.01,
+      "required_f_H": 0.99,
+      "required_Omega_H_h2": 0.118602,
+      "target_over_published_IDM_relic": 0.9871982686865324,
+      "fixed_profile_plus_phi_total_Omega_h2": 0.121338,
+      "fixed_profile_plus_phi_planck_central_sigma": 1.281666666666665,
+      "approx_sigma_eff_multiplier_inverse_Omega_only": 1.0129677408475406
+    },
+    {
+      "f_phi": 0.1,
+      "required_f_H": 0.9,
+      "required_Omega_H_h2": 0.10782,
+      "target_over_published_IDM_relic": 0.8974529715332112,
+      "fixed_profile_plus_phi_total_Omega_h2": 0.13212,
+      "fixed_profile_plus_phi_planck_central_sigma": 10.266666666666653,
+      "approx_sigma_eff_multiplier_inverse_Omega_only": 1.1142645149322945
+    },
+    {
+      "f_phi": 0.25,
+      "required_f_H": 0.75,
+      "required_Omega_H_h2": 0.08985,
+      "target_over_published_IDM_relic": 0.7478774762776761,
+      "fixed_profile_plus_phi_total_Omega_h2": 0.15009,
+      "fixed_profile_plus_phi_planck_central_sigma": 25.241666666666667,
+      "approx_sigma_eff_multiplier_inverse_Omega_only": 1.3371174179187535
+    }
+  ],
+  "coannihilator_equilibrium_weights": [
+    {
+      "x_freezeout_m_over_T": 20.0,
+      "delta_charged_GeV": 0.5,
+      "weight_H": 0.25107101383691427,
+      "weight_A": 0.25106942686387457,
+      "weight_charged_total": 0.4978595592992111,
+      "weight_neutral_total": 0.5021404407007888,
+      "ordered_pair_population_fraction_charged_charged": 0.2478641407856047,
+      "ordered_pair_population_fraction_neutral_charged": 0.4999908370272127,
+      "ordered_pair_population_fraction_neutral_neutral": 0.2521450221871824,
+      "charged_fraction_ratio_to_8p17_GeV": 1.0705278478654727,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 1.1460298730554808,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 1.0048887933939834,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 0.8811301614647614
+    },
+    {
+      "x_freezeout_m_over_T": 20.0,
+      "delta_charged_GeV": 8.17,
+      "weight_H": 0.2674709021248434,
+      "weight_A": 0.2674692114911693,
+      "weight_charged_total": 0.4650598863839872,
+      "weight_neutral_total": 0.5349401136160128,
+      "ordered_pair_population_fraction_charged_charged": 0.2162806979234871,
+      "ordered_pair_population_fraction_neutral_charged": 0.49755837692100024,
+      "ordered_pair_population_fraction_neutral_neutral": 0.28616092515551267,
+      "charged_fraction_ratio_to_8p17_GeV": 1.0,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 1.0,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 1.0,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 1.0
+    },
+    {
+      "x_freezeout_m_over_T": 20.0,
+      "delta_charged_GeV": 10.0,
+      "weight_H": 0.2713682288712057,
+      "weight_A": 0.2713665136032563,
+      "weight_charged_total": 0.4572652575255379,
+      "weight_neutral_total": 0.542734742474462,
+      "ordered_pair_population_fraction_charged_charged": 0.2090915157398965,
+      "ordered_pair_population_fraction_neutral_charged": 0.4963474835712827,
+      "ordered_pair_population_fraction_neutral_neutral": 0.2945610006888205,
+      "charged_fraction_ratio_to_8p17_GeV": 0.9832395158415932,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 0.9667599455124106,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 0.9975663290864264,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 1.029354376488484
+    },
+    {
+      "x_freezeout_m_over_T": 25.0,
+      "delta_charged_GeV": 0.5,
+      "weight_H": 0.2513604676729853,
+      "weight_A": 0.25135844946597724,
+      "weight_charged_total": 0.4972810828610375,
+      "weight_neutral_total": 0.5027189171389626,
+      "ordered_pair_population_fraction_charged_charged": 0.24728847537144605,
+      "ordered_pair_population_fraction_neutral_charged": 0.49998521497918297,
+      "ordered_pair_population_fraction_neutral_neutral": 0.2527263096493711,
+      "charged_fraction_ratio_to_8p17_GeV": 1.0913333239532637,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 1.1910084239708791,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 1.00789530580875,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 0.8529351489256571
+    },
+    {
+      "x_freezeout_m_over_T": 25.0,
+      "delta_charged_GeV": 8.17,
+      "weight_H": 0.27216919566451303,
+      "weight_A": 0.2721670103814287,
+      "weight_charged_total": 0.4556637939540583,
+      "weight_neutral_total": 0.5443362060459418,
+      "ordered_pair_population_fraction_charged_charged": 0.20762949312060652,
+      "ordered_pair_population_fraction_neutral_charged": 0.4960686016669037,
+      "ordered_pair_population_fraction_neutral_neutral": 0.29630190521249,
+      "charged_fraction_ratio_to_8p17_GeV": 1.0,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 1.0,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 1.0,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 1.0
+    },
+    {
+      "x_freezeout_m_over_T": 25.0,
+      "delta_charged_GeV": 10.0,
+      "weight_H": 0.27710077554191737,
+      "weight_A": 0.2770985506625149,
+      "weight_charged_total": 0.44580067379556776,
+      "weight_neutral_total": 0.5541993262044322,
+      "ordered_pair_population_fraction_charged_charged": 0.19873824075658222,
+      "ordered_pair_population_fraction_neutral_charged": 0.49412486607797107,
+      "ordered_pair_population_fraction_neutral_neutral": 0.3071368931654467,
+      "charged_fraction_ratio_to_8p17_GeV": 0.9783543913531014,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 0.9571773150798976,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 0.9960817201846656,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 1.0365673921171261
+    },
+    {
+      "x_freezeout_m_over_T": 30.0,
+      "delta_charged_GeV": 0.5,
+      "weight_H": 0.25164991836380396,
+      "weight_A": 0.25164746793463244,
+      "weight_charged_total": 0.4967026137015635,
+      "weight_neutral_total": 0.5032973862984365,
+      "ordered_pair_population_fraction_charged_charged": 0.2467134864579646,
+      "ordered_pair_population_fraction_neutral_charged": 0.49997825448719774,
+      "ordered_pair_population_fraction_neutral_neutral": 0.25330825905483756,
+      "charged_fraction_ratio_to_8p17_GeV": 1.1129364786046763,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 1.2386276054089769,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 1.0116257348132645,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 0.8262262385138505
+    },
+    {
+      "x_freezeout_m_over_T": 30.0,
+      "delta_charged_GeV": 8.17,
+      "weight_H": 0.27685176873902323,
+      "weight_A": 0.2768490729080263,
+      "weight_charged_total": 0.4462991583529505,
+      "weight_neutral_total": 0.5537008416470495,
+      "ordered_pair_population_fraction_charged_charged": 0.19918293874655196,
+      "ordered_pair_population_fraction_neutral_charged": 0.49423243921279697,
+      "ordered_pair_population_fraction_neutral_neutral": 0.30658462204065096,
+      "charged_fraction_ratio_to_8p17_GeV": 1.0,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 1.0,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 1.0,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 1.0
+    },
+    {
+      "x_freezeout_m_over_T": 30.0,
+      "delta_charged_GeV": 10.0,
+      "weight_H": 0.2828046422526048,
+      "weight_A": 0.28280188845578375,
+      "weight_charged_total": 0.43439346929161143,
+      "weight_neutral_total": 0.5656065307083886,
+      "ordered_pair_population_fraction_charged_charged": 0.18869768616320218,
+      "ordered_pair_population_fraction_neutral_charged": 0.49139156625681857,
+      "ordered_pair_population_fraction_neutral_neutral": 0.31991074757997934,
+      "charged_fraction_ratio_to_8p17_GeV": 0.9733235233844569,
+      "charged_charged_pair_weight_ratio_to_8p17_GeV": 0.9473586811735335,
+      "neutral_charged_pair_weight_ratio_to_8p17_GeV": 0.9942519496281885,
+      "neutral_neutral_pair_weight_ratio_to_8p17_GeV": 1.0434663860523357
+    }
+  ],
+  "interpretation": [
+    "At f_phi=0.10, the target IDM abundance is 0.10782, 0.89745 of the published 0.12014 point; inverse-Omega scaling alone suggests a 1.1143 effective freezeout-rate multiplier.",
+    "The profile paper treats charged splitting as a profiled parameter and scans 0.5-10 GeV; moving below its 8.17 GeV best-fit value raises the charged equilibrium weight.",
+    "At x=25, the charged-charged population pair weight rises 19.1% from DeltaM_charged=8.17 to 0.5 GeV, while the neutral-neutral weight falls 14.7%; mixed initial-state weight changes by less than 1%. The effective rate is their weighted sum with different channel cross sections, which this preflight does not calculate.",
+    "The neutral mass splitting of 369 keV is negligible compared with the freezeout temperature in this diagnostic, but it remains essential for the present-day xenon kinematics."
+  ],
+  "required_next_calculation": "Re-run the exact IDM model in micrOMEGAs at fixed m_H and delta, scan DeltaM_charged, lambda_L, and lambda_2 under vacuum, unitarity, oblique, collider, and indirect constraints; then response-profile LZ with rho_H/rho_DM=Omega_H/Omega_DM and verify whether Omega_H h^2<=0.10782 remains allowed.",
+  "limits": [
+    "Equilibrium weights use nonrelativistic Maxwell-Boltzmann statistics and an illustrative x_f grid; they are not a freezeout integration.",
+    "All channel cross sections, thresholds, Sommerfeld effects, thermal corrections, and changing x_f are omitted.",
+    "No micrOMEGAs executable or model source is present in the inspected repository/environment; do not promote this preflight to an IDM point selection.",
+    "The LZ paper states that its full profile likelihood requires additional detector-level information not currently public."
+  ]
+}

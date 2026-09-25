@@ -1,0 +1,37 @@
+{
+  "classification": "pNGB_star_and_radial_mediator_conditional_compatibility_screen",
+  "inputs": {
+    "m_phi_eV": 1e-17,
+    "target_star_mass_solar": 4020000.0,
+    "m_H_GeV": 1080.0,
+    "axion_like_dilute_star_scaling": "Mmax=5.97e-12 Msun*(m_phi/1e-5 eV)^-1*(f/1e12 GeV), kappa_axion=1",
+    "freezeout_contact_scale_GeV": 3379.977126775077,
+    "matching": "C_derivative=2*kappa_X/m_s^2; m_s^2=2*lambda_X*f^2",
+    "radial_quartic_naturalness": "delta_lambda_X~kappa_X^2/(16*pi^2)"
+  },
+  "outputs": {
+    "f_required_GeV_for_target_star_mass": 6.733668341708543e+17,
+    "f_over_reduced_Planck_2p435e18_GeV": 0.27653668754449867,
+    "C_required_GeV_minus2": 8.753313387048812e-08,
+    "optimistic_min_radial_mass_GeV": 2160.0,
+    "kappa_required_at_min_radial_mass": 0.20419729469307468,
+    "lambda_X_tree_at_min_radial_mass": 5.144865938961907e-30,
+    "delta_lambda_X_loop": 0.0002640463935120346,
+    "loop_correction_over_tree_lambda": 5.132230783943651e+25,
+    "kappa_2_max_from_no_cancellation_in_mH2": 5.144865938961907e-30,
+    "kappa_required_over_mH2_natural_max": 3.9689526824536866e+28,
+    "maximum_C_from_mH2_naturalness_at_mediator_threshold_GeV_minus2": 2.205446647360214e-36,
+    "required_over_max_C_from_mH2_naturalness": 3.968952682453687e+28,
+    "maximum_natural_C_for_mediator_at_least_2mH_GeV_minus2": 1.2218542077024803e-20,
+    "required_over_max_natural_C": 7163958950150.157,
+    "radial_mass_if_target_C_and_loop_naturalness_GeV": 3.015092653419973e-10,
+    "radial_mass_if_target_C_and_loop_naturalness_eV": 0.3015092653419973
+  },
+  "interpretation": "For the standard attractive pNGB dilute-star scaling, the Sgr A*-scale target asks for f near the reduced Planck scale. In the minimal weakly coupled linear-sigma completion, a radial mediator heavy enough for freezeout scattering cannot naturally generate the required derivative portal: the invariant portal itself induces a heavy-doublet mass threshold that requires about 10^28 cancellation, while even the radial-quartic naturalness bound leaves the coefficient more than 10^12 too small. Matching the target coefficient with loop-sized radial quartic instead makes the radial mode sub-eV, invalidating the contact EFT.",
+  "limits": [
+    "The dilute-star mass formula is for a standard attractive axion-like potential; the exact O(3)/O(2) soft-breaking potential needs its own Einstein-Klein-Gordon solutions.",
+    "The radial matching and loop estimate are leading-order linear-sigma-model power counting; multiplicities and UV structure can change order-one factors.",
+    "The mediator threshold m_s=2m_H is intentionally optimistic and not a controlled contact limit.",
+    "A tuned, strongly coupled, multi-field, or different UV model is not excluded; it must be analyzed as a distinct candidate."
+  ]
+}

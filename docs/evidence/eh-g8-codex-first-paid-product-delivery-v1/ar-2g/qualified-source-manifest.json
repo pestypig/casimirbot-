@@ -1,0 +1,57 @@
+{
+  "schema": "casimirbot.ar2f.source-manifest.v1",
+  "captured_at": "2026-09-25T04:34:27.4472489Z",
+  "git_head": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "source_tree": "dirty",
+  "installed_package_rebuilt": false,
+  "files": [
+    {
+      "path": "shared/helix-room-mission-owner.ts",
+      "sha256": "6565bc22618de0c9723f936d6fb0142d2375a7f4d51713b0ac86f40f221019ba"
+    },
+    {
+      "path": "server/routes/agent-connections.ts",
+      "sha256": "1050d03d211fb321471906bb9ba6e3526892bf221e3d46ce05ce4dd37bfc78b6"
+    },
+    {
+      "path": "server/routes/__tests__/agent-connections.test.ts",
+      "sha256": "303b9a418abcdc0e96050ebacdc5aba8b3c53e1645327ec59e76e2f28a168ae0"
+    },
+    {
+      "path": "server/routes/__tests__/room-mission-owner-options.test.ts",
+      "sha256": "0e0a81b994af71b238ee1be29c5310d636fa913d885207d3322eeceec7235d14"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/voice-handoff-authority.test.ts",
+      "sha256": "90ed2e840e14f3a718973e9f9ebd73917c45717f1bdb8e8a71340cb65c6b21cf"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/HelixAskRealtimeProviderEventHandler.ts",
+      "sha256": "3ae130f3e9e8b7e266931c90b00702dbb740acb71e47db8f5d990e715717e20e"
+    },
+    {
+      "path": "client/src/components/__tests__/helix-ask-realtime-provider-event-handler.spec.ts",
+      "sha256": "a8a3425007e98cc076c9b83811bd76b900acb6f4efbc54fa04b9e68d3e3e34eb"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomActivePanel.tsx",
+      "sha256": "158f91df602c9ff09445fc4a005ba0f9cf1a06395b9edb2cff5c3e4d189220eb"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/RoomMissionHandoffReview.ts",
+      "sha256": "9f8d9e0c99fa2fa0c052da4e7a85abf931a98ade62a2d864f736903f52a5b8b7"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/RoomMissionOwnerApi.ts",
+      "sha256": "7b5e468e8936ba6bfa788027137dc5b905fc6f95d84cfdff65ae49042736c930"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomMissionPanel.tsx",
+      "sha256": "1ce7bf2f4dd6a2a3f114e77a31c58fd266f24b12bfc005197e4667d42c5c725b"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomMissionPanel.spec.tsx",
+      "sha256": "c58585fa17848908be6bf376bd776db42ffe47fdf05eb5329a4e726253a785a9"
+    }
+  ]
+}

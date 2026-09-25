@@ -1,0 +1,57 @@
+{
+  "classification": "conditional_dark_photon_LZ_gamma_candidate_scale_screen_not_profile_fit",
+  "paper": "Yamashita, arXiv:2609.02868v2 (2026-09-03)",
+  "inputs": {
+    "m_X_GeV": 420.0,
+    "delta_keV": 316.0,
+    "m_phi_GeV": 0.4,
+    "m_phi_prime_GeV": 0.4,
+    "v_esc_km_s": 544.0,
+    "v_earth_km_s": 220.0,
+    "sigma_v_halo_cm3_s": 2.7e-24,
+    "sigma_v_dwarf_cm3_s": 6.5e-26,
+    "sigma_v_freezeout_cm3_s": 1.9e-26,
+    "Totani_bbar_sigma_v_cm3_s_range": [
+      5e-25,
+      8e-25
+    ]
+  },
+  "derived": {
+    "vmax_km_s": 764.0,
+    "Xe136_threshold_km_s": 763.9465096493543,
+    "Xe136_delta_ceiling_keV": 316.04425320974633,
+    "C12_threshold_km_s": 2284.031979278871,
+    "C12_delta_ceiling_keV": 35.356514026741856,
+    "carbon_threshold_over_vmax": 2.9895706535063757,
+    "complex_Proca_free_max_mass_kg_scale_only": 669357968.8657627,
+    "complex_Proca_free_max_mass_solar_scale_only": 3.366195964061629e-22,
+    "SgrA_reference_over_complex_Proca_scale": 1.1942263739005544e+28,
+    "halo_over_dwarf_sigma_v": 41.53846153846154,
+    "halo_over_freezeout_sigma_v": 142.10526315789474,
+    "halo_over_Totani_bbar_rate_range": [
+      3.375,
+      5.4
+    ],
+    "V_lifetime_s": 3e-06,
+    "universe_age_over_V_lifetime": 1.4499999999999999e+23
+  },
+  "source_findings": {
+    "LZ_normalization": "about one event in 225-271 keV, normalized phenomenologically; no full local/global profile likelihood",
+    "gamma_channel": "420 GeV X X -> W+W- with p-wave freeze-out and Sommerfeld enhancement",
+    "extra_symmetry": "paper says a further discrete symmetry is still needed to isolate diagonal and off-diagonal scalar couplings; construction left for future work",
+    "V_today": "unstable; paper gives a 3 microsecond lifetime via V -> X gamma"
+  },
+  "checks": {
+    "xenon_threshold_within_paper_vmax": true,
+    "carbon_upscatter_closed": true,
+    "complex_Proca_scale_far_below_SgrA": true,
+    "V_not_surviving_to_present": true,
+    "paper_gamma_rate_exceeds_user_Totani_range": true
+  },
+  "limits": [
+    "The Proca mass scaling assumes a free, minimally coupled complex vector with conserved charge; it is only a comparator for the paper's parity-stabilized dark photon X.",
+    "The LZ rate is a one-event normalization, not an independent collaboration profile-likelihood fit or evidence of detection.",
+    "No Casimir-DP material response is calculated; carbon is kinematically closed for the paper's specified X-to-V transition under its own halo support.",
+    "No complete field-theory symmetry construction, stellar solution, or local population model is provided by this screen."
+  ]
+}

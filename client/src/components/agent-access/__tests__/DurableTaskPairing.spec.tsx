@@ -20,17 +20,18 @@ async function selectAndApprove() {
 }
 
 it.each([
-  ["pairing_account_link_required", /The account link for this exact task could not be verified/],
-  ["pairing_device_identity_mismatch", /This request does not match the installed device/],
-  ["pairing_device_trust_required", /Device trust is not current/],
-])("shows fixed authority guidance and retains the same reviewed request after %s", async (code, guidance) => {
+  ["pairing_account_link_required", /The account link for this exact task could not be verified/, 403],
+  ["pairing_device_identity_mismatch", /This request does not match the installed device/, 403],
+  ["pairing_device_trust_required", /Device trust is not current/, 403],
+  ["pairing_registration_expired", /This task's registration expired.*Cancel request and review again/, 409],
+])("shows fixed authority guidance and retains the same reviewed request after %s", async (code, guidance, status) => {
   const writes: unknown[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
     if (init.method === "GET") return response(url.includes("/reasoning-invitations/")
       ? { ok: true, pairing: null, execution_authority: false, answer_authority: false } : listed);
     writes.push(JSON.parse(init.body as string));
     return new Response(JSON.stringify({ schema: "helix.reasoning_task_binding_error.v1", ok: false,
-      error: code, message: "fixture-private-detail" }), { status: 403 });
+      error: code, message: "fixture-private-detail" }), { status });
   }));
   render(<DurableTaskPairing {...props} />);
   await selectAndApprove();

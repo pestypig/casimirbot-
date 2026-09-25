@@ -54,3 +54,28 @@ it("rejects impossible persisted acknowledgement revisions", () => {
   expect(durableSteeringRecordSchema.safeParse(pending).success).toBe(true);
   expect(durableSteeringRecordSchema.safeParse(acknowledged).success).toBe(true);
 });
+
+it("binds a private room mission envelope into the durable request digest", () => {
+  const roomMission = {
+    schema: "helix.room_mission_steering.v1" as const,
+    roomId: "room:fixture", ownerProfileId: "fixture-owner",
+    roomMissionId: "room_mission:fixture", roomMissionRevision: 2,
+    handoffId: "handoff:fixture", realtimeSessionId: "realtime:fixture",
+    runtimeId: "runtime:fixture", speakerParticipantId: "participant:fixture",
+    capturedAtMs: now.getTime(), consentVersion: 3,
+    consentReceiptRef: "consent:fixture", transcriptTextHash: `sha256:${"a".repeat(64)}`,
+    bindingId: "binding:fixture", bindingEpoch: 4,
+    authenticatedMcpClientRef: "client:fixture", clientSessionRef: "session:fixture",
+    clientContinuationRef: "continuation:fixture", helixConversationId: "fixture-chat",
+    bindingMissionId: null, runId: null,
+  };
+  const linked = { ...request, origin: "gpt_live_finalized" as const, roomMission };
+  const row = createDurableSteering(grant, linked, 1, now);
+  expect(durableSteeringRecordSchema.parse(JSON.parse(JSON.stringify(row))).request.roomMission).toEqual(roomMission);
+  expect(() => replayDurableSteering(grant, row, { ...linked,
+    roomMission: { ...roomMission, roomMissionRevision: 3 } }, now))
+    .toThrow("reasoning_steering_request_conflict");
+  expect(durableSteeringRecordSchema.safeParse({ ...row,
+    request: { ...row.request, roomMission: { ...roomMission, speakerParticipantId: "participant:other" } } }).success)
+    .toBe(false);
+});

@@ -268,6 +268,11 @@ const OUTPUT_REQUIRED: Record<RoomToolName, string[]> = {
   ],
   helix_room_command_request: [
     "api_version",
+    "content_role",
+    "reentry_required",
+    "answer_authority",
+    "assistant_answer",
+    "terminal_eligible",
     "error",
     "message",
     "request_id",
@@ -336,6 +341,11 @@ const OUTPUT_LITERALS: Record<
   helix_room_command_request: {
     api_version: "v1",
     schema: "helix.shared_live_room.error.v1",
+    content_role: "room_control_error_not_assistant_answer",
+    reentry_required: true,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
   },
   helix_room_source_list: {
     ...NONTERMINAL_LITERALS,
@@ -857,6 +867,26 @@ describe("Shared Live Room MCP catalog validation", () => {
       ]),
     );
   });
+
+  it.each(["answer_authority", "assistant_answer", "terminal_eligible", "reentry_required", "content_role"])(
+    "rejects a command error catalog that omits or changes %s", field => {
+      for (const mutation of ["omit", "forge"]) {
+        const damaged = structuredClone(HELIX_SHARED_LIVE_ROOM_MCP_TOOLS.map(validRoomTool));
+        const command = damaged.find(tool => tool.name === "helix_room_command_request")!;
+        const output = command.outputSchema as MutableJsonSchema;
+        if (mutation === "omit") {
+          output.required = output.required!.filter(name => name !== field);
+          delete output.properties![field];
+        } else {
+          output.properties![field].const = field === "content_role" ? "assistant_answer"
+            : field !== "reentry_required";
+        }
+        expect(validateSharedLiveRoomToolCatalog(damaged)).toEqual(expect.arrayContaining([
+          expect.objectContaining({ tool: "helix_room_command_request", code: "invalid_output_schema" }),
+        ]));
+      }
+    },
+  );
 
   it("rejects nested request drift, extra required outputs, and forged receipt literals", () => {
     const damaged = structuredClone(

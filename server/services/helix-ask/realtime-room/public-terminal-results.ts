@@ -4,6 +4,7 @@ import {
   type HelixSharedRealtimeRoomPublicTerminalResult,
 } from "@shared/helix-shared-realtime-room";
 import { readHelixSharedRoomIdFromAskSession } from "../shared-room-ask-session";
+import { ROOM_RESULT_TURN_PREFIX, hasRoomResultPublicationGrant } from "./mission-result-ask";
 
 type RecordLike = Record<string, unknown>;
 
@@ -134,6 +135,8 @@ export const publishSharedRealtimeRoomPublicTerminalResult = (input: {
     text(input.payload.final_answer_source) ??
     text(authority?.final_answer_source);
   const publicationChecks = {
+    exact_result_terminal_grant: !turnId?.startsWith(ROOM_RESULT_TURN_PREFIX) ||
+      hasRoomResultPublicationGrant(input.payload, roomId, turnId),
     room_session: Boolean(roomId),
     verified_membership: Boolean(
       (access?.admitted === true && access?.membership_verified === true) ||

@@ -1,0 +1,327 @@
+{
+  "purpose": "Notation ambiguity screen only; no detector likelihood or predicted event rate.",
+  "inputs": {
+    "dark_matter_masses_TeV": [
+      1.0,
+      2.0,
+      3.0,
+      5.0
+    ],
+    "quoted_sqrt_mass_squared_difference_keV": [
+      100.0,
+      200.0,
+      300.0
+    ],
+    "xe_isotope_mass_u": 131.293,
+    "carbon_isotope_mass_u": 12.0,
+    "xenon_recoil_keV": 248.0,
+    "speed_cap_km_s": 798.0,
+    "speed_of_light_km_s": 299792.458,
+    "mass_energy_conversion_eV_per_u": 931494102.42,
+    "carbon_target_nucleon_cross_section_cm2": 1e-45,
+    "carbon_target_sphere_mass_kg": 3.0925052683774525e-16,
+    "frozen_hold_s": 0.25,
+    "frozen_configuration_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+    "frozen_configuration_sha256_recomputed": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+    "registered_one_sigma_D": 0.005816
+  },
+  "definitions": {
+    "literal_reading": "q=sqrt(mP^2-mS^2); delta=mP-mS=sqrt(mS^2+q^2)-mS",
+    "physical_gap_reading": "delta=mP-mS=q",
+    "vmin": "(mT*ER/mu + delta)/sqrt(2*mT*ER), with all energies in the same units",
+    "carbon_threshold": "delta_max=mu_C*v_cap^2/2",
+    "physical_gap_optimum": "delta*=mXe*ER/mu_Xe minimizes vmin at fixed recoil"
+  },
+  "rows": [
+    {
+      "mS_TeV": 1.0,
+      "xe_reduced_mass_GeV": 108.97157777350294,
+      "carbon_endothermic_max_gap_keV_at_vcap": 39.16229684893074,
+      "physical_gap_minimizing_248keV_xe_vmin_keV": 278.3300664868792,
+      "sqrt_mass_squared_difference_for_optimal_gap_GeV": 0.7460966495310003,
+      "literal_sqrt_difference_reading": [
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 100.0,
+          "physical_gap_eV": 0.0050048828125,
+          "xe_vmin_km_s": 338.7888862032438,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.2852763507500967,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0025669129679437e-41,
+            "expected_C_collisions_per_hold_if_open": 1.860078597686561e-27,
+            "D_upper_if_open": 3.720157195373122e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 6.396418836611283e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 200.0,
+          "physical_gap_eV": 0.02001953125,
+          "xe_vmin_km_s": 338.7889044793718,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.5705527015001934,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0025669129679437e-41,
+            "expected_C_collisions_per_hold_if_open": 1.860078597686561e-27,
+            "D_upper_if_open": 3.720157195373122e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 6.396418836611283e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 300.0,
+          "physical_gap_eV": 0.0450439453125,
+          "xe_vmin_km_s": 338.7889349395852,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.8558290522502904,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0025669129679437e-41,
+            "expected_C_collisions_per_hold_if_open": 1.860078597686561e-27,
+            "D_upper_if_open": 3.720157195373122e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 6.396418836611283e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        }
+      ],
+      "physical_mass_gap_reading": [
+        {
+          "physical_gap_keV": 100.0,
+          "xe_vmin_km_s": 460.51086451175166,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 200.0,
+          "xe_vmin_km_s": 582.2328489123022,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 300.0,
+          "xe_vmin_km_s": 703.9548333128528,
+          "carbon_endothermic_open_at_vcap": false
+        }
+      ]
+    },
+    {
+      "mS_TeV": 2.0,
+      "xe_reduced_mass_GeV": 115.25112631062393,
+      "carbon_endothermic_max_gap_keV_at_vcap": 39.379957045108306,
+      "physical_gap_minimizing_248keV_xe_vmin_keV": 263.1650332434396,
+      "sqrt_mass_squared_difference_for_optimal_gap_GeV": 1.0259923012525938,
+      "literal_sqrt_difference_reading": [
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 100.0,
+          "physical_gap_eV": 0.00244140625,
+          "xe_vmin_km_s": 320.32970368401146,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.1986942495671049,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.022991241917821e-41,
+            "expected_C_collisions_per_hold_if_open": 9.395248388533947e-28,
+            "D_upper_if_open": 1.8790496777067895e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 3.2308281941313435e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 200.0,
+          "physical_gap_eV": 0.010009765625,
+          "xe_vmin_km_s": 320.3297128963686,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.40232519151209434,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.022991241917821e-41,
+            "expected_C_collisions_per_hold_if_open": 9.395248388533947e-28,
+            "D_upper_if_open": 1.8790496777067895e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 3.2308281941313435e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 300.0,
+          "physical_gap_eV": 0.0224609375,
+          "xe_vmin_km_s": 320.32972805218213,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.6026694983666602,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.022991241917821e-41,
+            "expected_C_collisions_per_hold_if_open": 9.395248388533947e-28,
+            "D_upper_if_open": 1.8790496777067895e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 3.2308281941313435e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        }
+      ],
+      "physical_mass_gap_reading": [
+        {
+          "physical_gap_keV": 100.0,
+          "xe_vmin_km_s": 442.05168511283387,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 200.0,
+          "xe_vmin_km_s": 563.7736695133844,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 300.0,
+          "xe_vmin_km_s": 685.495653913935,
+          "carbon_endothermic_open_at_vcap": false
+        }
+      ]
+    },
+    {
+      "mS_TeV": 3.0,
+      "xe_reduced_mass_GeV": 117.50828670964361,
+      "carbon_endothermic_max_gap_keV_at_vcap": 39.453049101313304,
+      "physical_gap_minimizing_248keV_xe_vmin_keV": 258.1100221622931,
+      "sqrt_mass_squared_difference_for_optimal_gap_GeV": 1.2444517666806305,
+      "literal_sqrt_difference_reading": [
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 100.0,
+          "physical_gap_eV": 0.00146484375,
+          "xe_vmin_km_s": 314.1766426956809,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.15376527031943601,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0298731391641978e-41,
+            "expected_C_collisions_per_hold_if_open": 6.284806361488438e-28,
+            "D_upper_if_open": 1.2569612722976876e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 2.161212641502214e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 200.0,
+          "physical_gap_eV": 0.0068359375,
+          "xe_vmin_km_s": 314.17664923348275,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.3321709484536184,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0298731391641978e-41,
+            "expected_C_collisions_per_hold_if_open": 6.284806361488438e-28,
+            "D_upper_if_open": 1.2569612722976876e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 2.161212641502214e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 300.0,
+          "physical_gap_eV": 0.01513671875,
+          "xe_vmin_km_s": 314.17665933735844,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.49428618871010543,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0298731391641978e-41,
+            "expected_C_collisions_per_hold_if_open": 6.284806361488438e-28,
+            "D_upper_if_open": 1.2569612722976876e-27,
+            "fraction_of_registered_one_sigma_D_if_open": 2.161212641502214e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        }
+      ],
+      "physical_mass_gap_reading": [
+        {
+          "physical_gap_keV": 100.0,
+          "xe_vmin_km_s": 435.8986253131946,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 200.0,
+          "xe_vmin_km_s": 557.6206097137451,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 300.0,
+          "xe_vmin_km_s": 679.3425941142957,
+          "carbon_endothermic_open_at_vcap": false
+        }
+      ]
+    },
+    {
+      "mS_TeV": 5.0,
+      "xe_reduced_mass_GeV": 119.37868467034538,
+      "carbon_endothermic_max_gap_keV_at_vcap": 39.51171839317141,
+      "physical_gap_minimizing_248keV_xe_vmin_keV": 254.0660132973758,
+      "sqrt_mass_squared_difference_for_optimal_gap_GeV": 1.5939448539781096,
+      "literal_sqrt_difference_reading": [
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 100.0,
+          "physical_gap_eV": 0.0009765625,
+          "xe_vmin_km_s": 309.25419426162375,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.1254555717700887,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0354055322728744e-41,
+            "expected_C_collisions_per_hold_if_open": 3.7811613121905223e-28,
+            "D_upper_if_open": 7.5623226243810445e-28,
+            "fraction_of_registered_one_sigma_D_if_open": 1.300261799240207e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 200.0,
+          "physical_gap_eV": 0.00390625,
+          "xe_vmin_km_s": 309.2541978276975,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.2509111435401774,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0354055322728744e-41,
+            "expected_C_collisions_per_hold_if_open": 3.7811613121905223e-28,
+            "D_upper_if_open": 7.5623226243810445e-28,
+            "fraction_of_registered_one_sigma_D_if_open": 1.300261799240207e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        },
+        {
+          "quoted_sqrt_mass_squared_difference_keV": 300.0,
+          "physical_gap_eV": 0.0087890625,
+          "xe_vmin_km_s": 309.25420377115375,
+          "carbon_endothermic_open_at_vcap": true,
+          "independent_carbon_decoherence_upper": {
+            "endothermic_carbon_threshold_speed_km_s": 0.37636671531026616,
+            "endothermic_carbon_open_at_speed_cap": true,
+            "sigma_C12_cm2_from_transferred_sigma_p": 2.0354055322728744e-41,
+            "expected_C_collisions_per_hold_if_open": 3.7811613121905223e-28,
+            "D_upper_if_open": 7.5623226243810445e-28,
+            "fraction_of_registered_one_sigma_D_if_open": 1.300261799240207e-25,
+            "assumptions": "all local DM in S; sigma_p=1e-45 cm2; F_C^2=1; incident speed at 798 km/s; independent C12 nuclei; D per collision <=2"
+          }
+        }
+      ],
+      "physical_mass_gap_reading": [
+        {
+          "physical_gap_keV": 100.0,
+          "xe_vmin_km_s": 430.97617747348306,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 200.0,
+          "xe_vmin_km_s": 552.6981618740336,
+          "carbon_endothermic_open_at_vcap": false
+        },
+        {
+          "physical_gap_keV": 300.0,
+          "xe_vmin_km_s": 674.4201462745841,
+          "carbon_endothermic_open_at_vcap": false
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Uses nuclear masses approximated by isotope mass numbers/masses; kinematic diagnostic only.",
+    "Does not infer the intended notation from the authors or reproduce the LZ analysis.",
+    "Does not calculate the actual carbon decoherence functional or recoil spectrum.",
+    "The attached carbon D is only an extreme upper envelope transferred from the paper's approximate cross-section scale; it assumes maximal which-path separation per collision and is not a material-response prediction."
+  ]
+}

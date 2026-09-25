@@ -1,0 +1,241 @@
+{
+  "classification": "charged_mediator_boson_star_charge_budget_and_localization_preflight",
+  "model": {
+    "fields": "complex Phi and complex S",
+    "charges": "q_S=-2*q_phi",
+    "interaction": "mu*(S*Phi^2 + conjugate)",
+    "stationary_phase_lock": "omega_S + 2*omega_phi = 0 (signed frequencies)",
+    "localization_condition": "M_S > 2*abs(omega_phi) in the asymptotically flat linear tail"
+  },
+  "assumptions": [
+    "weak binding, with q=abs(omega_phi)/m_phi supplied as a scan parameter",
+    "zero total U(1) charge for the freely propagating, nonrelativistic population budget",
+    "free nonrelativistic energy per particle, E_phi/Q_phi ~= m_phi and E_S/abs(Q_S) ~= M_S/2",
+    "flat-space asymptotic mediator equation; gravitational redshift and nonlinear core effects omitted"
+  ],
+  "derived_relations": {
+    "zero_charge_number_balance": "N_S=N_phi/2",
+    "free_population_rest_mass_reference": "rho_S/rho_phi = M_S/(2*m_phi) = r/2 if the compensating charge is stored in free nonrelativistic S quanta",
+    "asymptotic_inverse_length": "kappa_S=sqrt(M_S^2-4*omega_phi^2)",
+    "important_interpretation": "this is not a lower bound on the mediator stress-energy fraction inside a bound star; its charge and energy partition must be computed from the coupled solution"
+  },
+  "scan": [
+    {
+      "M_S_over_m_phi": 0.5,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.7222222222222222,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.25
+    },
+    {
+      "M_S_over_m_phi": 0.5,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.7474747474747474,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.25
+    },
+    {
+      "M_S_over_m_phi": 0.5,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.7497497497497497,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.25
+    },
+    {
+      "M_S_over_m_phi": 1.0,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.4444444444444444,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.5
+    },
+    {
+      "M_S_over_m_phi": 1.0,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.4949494949494949,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.5
+    },
+    {
+      "M_S_over_m_phi": 1.0,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.49949949949949946,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.5
+    },
+    {
+      "M_S_over_m_phi": 1.5,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.16666666666666674,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.75
+    },
+    {
+      "M_S_over_m_phi": 1.5,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.24242424242424243,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.75
+    },
+    {
+      "M_S_over_m_phi": 1.5,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": false,
+      "threshold_fractional_margin": -0.2492492492492493,
+      "mediator_inverse_decay_length_over_m_phi": 0.0,
+      "mediator_decay_length_over_phi_compton_length": null,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 0.75
+    },
+    {
+      "M_S_over_m_phi": 2.0,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.11111111111111116,
+      "mediator_inverse_decay_length_over_m_phi": 0.8717797887081346,
+      "mediator_decay_length_over_phi_compton_length": 1.147078669352809,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.0
+    },
+    {
+      "M_S_over_m_phi": 2.0,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.010101010101010166,
+      "mediator_inverse_decay_length_over_m_phi": 0.2821347195933179,
+      "mediator_decay_length_over_phi_compton_length": 3.544406025041677,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.0
+    },
+    {
+      "M_S_over_m_phi": 2.0,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.0010010010010010895,
+      "mediator_inverse_decay_length_over_m_phi": 0.08942035562443203,
+      "mediator_decay_length_over_phi_compton_length": 11.183136021064685,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.0
+    },
+    {
+      "M_S_over_m_phi": 2.1,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.16666666666666674,
+      "mediator_inverse_decay_length_over_m_phi": 1.0816653826391966,
+      "mediator_decay_length_over_phi_compton_length": 0.9245003270420487,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.05
+    },
+    {
+      "M_S_over_m_phi": 2.1,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.06060606060606055,
+      "mediator_inverse_decay_length_over_m_phi": 0.6997142273814363,
+      "mediator_decay_length_over_phi_compton_length": 1.4291548761875732,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.05
+    },
+    {
+      "M_S_over_m_phi": 2.1,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.05105105105105112,
+      "mediator_inverse_decay_length_over_m_phi": 0.6465261015612594,
+      "mediator_decay_length_over_phi_compton_length": 1.5467279628543324,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.05
+    },
+    {
+      "M_S_over_m_phi": 3.0,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.6666666666666665,
+      "mediator_inverse_decay_length_over_m_phi": 2.4,
+      "mediator_decay_length_over_phi_compton_length": 0.4166666666666667,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.5
+    },
+    {
+      "M_S_over_m_phi": 3.0,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.5151515151515151,
+      "mediator_inverse_decay_length_over_m_phi": 2.2537967965191537,
+      "mediator_decay_length_over_phi_compton_length": 0.44369572338750174,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.5
+    },
+    {
+      "M_S_over_m_phi": 3.0,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 0.5015015015015014,
+      "mediator_inverse_decay_length_over_m_phi": 2.237855223199213,
+      "mediator_decay_length_over_phi_compton_length": 0.4468564318340536,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 1.5
+    },
+    {
+      "M_S_over_m_phi": 5.0,
+      "omega_phi_over_m_phi": 0.9,
+      "localization_threshold_M_S_over_m_phi": 1.8,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 1.7777777777777777,
+      "mediator_inverse_decay_length_over_m_phi": 4.66476151587624,
+      "mediator_decay_length_over_phi_compton_length": 0.21437323142813608,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 2.5
+    },
+    {
+      "M_S_over_m_phi": 5.0,
+      "omega_phi_over_m_phi": 0.99,
+      "localization_threshold_M_S_over_m_phi": 1.98,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 1.525252525252525,
+      "mediator_inverse_decay_length_over_m_phi": 4.591252552408765,
+      "mediator_decay_length_over_phi_compton_length": 0.21780548741004407,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 2.5
+    },
+    {
+      "M_S_over_m_phi": 5.0,
+      "omega_phi_over_m_phi": 0.999,
+      "localization_threshold_M_S_over_m_phi": 1.998,
+      "localized_asymptotic_mode": true,
+      "threshold_fractional_margin": 1.5025025025025025,
+      "mediator_inverse_decay_length_over_m_phi": 4.583448047049295,
+      "mediator_decay_length_over_phi_compton_length": 0.21817635756639023,
+      "free_rest_mass_rho_S_over_rho_phi_reference_for_zero_total_charge": 2.5
+    }
+  ],
+  "limits": [
+    "This is not a solution of the coupled Einstein-Klein-Gordon equations and does not establish existence or stability of a star.",
+    "At r close to 2q, the mediator tail becomes extended; a compact one-field profile is not a controlled approximation.",
+    "The charge-energy floor ignores binding, interactions, and spatially separated charge reservoirs; it is an asymptotic bookkeeping test only.",
+    "The early-universe total charge, production mechanism, and charge partition must be specified independently.",
+    "The two-field boson-star literature establishes precedent for interacting complex fields in other potentials, not for this specific S*Phi^2 interaction."
+  ]
+}

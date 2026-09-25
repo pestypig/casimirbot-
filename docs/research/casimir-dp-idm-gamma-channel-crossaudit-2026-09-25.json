@@ -1,0 +1,38 @@
+{
+  "classification": "source_audited_gamma_compatibility_crosscheck_not_flux_fit",
+  "inputs": {
+    "idm_gate_json_sha256": "3d1481ee7e36ca63340b999679c9d8d112c0c3a611366459c85fbd7dde3d0493",
+    "user_gamma_intake_sha256": "25ab2e30f7c04a9b60702e05778249b4dc1f074207a8238ceb743ba0c5a8fd61",
+    "m_H_GeV": 1080.0,
+    "user_MW_bbar_mass_range_GeV": [
+      500.0,
+      800.0
+    ],
+    "cluster_line_energy_GeV": 43.2,
+    "co_traced_heavy_fraction_illustration": 0.9
+  },
+  "derived": {
+    "m_H_over_continuum_mass_range": [
+      1.35,
+      2.16
+    ],
+    "idm_gamma_gamma_annihilation_line_GeV": 1080.0,
+    "idm_gamma_Z_annihilation_line_GeV": 1078.0751901866297,
+    "two_photon_decay_line_energy_GeV": 540.0,
+    "annihilation_J_factor_ratio_if_H_co_traces_with_constant_fraction": 0.81
+  },
+  "source_findings": {
+    "idm_paper_uses_micromegas_and_combined_dwarf_constraints": true,
+    "idm_paper_reports_a_complete_1080_GeV_channel_spectrum_or_numeric_sigma_v": false,
+    "idm_lz_profile_bestfit_mH_GeV": 1080.0,
+    "idm_lz_profile_bestfit_delta_keV": 369.0,
+    "direct_gamma_line_compatibility": "not_supported by standard direct line kinematics at this mass",
+    "MW_bbar_excess_compatibility": "not established; mass interval differs and the IDM point's channel-resolved present-day spectrum is not supplied"
+  },
+  "limits": [
+    "Line energies are kinematic comparators only; no branching fractions or loop line rates are calculated.",
+    "The constant local fraction f_H scaling is illustrative; actual annihilation prediction requires rho_H(r) squared along each line of sight.",
+    "The IDM paper's scan applies combined dwarf-spheroidal constraints and uses micrOMEGAs, but does not supply a reusable channel-resolved spectrum or numeric present-day cross section for the profile point in its text/tables.",
+    "The supplied gamma papers report separate, model-dependent signals and do not establish a common halo or particle model."
+  ]
+}

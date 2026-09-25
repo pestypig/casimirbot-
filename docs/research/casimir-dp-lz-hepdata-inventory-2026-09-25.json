@@ -1,0 +1,386 @@
+{
+  "classification": "DataCite DOI metadata inventory only; HEPData table payloads not retrieved",
+  "retrieved_date": "2026-09-25",
+  "parent_doi": "10.17182/hepdata.182472.v1",
+  "parent_api": "https://api.datacite.org/dois/10.17182/hepdata.182472.v1",
+  "record_url": "https://www.hepdata.net/record/ins3199115?version=1",
+  "table_count": 46,
+  "tables_1_to_3": "Science, prompt-veto, and delayed-veto event samples in log10(S2)-S1 coordinates",
+  "tables_4_to_46": "43 result tables: L01-L20 scalar/vector (40), O01s/O01v, and O04s; metadata describes limits and/or significance",
+  "payload_access": "Direct HEPData record/download endpoints return a Cloudflare anti-bot challenge in this environment; metadata are obtained from the public DataCite API.",
+  "limits": [
+    "DataCite titles/descriptions do not reveal the numeric table payloads.",
+    "This metadata inventory does not establish whether the HEPData record has additional non-table resource files.",
+    "No detector-level event-response PDF, migration kernel, background likelihood, or IDM reinterpretation is reconstructed by this script."
+  ],
+  "tables": [
+    {
+      "table_number": 1,
+      "doi": "10.17182/hepdata.182472.v1/t1",
+      "title": "\"Science Sample Data\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Data points used in the Science sample in the analysis in log_10(S2)-S1 space.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183112",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 2,
+      "doi": "10.17182/hepdata.182472.v1/t2",
+      "title": "\"Prompt Veto Sample Data\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Data points used in the Prompt Veto sample in the analysis in log_10(S2)-S1 space.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183113",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 3,
+      "doi": "10.17182/hepdata.182472.v1/t3",
+      "title": "\"Delayed Veto Sample Data\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Data points used in the Delayed Veto sample in the analysis in log_10(S2)-S1 space.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183114",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 4,
+      "doi": "10.17182/hepdata.182472.v1/t4",
+      "title": "\"L01s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L01s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183115",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 5,
+      "doi": "10.17182/hepdata.182472.v1/t5",
+      "title": "\"L01v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L01v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183116",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 6,
+      "doi": "10.17182/hepdata.182472.v1/t6",
+      "title": "\"L02s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L02s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183117",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 7,
+      "doi": "10.17182/hepdata.182472.v1/t7",
+      "title": "\"L02v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L02v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183118",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 8,
+      "doi": "10.17182/hepdata.182472.v1/t8",
+      "title": "\"L03s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L03s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183119",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 9,
+      "doi": "10.17182/hepdata.182472.v1/t9",
+      "title": "\"L03v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L03v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183120",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 10,
+      "doi": "10.17182/hepdata.182472.v1/t10",
+      "title": "\"L04s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L04s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183121",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 11,
+      "doi": "10.17182/hepdata.182472.v1/t11",
+      "title": "\"L04v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L04v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183122",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 12,
+      "doi": "10.17182/hepdata.182472.v1/t12",
+      "title": "\"L05s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L05s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183123",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 13,
+      "doi": "10.17182/hepdata.182472.v1/t13",
+      "title": "\"L05v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L05v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183124",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 14,
+      "doi": "10.17182/hepdata.182472.v1/t14",
+      "title": "\"L06s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L06s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183125",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 15,
+      "doi": "10.17182/hepdata.182472.v1/t15",
+      "title": "\"L06v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L06v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183126",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 16,
+      "doi": "10.17182/hepdata.182472.v1/t16",
+      "title": "\"L07s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L07s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183127",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 17,
+      "doi": "10.17182/hepdata.182472.v1/t17",
+      "title": "\"L07v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L07v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183128",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 18,
+      "doi": "10.17182/hepdata.182472.v1/t18",
+      "title": "\"L08s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L08s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183129",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 19,
+      "doi": "10.17182/hepdata.182472.v1/t19",
+      "title": "\"L08v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L08v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183130",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 20,
+      "doi": "10.17182/hepdata.182472.v1/t20",
+      "title": "\"L09s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L09s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183131",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 21,
+      "doi": "10.17182/hepdata.182472.v1/t21",
+      "title": "\"L09v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L09v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183132",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 22,
+      "doi": "10.17182/hepdata.182472.v1/t22",
+      "title": "\"L10s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L10s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183133",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 23,
+      "doi": "10.17182/hepdata.182472.v1/t23",
+      "title": "\"L10v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L10v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183134",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 24,
+      "doi": "10.17182/hepdata.182472.v1/t24",
+      "title": "\"L11s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L11s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183135",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 25,
+      "doi": "10.17182/hepdata.182472.v1/t25",
+      "title": "\"L11v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L11v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183136",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 26,
+      "doi": "10.17182/hepdata.182472.v1/t26",
+      "title": "\"L12s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L12s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183137",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 27,
+      "doi": "10.17182/hepdata.182472.v1/t27",
+      "title": "\"L12v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L12v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183138",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 28,
+      "doi": "10.17182/hepdata.182472.v1/t28",
+      "title": "\"L13s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L13s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183139",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 29,
+      "doi": "10.17182/hepdata.182472.v1/t29",
+      "title": "\"L13v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L13v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183140",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 30,
+      "doi": "10.17182/hepdata.182472.v1/t30",
+      "title": "\"L14s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L14s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183141",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 31,
+      "doi": "10.17182/hepdata.182472.v1/t31",
+      "title": "\"L14v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L14v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183142",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 32,
+      "doi": "10.17182/hepdata.182472.v1/t32",
+      "title": "\"L15s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L15s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183143",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 33,
+      "doi": "10.17182/hepdata.182472.v1/t33",
+      "title": "\"L15v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L15v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183144",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 34,
+      "doi": "10.17182/hepdata.182472.v1/t34",
+      "title": "\"L16s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L16s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183145",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 35,
+      "doi": "10.17182/hepdata.182472.v1/t35",
+      "title": "\"L16v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L16v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183146",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 36,
+      "doi": "10.17182/hepdata.182472.v1/t36",
+      "title": "\"L17s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L17s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183147",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 37,
+      "doi": "10.17182/hepdata.182472.v1/t37",
+      "title": "\"L17v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L17v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183148",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 38,
+      "doi": "10.17182/hepdata.182472.v1/t38",
+      "title": "\"L18s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L18s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183149",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 39,
+      "doi": "10.17182/hepdata.182472.v1/t39",
+      "title": "\"L18v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L18v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183150",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 40,
+      "doi": "10.17182/hepdata.182472.v1/t40",
+      "title": "\"L19s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L19s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183151",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 41,
+      "doi": "10.17182/hepdata.182472.v1/t41",
+      "title": "\"L19v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L19v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183152",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 42,
+      "doi": "10.17182/hepdata.182472.v1/t42",
+      "title": "\"L20s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L20s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183153",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 43,
+      "doi": "10.17182/hepdata.182472.v1/t43",
+      "title": "\"L20v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for L20v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183154",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 44,
+      "doi": "10.17182/hepdata.182472.v1/t44",
+      "title": "\"O01s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for O01s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183155",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 45,
+      "doi": "10.17182/hepdata.182472.v1/t45",
+      "title": "\"O01v\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for O01v couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183156",
+      "resource_type": "Dataset"
+    },
+    {
+      "table_number": 46,
+      "doi": "10.17182/hepdata.182472.v1/t46",
+      "title": "\"O04s\" of \"Search for dark matter particle interactions in an extended nuclear recoil energy window with the LUX-ZEPLIN (LZ) experiment\"",
+      "description": "Limits and Significance for O04s couplings.; No data abstract available.",
+      "record_url": "https://www.hepdata.net/record/183157",
+      "resource_type": "Dataset"
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "classification": "evidence-synthesis branch verdict; not a common likelihood, new physical solve, or universal no-go theorem",
+  "source_packets": [
+    "casimir-dp-bosonic-free-field-scaling-2026-09-24.json",
+    "casimir-dp-idm-gravity-only-xenon-screen-2026-09-25.json",
+    "casimir-dp-idm-heavy-field-bosonstar-scale-2026-09-25.json",
+    "casimir-dp-bosonic-two-component-observable-overlay-2026-09-25.json",
+    "casimir-dp-boson-star-local-encounter-screen-2026-09-25.json"
+  ],
+  "inputs": {
+    "registered_Casimir_DP_one_sigma_magnitude_precision": 0.005816050749546031,
+    "registered_Casimir_DP_SNR5_visibility_loss": 0.029080253747730156,
+    "apparatus_values_are_design_forecasts_not_measured_performance": true
+  },
+  "outputs": {
+    "ultralight_single_field": {
+      "mass_eV": 1e-17,
+      "free_field_max_star_mass_Msun": 8458760.485072244,
+      "reference_SgrA_mass_Msun": 4020000.0,
+      "star_scale_ratio": 2.104169274893593,
+      "maximum_elastic_Xe_recoil_keV_at_assumed_speed_cap": 1.1793006899485677e-53,
+      "43_GeV_photon_annihilation_channel": "kinematically unavailable for this constituent mass",
+      "star_population": "free-field maximum is an order-of-magnitude mass-scale match only; no Milky Way object abundance or local encounter history is inferred",
+      "Casimir_DP": "no matter-coupling or coherent-field phase/noise response follows from the free-star mass match",
+      "verdict": "passes only the illustrative galactic-star mass-scale gate; fails ordinary xenon nuclear-recoil kinematics and cannot explain the tens-of-GeV gamma features through standard pair annihilation"
+    },
+    "heavy_single_field_IDM_like": {
+      "mass_GeV": 1080.0,
+      "neutral_splitting_keV": 369.0,
+      "gamma_channel_status": "the LZ benchmark does not provide a joint fit to the supplied 43 GeV line or 0.5-0.8 TeV b-bbar continuum interpretations",
+      "quartic_star_proxy_max_Msun": 1.7490926259359515e-07,
+      "reference_SgrA_over_proxy": 22869000421630.457,
+      "gravity_only_LZ_events_upper_bound_in_exposure": 9.918020965428376e-47,
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 7e-19,
+      "verdict": "the specified inelastic electroweak channel can address LZ recoil kinematics; gravity alone gives negligible events, the tested quartic star proxy misses SgrA by 13.36 orders, and the same-scattering Casimir signal is far below precision"
+    },
+    "two_component_phi_plus_heavy_H": {
+      "m_phi_eV": 1e-17,
+      "m_H_GeV": 1080.0,
+      "f_phi_cosmic_assumed": 0.1,
+      "f_H_cosmic_local_if_co_tracing": 0.9,
+      "required_Omega_H_h2": 0.10782,
+      "unchanged_published_H_point_total_overclosure_sigma": 10.266666666666653,
+      "conditional_LZ_rate_ratio_to_IDM_SHM_profile_scaled_MW_like_7_quantiles": [
+        1.9460056753183466,
+        6.595016616287084,
+        8.746026436519246
+      ],
+      "conditional_H_annihilation_flux_ratio_if_GC_co_traces": 0.81,
+      "gamma_channel_status": "0.81 is only fixed-shape density-squared bookkeeping; the benchmark-specific spectrum and likelihood are absent",
+      "Casimir_DP_exponent_ceiling_if_same_H_kernel": 6.3e-19,
+      "10y_compact_phi_encounter_probability_at_rho0p4_v220": 3.961288021006545e-18,
+      "verdict": "strongest tested architecture for assigning star formation and xenon/gamma signatures to different components, but no dynamical connection or measurable common Casimir-DP response is established; relic, local fractions, halo-tail fold, gamma spectrum, and detector likelihood remain conditional"
+    }
+  },
+  "derived": {
+    "heavy_same_kernel_visibility_scale_to_one_sigma_precision": 8308643927922901.0,
+    "heavy_same_kernel_visibility_scale_to_SNR5_design_target": 4.1543219639614504e+16,
+    "two_component_same_kernel_visibility_scale_to_one_sigma_precision": 9231826586581002.0,
+    "two_component_same_kernel_visibility_scale_to_SNR5_design_target": 4.615913293290501e+16,
+    "no_tested_branch_passes_all_four_observable_gates": true,
+    "best_architecture_for_next_model_construction_step": "explicit two-component ultralight star-forming field plus heavy recoil component",
+    "selected_four_observable_prediction_model": null
+  },
+  "decision": {
+    "selected_status": "No model selected. The two-component sector is retained as the leading conditional architecture, not as a common-cause prediction.",
+    "scope_of_negative_result": "The tested free/repulsive-quartic star scalings, ordinary single-particle recoil, gravity-only LZ scattering, and screened IDM Casimir-DP kernel fail at least one gate. This is not an exclusion of every possible interaction or UV completion.",
+    "next_gate": "Identify one explicit symmetry-consistent cross-sector/operator kernel that can raise the predicted interferometer signal to the registered design sensitivity while reproducing the xenon spectrum and respecting stellar stability, shared abundance, gamma/dwarf, direct-detection, and apparatus constraints. If the required response enhancement cannot be generated without violating those bounds, close the measurable-overlap branch and retain a null Casimir prediction."
+  },
+  "limits": [
+    "The branches use different published benchmark analyses and are compared by compatibility gates, not combined likelihoods.",
+    "The two-component LZ halo quantiles are a seven-simulation diagnostic subset, not a Milky Way posterior or detector-level fit.",
+    "Gamma-ray observables lack a common channel-specific prediction for the 1.08 TeV heavy component.",
+    "Boson-star quartic results are scaling proxies, not coupled Einstein-matter solutions; the IDM neutral field is not a conserved-charge complex scalar.",
+    "Casimir-DP sensitivity is a registered forecast; no measured local residual is assumed."
+  ]
+}

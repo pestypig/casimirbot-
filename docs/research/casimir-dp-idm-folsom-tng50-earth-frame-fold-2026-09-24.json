@@ -1,0 +1,1954 @@
+{
+  "classification": "published simulation-ensemble fold; not Milky Way posterior or LZ likelihood",
+  "source_paper": "https://arxiv.org/abs/2505.07924",
+  "source_data": "https://zenodo.org/records/15374887",
+  "source_data_sha256": "9d3e18f95cb373634f57cadfd8d836a62dbf991d20cf0271a968e15dc1a0a9e0",
+  "source_data_attribution": "Folsom et al. (2025), CC-BY-4.0 supplemental data, Zenodo record 15374887, v1",
+  "benchmark": {
+    "mH_GeV": 1080.0,
+    "delta_keV": 369.0,
+    "target": "Xe-131",
+    "recoil_keV": 248.0,
+    "vmin_km_s": 786.009560806017,
+    "source_SHM_eta_per_km_s": 7.555099680798103e-08,
+    "source_SHM_density_GeV_cm3": 0.3,
+    "source_SHM_v0_km_s": 238.0,
+    "source_SHM_vesc_km_s": 544.0,
+    "source_SHM_vlab_km_s": 254.0
+  },
+  "data_grid": {
+    "geocentric_bin_count": 151,
+    "min_km_s": 0.0,
+    "max_km_s": 975.0,
+    "pdf_units": "1e-3 s/km",
+    "density_speed_pairing": "same simulated halo"
+  },
+  "results": {
+    "scaled": {
+      "sample_size": 98,
+      "geocentric_epoch": "2000-03-09 (as specified by the supplement)",
+      "speed_pdf_normalization_percentiles": {
+        "0": 0.999346883764872,
+        "0.16": 0.999654697225382,
+        "0.5": 0.9997596192159182,
+        "0.84": 0.9998434187357496,
+        "1": 0.9999170255440787
+      },
+      "fraction_with_nonzero_support_at_vmin": 0.9489795918367347,
+      "rho_GeV_cm3_percentiles_0_16_50_84_100": [
+        0.34209424791176096,
+        0.43262580461821093,
+        0.5055208704613745,
+        0.6345955979761299,
+        0.853247662890811
+      ],
+      "eta_per_km_s_percentiles_0_16_50_84_100": [
+        0.0,
+        4.091772220655397e-08,
+        3.38589995179415e-07,
+        1.4194172047575152e-06,
+        6.700316000200254e-06
+      ],
+      "eta_ratio_to_source_SHM_percentiles_0_16_50_84_100": [
+        0.0,
+        0.5415907656460135,
+        4.481608575462861,
+        18.787537752348637,
+        88.68600393492689
+      ],
+      "rho_eta_ratio_to_rho0p30_SHM_percentiles_0_16_50_84_100": [
+        0.0,
+        0.9370006863495103,
+        7.954914749593193,
+        38.16311384104189,
+        148.9278664951219
+      ],
+      "rho_eta_ratio_percentiles_if_local_IDM_fraction_0p9": [
+        0.0,
+        0.8433006177145592,
+        7.159423274633874,
+        34.3468024569377,
+        134.03507984560972
+      ],
+      "rho_eta_ratio_percentiles_if_local_IDM_fraction_0p1": [
+        0.0,
+        0.09370006863495103,
+        0.7954914749593194,
+        3.816311384104189,
+        14.892786649512189
+      ]
+    },
+    "unscaled": {
+      "sample_size": 98,
+      "geocentric_epoch": "2000-03-09 (as specified by the supplement)",
+      "speed_pdf_normalization_percentiles": {
+        "0": 0.9993854587506866,
+        "0.16": 0.9996199408843216,
+        "0.5": 0.999746089315538,
+        "0.84": 0.9998634376292194,
+        "1": 0.9999669870774545
+      },
+      "fraction_with_nonzero_support_at_vmin": 0.5,
+      "rho_GeV_cm3_percentiles_0_16_50_84_100": [
+        0.24567833881508067,
+        0.3184011150612331,
+        0.3749369523420305,
+        0.4293092298757445,
+        0.5812288953018951
+      ],
+      "eta_per_km_s_percentiles_0_16_50_84_100": [
+        0.0,
+        0.0,
+        2.9464430813488153e-13,
+        1.7273698541715977e-07,
+        4.684965300820801e-06
+      ],
+      "eta_ratio_to_source_SHM_percentiles_0_16_50_84_100": [
+        0.0,
+        0.0,
+        3.899939386421914e-06,
+        2.2863627578095995,
+        62.01063518364978
+      ],
+      "rho_eta_ratio_to_rho0p30_SHM_percentiles_0_16_50_84_100": [
+        0.0,
+        0.0,
+        5.5971712906332454e-06,
+        2.9658296613185597,
+        105.21133532438361
+      ],
+      "rho_eta_ratio_percentiles_if_local_IDM_fraction_0p9": [
+        0.0,
+        0.0,
+        5.037454161569921e-06,
+        2.669246695186704,
+        94.69020179194526
+      ],
+      "rho_eta_ratio_percentiles_if_local_IDM_fraction_0p1": [
+        0.0,
+        0.0,
+        5.597171290633246e-07,
+        0.296582966131856,
+        10.521133532438363
+      ]
+    }
+  },
+  "near_unity_scaling_validation": {
+    "scaled": {
+      "sample_size": 7,
+      "halo_ids": [
+        394621,
+        503987,
+        504559,
+        515296,
+        529365,
+        534628,
+        7
+      ],
+      "rho_eta_ratio_to_rho0p30_SHM_percentiles_0_16_50_84_100": [
+        0.0,
+        2.162228196742099,
+        7.327794937092802,
+        9.717805380994177,
+        40.00321542171826
+      ]
+    },
+    "unscaled": {
+      "sample_size": 7,
+      "halo_ids": [
+        394621,
+        503987,
+        504559,
+        515296,
+        529365,
+        534628,
+        7
+      ],
+      "rho_eta_ratio_to_rho0p30_SHM_percentiles_0_16_50_84_100": [
+        0.0,
+        2.453988978320071,
+        4.560077977099512,
+        21.060943802852385,
+        24.739194834276308
+      ]
+    }
+  },
+  "halos": {
+    "scaled": [
+      {
+        "halo_id": 208812,
+        "rho_GeV_cm3": 0.5294591846614954,
+        "eta_per_km_s": 1.616478486933881e-06,
+        "eta_ratio_to_source_SHM": 21.395859157785722,
+        "rho_eta_ratio_to_rho0p30_SHM": 37.7607804827114,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 372755,
+        "rho_GeV_cm3": 0.5432092198075856,
+        "eta_per_km_s": 6.366702235293534e-07,
+        "eta_ratio_to_source_SHM": 8.427026120482596,
+        "rho_eta_ratio_to_rho0p30_SHM": 15.258794280684986,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 392277,
+        "rho_GeV_cm3": 0.4628626288936853,
+        "eta_per_km_s": 4.304089464628175e-07,
+        "eta_ratio_to_source_SHM": 5.696932729514299,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.789657532711555,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 394621,
+        "rho_GeV_cm3": 0.5625089679343266,
+        "eta_per_km_s": 1.6118584624884069e-06,
+        "eta_ratio_to_source_SHM": 21.334708085785756,
+        "rho_eta_ratio_to_rho0p30_SHM": 40.00321542171826,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 419618,
+        "rho_GeV_cm3": 0.4877120900010772,
+        "eta_per_km_s": 3.931539353155052e-07,
+        "eta_ratio_to_source_SHM": 5.20382194711127,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.459889592730374,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 444134,
+        "rho_GeV_cm3": 0.5037814081838572,
+        "eta_per_km_s": 6.700316000200254e-06,
+        "eta_ratio_to_source_SHM": 88.68600393492689,
+        "rho_eta_ratio_to_rho0p30_SHM": 148.9278664951219,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 446665,
+        "rho_GeV_cm3": 0.5164546333486271,
+        "eta_per_km_s": 2.578089114436017e-06,
+        "eta_ratio_to_source_SHM": 34.12382659872032,
+        "rho_eta_ratio_to_rho0p30_SHM": 58.74469451498076,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 449658,
+        "rho_GeV_cm3": 0.4683295103373115,
+        "eta_per_km_s": 1.811879063234677e-06,
+        "eta_ratio_to_source_SHM": 23.982199306247594,
+        "rho_eta_ratio_to_rho0p30_SHM": 37.438572193022495,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 454172,
+        "rho_GeV_cm3": 0.48970004688966845,
+        "eta_per_km_s": 9.274648581189952e-07,
+        "eta_ratio_to_source_SHM": 12.276010870858821,
+        "rho_eta_ratio_to_rho0p30_SHM": 20.038543663592147,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 455291,
+        "rho_GeV_cm3": 0.641198928107734,
+        "eta_per_km_s": 4.3937733637668556e-06,
+        "eta_ratio_to_source_SHM": 58.15639170101204,
+        "rho_eta_ratio_to_rho0p30_SHM": 124.29938673767481,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 459557,
+        "rho_GeV_cm3": 0.4522601921545314,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 459558,
+        "rho_GeV_cm3": 0.4057088683466841,
+        "eta_per_km_s": 5.8177278248148196e-08,
+        "eta_ratio_to_source_SHM": 0.770039849983852,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.0413733203959967,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 476266,
+        "rho_GeV_cm3": 0.5573734126387988,
+        "eta_per_km_s": 3.836924323685968e-07,
+        "eta_ratio_to_source_SHM": 5.078588616690024,
+        "rho_eta_ratio_to_rho0p30_SHM": 9.435567562243584,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 477328,
+        "rho_GeV_cm3": 0.6789701089909695,
+        "eta_per_km_s": 4.830760318158204e-06,
+        "eta_ratio_to_source_SHM": 63.94039155348238,
+        "rho_eta_ratio_to_rho0p30_SHM": 144.71204873997732,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 478216,
+        "rho_GeV_cm3": 0.4902798676488411,
+        "eta_per_km_s": 2.9342259203759138e-08,
+        "eta_ratio_to_source_SHM": 0.38837686388618886,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.6347111914133088,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 479938,
+        "rho_GeV_cm3": 0.4355282216755543,
+        "eta_per_km_s": 1.2189452367012839e-06,
+        "eta_ratio_to_source_SHM": 16.13407219231444,
+        "rho_eta_ratio_to_rho0p30_SHM": 23.422812567679063,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 480802,
+        "rho_GeV_cm3": 0.5424637359743638,
+        "eta_per_km_s": 1.1200676243396602e-07,
+        "eta_ratio_to_source_SHM": 1.4825318945644126,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.680732634088543,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 490079,
+        "rho_GeV_cm3": 0.589760543615433,
+        "eta_per_km_s": 2.7366043150227118e-06,
+        "eta_ratio_to_source_SHM": 36.22194849365142,
+        "rho_eta_ratio_to_rho0p30_SHM": 71.20758678142025,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 490814,
+        "rho_GeV_cm3": 0.48936872074156995,
+        "eta_per_km_s": 8.654996781684323e-07,
+        "eta_ratio_to_source_SHM": 11.455834002669345,
+        "rho_eta_ratio_to_rho0p30_SHM": 18.687089436380255,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 493433,
+        "rho_GeV_cm3": 0.5072603327388919,
+        "eta_per_km_s": 1.0901489529755834e-06,
+        "eta_ratio_to_source_SHM": 14.42931263695018,
+        "rho_eta_ratio_to_rho0p30_SHM": 24.398059764709487,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 495451,
+        "rho_GeV_cm3": 0.35948887068693525,
+        "eta_per_km_s": 3.021912902522121e-07,
+        "eta_ratio_to_source_SHM": 3.9998319415990724,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.792983558743273,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 497557,
+        "rho_GeV_cm3": 0.4617029873753404,
+        "eta_per_km_s": 3.480981437737341e-08,
+        "eta_ratio_to_source_SHM": 0.46074593119989365,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.7090925761867465,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 499704,
+        "rho_GeV_cm3": 0.5489245958622857,
+        "eta_per_km_s": 1.6895244831044204e-06,
+        "eta_ratio_to_source_SHM": 22.362702737046387,
+        "rho_eta_ratio_to_rho0p30_SHM": 40.91812520773873,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 5,
+        "rho_GeV_cm3": 0.4731337394847405,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 502371,
+        "rho_GeV_cm3": 0.6448435157368182,
+        "eta_per_km_s": 1.3566970734513444e-06,
+        "eta_ratio_to_source_SHM": 17.957368278005646,
+        "rho_eta_ratio_to_rho0p30_SHM": 38.59897497923325,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 503987,
+        "rho_GeV_cm3": 0.4612059981531925,
+        "eta_per_km_s": 3.9723452816671936e-07,
+        "eta_ratio_to_source_SHM": 5.257833052505224,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.08314713701173,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 504559,
+        "rho_GeV_cm3": 0.41871341965955244,
+        "eta_per_km_s": 3.966595188317421e-07,
+        "eta_ratio_to_source_SHM": 5.250222175623763,
+        "rho_eta_ratio_to_rho0p30_SHM": 7.327794937092802,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 505100,
+        "rho_GeV_cm3": 0.4097676136608914,
+        "eta_per_km_s": 5.424130795216518e-07,
+        "eta_ratio_to_source_SHM": 7.179429821425632,
+        "rho_eta_ratio_to_rho0p30_SHM": 9.806326084571404,
+        "hasGSE": true,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 509091,
+        "rho_GeV_cm3": 0.6728405752511465,
+        "eta_per_km_s": 1.4340422930031547e-06,
+        "eta_ratio_to_source_SHM": 18.981116776630877,
+        "rho_eta_ratio_to_rho0p30_SHM": 42.570885102991696,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 510585,
+        "rho_GeV_cm3": 0.5194365686815141,
+        "eta_per_km_s": 5.520277087884836e-07,
+        "eta_ratio_to_source_SHM": 7.3066899460176105,
+        "rho_eta_ratio_to_rho0p30_SHM": 12.651206513263684,
+        "hasGSE": true,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 511303,
+        "rho_GeV_cm3": 0.4720569295034203,
+        "eta_per_km_s": 1.011149935803115e-06,
+        "eta_ratio_to_source_SHM": 13.383674319652386,
+        "rho_eta_ratio_to_rho0p30_SHM": 21.059520682696277,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 512425,
+        "rho_GeV_cm3": 0.5808147376167719,
+        "eta_per_km_s": 1.4458004428774356e-06,
+        "eta_ratio_to_source_SHM": 19.136748738763227,
+        "rho_eta_ratio_to_rho0p30_SHM": 37.04968565847618,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 513105,
+        "rho_GeV_cm3": 0.48199671394637705,
+        "eta_per_km_s": 1.3654765638715442e-07,
+        "eta_ratio_to_source_SHM": 1.8073574427376693,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.9038011610869465,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 515296,
+        "rho_GeV_cm3": 0.3840898371832531,
+        "eta_per_km_s": 4.989869165378135e-07,
+        "eta_ratio_to_source_SHM": 6.604637101030303,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.455913295964006,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 516101,
+        "rho_GeV_cm3": 0.4809199039650568,
+        "eta_per_km_s": 1.20469556433445e-07,
+        "eta_ratio_to_source_SHM": 1.5945462207418402,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.5561633844900333,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 516760,
+        "rho_GeV_cm3": 0.39485793699645627,
+        "eta_per_km_s": 9.224454056706487e-07,
+        "eta_ratio_to_source_SHM": 12.209572932771732,
+        "rho_eta_ratio_to_rho0p30_SHM": 16.070155932806728,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 517271,
+        "rho_GeV_cm3": 0.6031792526134245,
+        "eta_per_km_s": 4.984696157468851e-06,
+        "eta_ratio_to_source_SHM": 65.97790059789494,
+        "rho_eta_ratio_to_rho0p30_SHM": 132.65500257213697,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 518682,
+        "rho_GeV_cm3": 0.7382774895006116,
+        "eta_per_km_s": 1.7950118997082936e-06,
+        "eta_ratio_to_source_SHM": 23.75894396562975,
+        "rho_eta_ratio_to_rho0p30_SHM": 58.468978347102784,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 520885,
+        "rho_GeV_cm3": 0.6083976394459769,
+        "eta_per_km_s": 2.094934331929942e-06,
+        "eta_ratio_to_source_SHM": 27.728745091932897,
+        "rho_eta_ratio_to_rho0p30_SHM": 56.23367686243731,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 521429,
+        "rho_GeV_cm3": 0.36056568066825556,
+        "eta_per_km_s": 1.131048916942355e-06,
+        "eta_ratio_to_source_SHM": 14.970668352887616,
+        "rho_eta_ratio_to_rho0p30_SHM": 17.993030749058786,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 521803,
+        "rho_GeV_cm3": 0.5025389351284876,
+        "eta_per_km_s": 1.3364046796702938e-07,
+        "eta_ratio_to_source_SHM": 1.7688776272097035,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.9630995971685676,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 522530,
+        "rho_GeV_cm3": 0.4951669283332947,
+        "eta_per_km_s": 7.460811735879694e-07,
+        "eta_ratio_to_source_SHM": 9.875199601723258,
+        "rho_eta_ratio_to_rho0p30_SHM": 16.2995741782116,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 522983,
+        "rho_GeV_cm3": 0.5614321579530064,
+        "eta_per_km_s": 6.905389333680206e-07,
+        "eta_ratio_to_source_SHM": 9.140037359441875,
+        "rho_eta_ratio_to_rho0p30_SHM": 17.10503632827517,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 523889,
+        "rho_GeV_cm3": 0.49649223292568895,
+        "eta_per_km_s": 6.843988594093864e-08,
+        "eta_ratio_to_source_SHM": 0.905876677112337,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.4992024472493584,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 524506,
+        "rho_GeV_cm3": 0.4927648137595802,
+        "eta_per_km_s": 4.637596271450558e-07,
+        "eta_ratio_to_source_SHM": 6.138365431812083,
+        "rho_eta_ratio_to_rho0p30_SHM": 10.082568329317088,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 525002,
+        "rho_GeV_cm3": 0.46683854267086805,
+        "eta_per_km_s": 2.3382557217967763e-06,
+        "eta_ratio_to_source_SHM": 30.949369572709177,
+        "rho_eta_ratio_to_rho0p30_SHM": 48.16119529301886,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 526478,
+        "rho_GeV_cm3": 0.6350693943679109,
+        "eta_per_km_s": 2.4852035570184374e-06,
+        "eta_ratio_to_source_SHM": 32.894384746964796,
+        "rho_eta_ratio_to_rho0p30_SHM": 69.63405666453326,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 528322,
+        "rho_GeV_cm3": 0.41506883203046835,
+        "eta_per_km_s": 2.1236397948174508e-07,
+        "eta_ratio_to_source_SHM": 2.8108693260723654,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.8890141605437543,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 528836,
+        "rho_GeV_cm3": 0.853247662890811,
+        "eta_per_km_s": 1.1297274899379097e-06,
+        "eta_ratio_to_source_SHM": 14.953177822513757,
+        "rho_eta_ratio_to_rho0p30_SHM": 42.529213432835235,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 529365,
+        "rho_GeV_cm3": 0.470731624911026,
+        "eta_per_km_s": 1.0844720679555577e-07,
+        "eta_ratio_to_source_SHM": 1.4354172860377092,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.2523210382730197,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 530330,
+        "rho_GeV_cm3": 0.48481298620521485,
+        "eta_per_km_s": 6.785597263498337e-07,
+        "eta_ratio_to_source_SHM": 8.981479464452972,
+        "rho_eta_ratio_to_rho0p30_SHM": 14.514459599007528,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 530852,
+        "rho_GeV_cm3": 0.49856302135130487,
+        "eta_per_km_s": 5.10265329431723e-07,
+        "eta_ratio_to_source_SHM": 6.753919220001869,
+        "rho_eta_ratio_to_rho0p30_SHM": 11.224181240955934,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 531910,
+        "rho_GeV_cm3": 0.41954173502979875,
+        "eta_per_km_s": 4.611720974032968e-07,
+        "eta_ratio_to_source_SHM": 6.104116648194636,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.536438964692856,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 532301,
+        "rho_GeV_cm3": 0.39684589388504765,
+        "eta_per_km_s": 6.684548069295167e-08,
+        "eta_ratio_to_source_SHM": 0.8847729813922225,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.1703950822864506,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 532760,
+        "rho_GeV_cm3": 0.6421100750150052,
+        "eta_per_km_s": 7.688973331585537e-07,
+        "eta_ratio_to_source_SHM": 10.177196405664487,
+        "rho_eta_ratio_to_rho0p30_SHM": 21.782934491612217,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 534628,
+        "rho_GeV_cm3": 0.5282167116061258,
+        "eta_per_km_s": 2.2941864672222797e-07,
+        "eta_ratio_to_source_SHM": 3.0366064832382555,
+        "rho_eta_ratio_to_rho0p30_SHM": 5.346620970059845,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 535050,
+        "rho_GeV_cm3": 0.5789924438022299,
+        "eta_per_km_s": 1.5127477868348052e-07,
+        "eta_ratio_to_source_SHM": 2.0022869991769614,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.8643634761563406,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 535410,
+        "rho_GeV_cm3": 0.5701294693405935,
+        "eta_per_km_s": 1.0649420624061052e-06,
+        "eta_ratio_to_source_SHM": 14.095671895802269,
+        "rho_eta_ratio_to_rho0p30_SHM": 26.787859793176214,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 535774,
+        "rho_GeV_cm3": 0.35037740161422487,
+        "eta_per_km_s": 9.130048971058002e-08,
+        "eta_ratio_to_source_SHM": 1.2084617485938351,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.411392291408302,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 537236,
+        "rho_GeV_cm3": 0.6502275656434198,
+        "eta_per_km_s": 9.109186848376217e-07,
+        "eta_ratio_to_source_SHM": 12.057004186891078,
+        "rho_eta_ratio_to_rho0p30_SHM": 26.13265493798235,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 537488,
+        "rho_GeV_cm3": 0.5700466378035688,
+        "eta_per_km_s": 3.831949446800538e-08,
+        "eta_ratio_to_source_SHM": 0.5072003823509764,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.9637595755061956,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 537941,
+        "rho_GeV_cm3": 0.6460031572551631,
+        "eta_per_km_s": 3.051255487760485e-07,
+        "eta_ratio_to_source_SHM": 4.0386700595301175,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.696645365227845,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 538905,
+        "rho_GeV_cm3": 0.5471851335847684,
+        "eta_per_km_s": 3.7205444158278155e-07,
+        "eta_ratio_to_source_SHM": 4.9245470913956035,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.982129860165953,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 539333,
+        "rho_GeV_cm3": 0.4056260368096594,
+        "eta_per_km_s": 1.0776326258334665e-07,
+        "eta_ratio_to_source_SHM": 1.4263645370190905,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.9285686473229948,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 540082,
+        "rho_GeV_cm3": 0.41597997893773936,
+        "eta_per_km_s": 7.3655556188672505e-09,
+        "eta_ratio_to_source_SHM": 0.09749117721884472,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.1351812594870348,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 540452,
+        "rho_GeV_cm3": 0.72022021442924,
+        "eta_per_km_s": 2.4630535590993226e-07,
+        "eta_ratio_to_source_SHM": 3.2601205320419164,
+        "rho_eta_ratio_to_rho0p30_SHM": 7.826682362174657,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 540920,
+        "rho_GeV_cm3": 0.5191880740704402,
+        "eta_per_km_s": 6.681133777996672e-07,
+        "eta_ratio_to_source_SHM": 8.843210626296981,
+        "rho_eta_ratio_to_rho0p30_SHM": 15.30429831222127,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 541218,
+        "rho_GeV_cm3": 0.5026217666655123,
+        "eta_per_km_s": 2.549587387123306e-07,
+        "eta_ratio_to_source_SHM": 3.374657509289108,
+        "rho_eta_ratio_to_rho0p30_SHM": 5.653921064033096,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 541497,
+        "rho_GeV_cm3": 0.5650767455820904,
+        "eta_per_km_s": 3.642047062887052e-08,
+        "eta_ratio_to_source_SHM": 0.48206472670951106,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.9080118897631012,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 541847,
+        "rho_GeV_cm3": 0.5527348465654192,
+        "eta_per_km_s": 2.2627000896993227e-07,
+        "eta_ratio_to_source_SHM": 2.994930821958786,
+        "rho_eta_ratio_to_rho0p30_SHM": 5.518008761164781,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 542252,
+        "rho_GeV_cm3": 0.604256062594745,
+        "eta_per_km_s": 1.1022025727052582e-07,
+        "eta_ratio_to_source_SHM": 1.4588855465489028,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.9384681204467413,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 543114,
+        "rho_GeV_cm3": 0.34209424791176096,
+        "eta_per_km_s": 1.4379620210734531e-11,
+        "eta_ratio_to_source_SHM": 0.00019032998660866777,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.00021703597874649246,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 543376,
+        "rho_GeV_cm3": 0.6341582474606398,
+        "eta_per_km_s": 6.166540788402924e-07,
+        "eta_ratio_to_source_SHM": 8.162090573173622,
+        "rho_eta_ratio_to_rho0p30_SHM": 17.253523511662642,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 543729,
+        "rho_GeV_cm3": 0.7218768451697328,
+        "eta_per_km_s": 1.3479842949262403e-06,
+        "eta_ratio_to_source_SHM": 17.842045133464637,
+        "rho_eta_ratio_to_rho0p30_SHM": 42.932530841071454,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 544001,
+        "rho_GeV_cm3": 0.6081491448349029,
+        "eta_per_km_s": 1.3777709043927201e-07,
+        "eta_ratio_to_source_SHM": 1.8236303458635181,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.6967974511062556,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 544408,
+        "rho_GeV_cm3": 0.5710406162478645,
+        "eta_per_km_s": 1.4059171233000014e-06,
+        "eta_ratio_to_source_SHM": 18.608849422241953,
+        "rho_eta_ratio_to_rho0p30_SHM": 35.42136280580254,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 545437,
+        "rho_GeV_cm3": 0.4828250293166236,
+        "eta_per_km_s": 2.3130073878037142e-07,
+        "eta_ratio_to_source_SHM": 3.061518028256344,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.927258439154136,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 546114,
+        "rho_GeV_cm3": 0.45665026361683736,
+        "eta_per_km_s": 2.2778778624599837e-07,
+        "eta_ratio_to_source_SHM": 3.015020262736433,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.589365992628994,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 546474,
+        "rho_GeV_cm3": 0.43842732547141666,
+        "eta_per_km_s": 1.4599237830881367e-08,
+        "eta_ratio_to_source_SHM": 0.19323686579525232,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.2824010741769718,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 546870,
+        "rho_GeV_cm3": 0.6440980319035964,
+        "eta_per_km_s": 1.3710442877971392e-07,
+        "eta_ratio_to_source_SHM": 1.81472693375808,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.8962068215867585,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 547293,
+        "rho_GeV_cm3": 0.5795722645614023,
+        "eta_per_km_s": 1.1136163761673542e-07,
+        "eta_ratio_to_source_SHM": 1.4739929626576604,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.847618131050236,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 547844,
+        "rho_GeV_cm3": 0.5186910848482924,
+        "eta_per_km_s": 1.0530348202764684e-07,
+        "eta_ratio_to_source_SHM": 1.3938066534751905,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.4098502838660485,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 549516,
+        "rho_GeV_cm3": 0.6905665241744191,
+        "eta_per_km_s": 4.1890199162008756e-07,
+        "eta_ratio_to_source_SHM": 5.544625608114223,
+        "rho_eta_ratio_to_rho0p30_SHM": 12.763109446813045,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 550149,
+        "rho_GeV_cm3": 0.44811861530329955,
+        "eta_per_km_s": 4.3316086272906515e-08,
+        "eta_ratio_to_source_SHM": 0.5733357348414323,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.8564080520034745,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 552414,
+        "rho_GeV_cm3": 0.5799864222465255,
+        "eta_per_km_s": 9.922281384932062e-08,
+        "eta_ratio_to_source_SHM": 1.3133223655738577,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.539030466885084,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 552581,
+        "rho_GeV_cm3": 0.45598761132064025,
+        "eta_per_km_s": 9.089671544654823e-08,
+        "eta_ratio_to_source_SHM": 1.203117354990955,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.8286886961357744,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 554798,
+        "rho_GeV_cm3": 0.5538116565467394,
+        "eta_per_km_s": 3.4429079549110647e-08,
+        "eta_ratio_to_source_SHM": 0.4557064897054229,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.8412518865428662,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 555601,
+        "rho_GeV_cm3": 0.6580137301237358,
+        "eta_per_km_s": 1.639617067469679e-07,
+        "eta_ratio_to_source_SHM": 2.170212355552235,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.76009842412515,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 557721,
+        "rho_GeV_cm3": 0.5420495782892406,
+        "eta_per_km_s": 5.548660351672351e-08,
+        "eta_ratio_to_source_SHM": 0.734425829718001,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.3269840376112267,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 559386,
+        "rho_GeV_cm3": 0.4986458528883296,
+        "eta_per_km_s": 3.2202331108949635e-08,
+        "eta_ratio_to_source_SHM": 0.4262330408531136,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.7084644606179569,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 560751,
+        "rho_GeV_cm3": 0.5018762828322905,
+        "eta_per_km_s": 1.6802759260078446e-07,
+        "eta_ratio_to_source_SHM": 2.2240287977647757,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.7206243531138448,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 569251,
+        "rho_GeV_cm3": 0.6433525480703747,
+        "eta_per_km_s": 1.507738738770686e-08,
+        "eta_ratio_to_source_SHM": 0.1995656976707701,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.4279703336797733,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 571454,
+        "rho_GeV_cm3": 0.4671698688189666,
+        "eta_per_km_s": 1.5750120460196196e-07,
+        "eta_ratio_to_source_SHM": 2.084700550043886,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.2463642749694333,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 571633,
+        "rho_GeV_cm3": 0.5527348465654192,
+        "eta_per_km_s": 2.76619059019752e-08,
+        "eta_ratio_to_source_SHM": 0.36613555175559326,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.6745862600725764,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 572328,
+        "rho_GeV_cm3": 0.5989548442251681,
+        "eta_per_km_s": 9.050893717822438e-08,
+        "eta_ratio_to_source_SHM": 1.1979846858706598,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.3917957696993266,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 613192,
+        "rho_GeV_cm3": 0.38872840325663294,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 7,
+        "rho_GeV_cm3": 0.42948151947275565,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 9,
+        "rho_GeV_cm3": 0.47901477861349,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      }
+    ],
+    "unscaled": [
+      {
+        "halo_id": 208812,
+        "rho_GeV_cm3": 0.35741808226131927,
+        "eta_per_km_s": 9.312078457418627e-08,
+        "eta_ratio_to_source_SHM": 1.2325553402142433,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.4684585532677426,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 372755,
+        "rho_GeV_cm3": 0.43254628634266723,
+        "eta_per_km_s": 7.962361800606668e-08,
+        "eta_ratio_to_source_SHM": 1.0539055918538909,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.5195431663739043,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 392277,
+        "rho_GeV_cm3": 0.40396940606916665,
+        "eta_per_km_s": 3.1162245399230994e-08,
+        "eta_ratio_to_source_SHM": 0.4124663699465456,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.555412648302704,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 394621,
+        "rho_GeV_cm3": 0.4863039538716583,
+        "eta_per_km_s": 1.153026300779184e-06,
+        "eta_ratio_to_source_SHM": 15.261563043432684,
+        "rho_eta_ratio_to_rho0p30_SHM": 24.739194834276308,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 419618,
+        "rho_GeV_cm3": 0.5812288953018951,
+        "eta_per_km_s": 2.385994685163234e-06,
+        "eta_ratio_to_source_SHM": 31.58124691891799,
+        "rho_eta_ratio_to_rho0p30_SHM": 61.18644419646361,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 444134,
+        "rho_GeV_cm3": 0.2996845009551456,
+        "eta_per_km_s": 2.6248443959203364e-07,
+        "eta_ratio_to_source_SHM": 3.4742683840315047,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.470614622842405,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 446665,
+        "rho_GeV_cm3": 0.37986542879499663,
+        "eta_per_km_s": 5.025340902079964e-07,
+        "eta_ratio_to_source_SHM": 6.651587820677302,
+        "rho_eta_ratio_to_rho0p30_SHM": 8.422360865563869,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 449658,
+        "rho_GeV_cm3": 0.3847524894794503,
+        "eta_per_km_s": 3.002248080871722e-07,
+        "eta_ratio_to_source_SHM": 3.973803401300155,
+        "rho_eta_ratio_to_rho0p30_SHM": 5.096435837840472,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 454172,
+        "rho_GeV_cm3": 0.40927062443874357,
+        "eta_per_km_s": 1.7232965565421225e-07,
+        "eta_ratio_to_source_SHM": 2.2809713032933505,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.1117818320857475,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 455291,
+        "rho_GeV_cm3": 0.4088564667536204,
+        "eta_per_km_s": 1.838689920960925e-07,
+        "eta_ratio_to_source_SHM": 2.4337070305426995,
+        "rho_eta_ratio_to_rho0p30_SHM": 3.3167895254037782,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 459557,
+        "rho_GeV_cm3": 0.2870941073274004,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 459558,
+        "rho_GeV_cm3": 0.28237270971699596,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 476266,
+        "rho_GeV_cm3": 0.2986076909738253,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 477328,
+        "rho_GeV_cm3": 0.32403697284038957,
+        "eta_per_km_s": 1.1509194997740545e-07,
+        "eta_ratio_to_source_SHM": 1.5233677229953821,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.6454248849406024,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 478216,
+        "rho_GeV_cm3": 0.41556582125261626,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 479938,
+        "rho_GeV_cm3": 0.31061826384239793,
+        "eta_per_km_s": 1.0012195273007805e-08,
+        "eta_ratio_to_source_SHM": 0.1325223451181539,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.13721286920308012,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 480802,
+        "rho_GeV_cm3": 0.3580807345575163,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 490079,
+        "rho_GeV_cm3": 0.3655355728897339,
+        "eta_per_km_s": 1.368354260170873e-07,
+        "eta_ratio_to_source_SHM": 1.8111663882458837,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.206819144420298,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 490814,
+        "rho_GeV_cm3": 0.36396177368626575,
+        "eta_per_km_s": 1.7317825932701957e-07,
+        "eta_ratio_to_source_SHM": 2.2922035002022025,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.7809148386115345,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 493433,
+        "rho_GeV_cm3": 0.3645415944454382,
+        "eta_per_km_s": 2.317571142541318e-08,
+        "eta_ratio_to_source_SHM": 0.3067558656349184,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.3727509078801459,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 495451,
+        "rho_GeV_cm3": 0.48936872074156995,
+        "eta_per_km_s": 1.5788415756906645e-06,
+        "eta_ratio_to_source_SHM": 20.89769351029766,
+        "rho_eta_ratio_to_rho0p30_SHM": 34.08892513194591,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 497557,
+        "rho_GeV_cm3": 0.34631865630001757,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 499704,
+        "rho_GeV_cm3": 0.348969265484806,
+        "eta_per_km_s": 1.077955142716035e-07,
+        "eta_ratio_to_source_SHM": 1.4267914233557304,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.6596878500282335,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 5,
+        "rho_GeV_cm3": 0.34416503633737694,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 502371,
+        "rho_GeV_cm3": 0.3839241741092038,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 503987,
+        "rho_GeV_cm3": 0.4792632732245639,
+        "eta_per_km_s": 2.1565502049051988e-07,
+        "eta_ratio_to_source_SHM": 2.8544298500604106,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.560077977099512,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 504559,
+        "rho_GeV_cm3": 0.4724710871885435,
+        "eta_per_km_s": 6.787093438622402e-07,
+        "eta_ratio_to_source_SHM": 8.98345981572202,
+        "rho_eta_ratio_to_rho0p30_SHM": 14.148083419495919,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 505100,
+        "rho_GeV_cm3": 0.3404376171712681,
+        "eta_per_km_s": 7.097360311398935e-08,
+        "eta_ratio_to_source_SHM": 0.9394131925800331,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.066038629404,
+        "hasGSE": true,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 509091,
+        "rho_GeV_cm3": 0.38549797331267205,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 510585,
+        "rho_GeV_cm3": 0.3222975105628721,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 511303,
+        "rho_GeV_cm3": 0.26439826618264917,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 512425,
+        "rho_GeV_cm3": 0.430558329454076,
+        "eta_per_km_s": 5.892886162697631e-13,
+        "eta_ratio_to_source_SHM": 7.799878772843828e-06,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.1194342581266491e-05,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 513105,
+        "rho_GeV_cm3": 0.3058140346949689,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 515296,
+        "rho_GeV_cm3": 0.4281562148803615,
+        "eta_per_km_s": 1.1067897155012673e-06,
+        "eta_ratio_to_source_SHM": 14.649571312927383,
+        "rho_eta_ratio_to_rho0p30_SHM": 20.907683343209722,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 516101,
+        "rho_GeV_cm3": 0.36893166590774407,
+        "eta_per_km_s": 2.3223886913325533e-09,
+        "eta_ratio_to_source_SHM": 0.030739352086049797,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.03780240124677013,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 516760,
+        "rho_GeV_cm3": 0.5089997950164095,
+        "eta_per_km_s": 4.684965300820801e-06,
+        "eta_ratio_to_source_SHM": 62.01063518364978,
+        "rho_eta_ratio_to_rho0p30_SHM": 105.21133532438361,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 517271,
+        "rho_GeV_cm3": 0.3621394798717237,
+        "eta_per_km_s": 3.0473648752034005e-07,
+        "eta_ratio_to_source_SHM": 4.033520408669822,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.868989942825571,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 518682,
+        "rho_GeV_cm3": 0.4805885778169582,
+        "eta_per_km_s": 4.434118096572403e-08,
+        "eta_ratio_to_source_SHM": 0.5869039832580996,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.940197835430393,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 520885,
+        "rho_GeV_cm3": 0.33853249181970146,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 521429,
+        "rho_GeV_cm3": 0.27069346299652175,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 521803,
+        "rho_GeV_cm3": 0.366198225185931,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 522530,
+        "rho_GeV_cm3": 0.4221923442145872,
+        "eta_per_km_s": 3.224075161464216e-07,
+        "eta_ratio_to_source_SHM": 4.267415782293996,
+        "rho_eta_ratio_to_rho0p30_SHM": 6.005567576216762,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 522983,
+        "rho_GeV_cm3": 0.33430808343144486,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 523889,
+        "rho_GeV_cm3": 0.3927043170338157,
+        "eta_per_km_s": 1.4574916334294468e-12,
+        "eta_ratio_to_source_SHM": 1.9291494421096518e-05,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.5252843803994574e-05,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 524506,
+        "rho_GeV_cm3": 0.4165597996969118,
+        "eta_per_km_s": 5.032039916996099e-08,
+        "eta_ratio_to_source_SHM": 0.6660454698943861,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.9248258917608032,
+        "hasGSE": false,
+        "hasLMC": true
+      },
+      {
+        "halo_id": 525002,
+        "rho_GeV_cm3": 0.24567833881508067,
+        "eta_per_km_s": 1.7766183619038632e-09,
+        "eta_ratio_to_source_SHM": 0.023515485393518797,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.019257484626366637,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 526478,
+        "rho_GeV_cm3": 0.35816356609454103,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 528322,
+        "rho_GeV_cm3": 0.27624317597717263,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 528836,
+        "rho_GeV_cm3": 0.3233743205441924,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 529365,
+        "rho_GeV_cm3": 0.47462470715118416,
+        "eta_per_km_s": 1.2207099543230774e-07,
+        "eta_ratio_to_source_SHM": 1.615743015840824,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.5562385190834074,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 530330,
+        "rho_GeV_cm3": 0.4219438496035133,
+        "eta_per_km_s": 2.161276984606154e-07,
+        "eta_ratio_to_source_SHM": 2.8606862595065614,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.023496576146911,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 530852,
+        "rho_GeV_cm3": 0.37854012420260236,
+        "eta_per_km_s": 4.005366784698474e-08,
+        "eta_ratio_to_source_SHM": 0.5301540620143553,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.668948614938094,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 531910,
+        "rho_GeV_cm3": 0.36048284913123085,
+        "eta_per_km_s": 4.50468350033719e-08,
+        "eta_ratio_to_source_SHM": 0.5962440855394943,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.7164525557764073,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 532301,
+        "rho_GeV_cm3": 0.34764396089241184,
+        "eta_per_km_s": 5.018221328134074e-10,
+        "eta_ratio_to_source_SHM": 0.006642164286578892,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.007697027671614689,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 532760,
+        "rho_GeV_cm3": 0.36006869144610765,
+        "eta_per_km_s": 6.485264268541239e-09,
+        "eta_ratio_to_source_SHM": 0.08583955927178648,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.10302712593767584,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 534628,
+        "rho_GeV_cm3": 0.4756186855954798,
+        "eta_per_km_s": 2.1375782540079153e-07,
+        "eta_ratio_to_source_SHM": 2.82931839991568,
+        "rho_eta_ratio_to_rho0p30_SHM": 4.4855889949966725,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 535050,
+        "rho_GeV_cm3": 0.3449105201705988,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 535410,
+        "rho_GeV_cm3": 0.41308087514187697,
+        "eta_per_km_s": 9.640811212545974e-08,
+        "eta_ratio_to_source_SHM": 1.2760667125344323,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.7570625145104706,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 535774,
+        "rho_GeV_cm3": 0.274089556014532,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 537236,
+        "rho_GeV_cm3": 0.41473750588236974,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 537488,
+        "rho_GeV_cm3": 0.3876515932753127,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 537941,
+        "rho_GeV_cm3": 0.43229779173159333,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 538905,
+        "rho_GeV_cm3": 0.4016501230324768,
+        "eta_per_km_s": 7.762682840688609e-10,
+        "eta_ratio_to_source_SHM": 0.010274758995461165,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.013756194048853417,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 539333,
+        "rho_GeV_cm3": 0.35526446229867864,
+        "eta_per_km_s": 9.071307958548684e-09,
+        "eta_ratio_to_source_SHM": 0.1200686733704407,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.14218710894621764,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 540082,
+        "rho_GeV_cm3": 0.35269668465091486,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 540452,
+        "rho_GeV_cm3": 0.2958742502520122,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 540920,
+        "rho_GeV_cm3": 0.40719983601312765,
+        "eta_per_km_s": 3.81592824221668e-08,
+        "eta_ratio_to_source_SHM": 0.5050798008549339,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.685561373605574,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 541218,
+        "rho_GeV_cm3": 0.42210951267756264,
+        "eta_per_km_s": 1.725091481867463e-08,
+        "eta_ratio_to_source_SHM": 0.22833470830992775,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.32127417484025667,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 541497,
+        "rho_GeV_cm3": 0.39204166473761853,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 541847,
+        "rho_GeV_cm3": 0.3550159676876046,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 542252,
+        "rho_GeV_cm3": 0.32793005508054757,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 543114,
+        "rho_GeV_cm3": 0.37663499885103563,
+        "eta_per_km_s": 1.7037139972540352e-07,
+        "eta_ratio_to_source_SHM": 2.255051646220052,
+        "rho_eta_ratio_to_rho0p30_SHM": 2.831104580610384,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 543376,
+        "rho_GeV_cm3": 0.4676668580411144,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 543729,
+        "rho_GeV_cm3": 0.4023127753286739,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 544001,
+        "rho_GeV_cm3": 0.3360475457089623,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 544408,
+        "rho_GeV_cm3": 0.40372091145809275,
+        "eta_per_km_s": 1.009300262203948e-07,
+        "eta_ratio_to_source_SHM": 1.3359191868363647,
+        "rho_eta_ratio_to_rho0p30_SHM": 1.7977950391464375,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 545437,
+        "rho_GeV_cm3": 0.31202639997181686,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 546114,
+        "rho_GeV_cm3": 0.2818757204948481,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 546474,
+        "rho_GeV_cm3": 0.3886455717196083,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 546870,
+        "rho_GeV_cm3": 0.44546800611851106,
+        "eta_per_km_s": 3.2946688975957898e-12,
+        "eta_ratio_to_source_SHM": 4.360854306091364e-05,
+        "rho_eta_ratio_to_rho0p30_SHM": 6.47540357569281e-05,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 547293,
+        "rho_GeV_cm3": 0.4101817713460146,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 547844,
+        "rho_GeV_cm3": 0.39610041005182606,
+        "eta_per_km_s": 3.0556888475521617e-10,
+        "eta_ratio_to_source_SHM": 0.004044538095663307,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.005340143993874891,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 549516,
+        "rho_GeV_cm3": 0.3295866858210404,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 550149,
+        "rho_GeV_cm3": 0.3065595185281907,
+        "eta_per_km_s": 7.6377062635126e-12,
+        "eta_ratio_to_source_SHM": 0.00010109338838936101,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0001033038015700863,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 552414,
+        "rho_GeV_cm3": 0.36180815372362507,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 552581,
+        "rho_GeV_cm3": 0.3929528116448896,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 554798,
+        "rho_GeV_cm3": 0.48398467083496843,
+        "eta_per_km_s": 1.225677285708078e-11,
+        "eta_ratio_to_source_SHM": 0.00016223178217267416,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.00026172565231270665,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 555601,
+        "rho_GeV_cm3": 0.4014844599584275,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 557721,
+        "rho_GeV_cm3": 0.3732389058330254,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 559386,
+        "rho_GeV_cm3": 0.3611455014274281,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 560751,
+        "rho_GeV_cm3": 0.38442116333135173,
+        "eta_per_km_s": 3.877146898776946e-12,
+        "eta_ratio_to_source_SHM": 5.131827590085977e-05,
+        "rho_eta_ratio_to_rho0p30_SHM": 6.575943773989261e-05,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 569251,
+        "rho_GeV_cm3": 0.4667557111338434,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 571454,
+        "rho_GeV_cm3": 0.3141800199344575,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 571633,
+        "rho_GeV_cm3": 0.3932013062559635,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 572328,
+        "rho_GeV_cm3": 0.3809422387763169,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 613192,
+        "rho_GeV_cm3": 0.352199695428767,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": true,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 7,
+        "rho_GeV_cm3": 0.41192123362353206,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      },
+      {
+        "halo_id": 9,
+        "rho_GeV_cm3": 0.33563338802383913,
+        "eta_per_km_s": 0.0,
+        "eta_ratio_to_source_SHM": 0.0,
+        "rho_eta_ratio_to_rho0p30_SHM": 0.0,
+        "hasGSE": false,
+        "hasLMC": false
+      }
+    ]
+  },
+  "method_limits": [
+    "The geocentric PDFs are evaluated for the Earth velocity on 2000-03-09, not annually averaged; the source paper also omits solar gravitational focusing.",
+    "Scaled and unscaled TNG50 samples are alternative population constructions, not interchangeable posterior draws. The scaled sample applies the paper's phase-space transformation to match the Milky Way local circular speed.",
+    "This transfers only the halo integral and local density into a conditional differential-rate ratio for a 1/v^2 recoil kernel. It does not include LZ efficiencies, isotope response, backgrounds, or likelihood profiling.",
+    "The ratio assumes the IDM component traces all local dark matter. For a local IDM fraction f_H, multiply each rho*eta ratio by f_H; its value is not inferred here.",
+    "The TNG50 simulation ensemble is a model-based halo-to-halo distribution, not a direct observation or complete posterior for the Milky Way."
+  ],
+  "falsification_test": "A detector-level prediction must combine one common local component fraction, particle cross section, and response-folded xenon spectrum with the event-level LZ likelihood; the halo fold alone cannot establish the IDM interpretation."
+}

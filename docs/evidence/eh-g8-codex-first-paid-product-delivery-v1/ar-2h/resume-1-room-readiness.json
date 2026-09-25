@@ -1,0 +1,18 @@
+{
+  "observed_at": "2026-09-25T05:31:14.5811299Z",
+  "checkpoint": "resumed-1-room-readiness",
+  "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+  "status": "waiting_for_participant",
+  "max_participants": 2,
+  "participant_count": 1,
+  "owner_present": true,
+  "required_voice_consents_enabled": false,
+  "runtime_state": "idle",
+  "transport_owner": "unbound",
+  "media_bridge_connected": false,
+  "public_terminal_result_count": 0,
+  "user_reported_action": "Start Harness",
+  "device_trust_control_still_off": true,
+  "task_registration_requires_owner_device_trust": true,
+  "model_call_started": false
+}

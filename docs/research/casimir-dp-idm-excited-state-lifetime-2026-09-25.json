@@ -1,0 +1,46 @@
+{
+  "evidence_class": "tree_level_Z_star_three_neutrino_decay_phase_space_screen",
+  "input": {
+    "branch_verdict_sha256": "a53f50531239b0735d53fb31efc84e20ec0deee54a95be0394e0bf8553cc3e87",
+    "m_H_GeV": 1080.0,
+    "delta_keV": 368.99999999999994,
+    "m_A_GeV": 1080.000369,
+    "G_F_GeV_minus2": 1.1663787e-05,
+    "open_final_states_assumed": "H plus three active-neutrino flavors; charged-lepton pairs closed"
+  },
+  "calculation": {
+    "dGamma_dq2_per_flavor": "G_F^2 * |p_H(q2)|^3 / (24*pi^3)",
+    "q2_interval_GeV2": [
+      0.0,
+      1.3616099999999997e-07
+    ],
+    "phase_integral_GeV5": 2.7362703386039965e-18,
+    "quadrature_absolute_error_GeV5": 1.85104978814946e-29,
+    "width_per_flavor_GeV": 5.002387185071911e-31,
+    "width_total_GeV": 1.5007161555215733e-30,
+    "lifetime_seconds": 438598.5680758122,
+    "lifetime_days": 5.076372315692271,
+    "small_splitting_width_GeV": 1.5008295682536212e-30,
+    "exact_to_small_splitting_relative_difference": -7.556669621044954e-05,
+    "age_of_universe_seconds_used": 4.3549488e+17,
+    "universe_age_over_lifetime": 992923624695.2915,
+    "log10_survival_probability_today_without_repopulation": -431221251156.54047
+  },
+  "checks": {
+    "three_neutrino_width_positive": true,
+    "small_splitting_limit_within_1e-3": true,
+    "excited_population_does_not_survive_halo_age": true,
+    "endothermic_C12_threshold_exceeds_frozen_halo_cap": true
+  },
+  "interpretation": {
+    "ground_state_H_to_A_on_carbon": "kinematically closed at the frozen halo-speed cap",
+    "excited_state_A_to_H_on_carbon": "exothermic in principle, but primordial A population decays away in days",
+    "conditional_escape": "requires an explicit late-time repopulation or modified decay channel, followed by a new abundance and target-response calculation"
+  },
+  "limitations": [
+    "Tree-level Z* decay with massless neutrinos and the standard IDM ZHA coupling is used; higher-order radiative channels are not needed to establish rapid depletion.",
+    "No mechanism for late-time excited-state repopulation is modeled.",
+    "This tests the proposed inelastic same-channel bridge only; it is not a global exclusion of IDM, boson stars, or other dark sectors.",
+    "The result does not calculate a Casimir-DP material response or gamma-ray likelihood."
+  ]
+}

@@ -70,6 +70,10 @@ import {
   buildCasimirDpStudyTheoryBadgesV1,
 } from "./casimir-dp-study-theory-badges";
 import {
+  YTTERBIUM_CLOCK_CORRELATION_BADGES,
+  YTTERBIUM_CLOCK_CORRELATION_EDGES,
+} from "./ytterbium-clock-correlation-theory-badges";
+import {
   buildAdvectionDiffusionScientificEvidenceBadgesV1,
 } from "./advection-diffusion-scientific-evidence-badges";
 import {
@@ -1004,6 +1008,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...granularTidal.badges,
       ...curvature.badges,
       ...casimirDpStudy.badges,
+      ...YTTERBIUM_CLOCK_CORRELATION_BADGES,
       ...advectionDiffusionEvidence.badges,
       ...orchOr.badges,
       ...nucleosynthesisOrigins.badges,
@@ -1037,6 +1042,7 @@ export function buildHelixTheoryBadgeGraphV1(): TheoryBadgeGraphV1 {
       ...granularTidal.edges,
       ...curvature.edges,
       ...casimirDpStudy.edges,
+      ...YTTERBIUM_CLOCK_CORRELATION_EDGES,
       ...advectionDiffusionEvidence.edges,
       ...orchOr.edges,
       ...nucleosynthesisOrigins.edges,

@@ -1,0 +1,60 @@
+{
+  "schema": "casimirbot.ar2d.source_snapshot.v1",
+  "captured_at": "2026-09-25T03:59:32.1247442Z",
+  "base_commit": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "scope": "Working tree with existing AR and unrelated changes; no release or deployment",
+  "files": [
+    {
+      "path": "shared/helix-room-result-catalog.ts",
+      "sha256": "9599a7e8b36ae9a7d17a3e3a0655202aee4bf1cbc6b152546df90572ed6c966e"
+    },
+    {
+      "path": "server/routes/room-result-catalog.ts",
+      "sha256": "b70aada5fe2aa1b1f827207f02000aecda99ee2ae77d7799dd0e40d1286cf669"
+    },
+    {
+      "path": "server/routes/__tests__/room-result-catalog.test.ts",
+      "sha256": "da93384e8c8dc5b772ec18b57c391d77a421c4c8115ba1546861796f5adaadc8"
+    },
+    {
+      "path": "server/index.ts",
+      "sha256": "74d23f6ba35c1adf58c93b64afc50e1961fede258d18fd39739d2d89bc4f76a7"
+    },
+    {
+      "path": "server/services/local-supervisor/room-mission-result.ts",
+      "sha256": "b4771d5a2d51e2a80a74cc1195a1314e8266bba8b9ba2d7086676af7191094e9"
+    },
+    {
+      "path": "server/services/local-supervisor/__tests__/room-mission-result.test.ts",
+      "sha256": "bb4ed68eaa0659035ad50ef815330af56c4770dfb6ead7403783323aa23f3738"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/voice-handoff-authority.test.ts",
+      "sha256": "c2c252500ae669d3f16857df54e32a38d0911c2b7fff1de7ca7694aafee51d8e"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/RoomResultOwnerApi.ts",
+      "sha256": "b1ba335f08e11b4bfea5018c09ab1b40b569e02be757c86d46740b1e99f5bf78"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomOwnerResultsPanel.tsx",
+      "sha256": "f021e20e3e84814a10680acae868c36db181420a9df08cb47b33a17557f86961"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomActivePanel.tsx",
+      "sha256": "aaade378a8ca5bbc5f2b48ab0f8473da633a9af9a21773d917f32efa751ba7db"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomPublicResultsPanel.tsx",
+      "sha256": "048231f4b96e0b5ba4da05251f10711ed99477ba09d661df0c31239ad25d5d7b"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomOwnerResultsPanel.spec.tsx",
+      "sha256": "de0bfeb1b79d1dd26f0645200afb07e0298dcc7841dfc9760a5b85dd4f9cf286"
+    },
+    {
+      "path": "client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPublicResultsPanel.spec.tsx",
+      "sha256": "00b3463d5336f7f882662fea277dd44ba3666150bcd952bf26916bcfb002c149"
+    }
+  ]
+}

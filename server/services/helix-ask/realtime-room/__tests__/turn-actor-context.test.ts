@@ -3,6 +3,7 @@ import {
   bindSharedRealtimeRoomAdmittedSession,
   claimSharedRealtimeRoomSpeakerFloor,
   markSharedRealtimeRoomTransportActive,
+  promoteSharedRealtimeRoomMediaBridge,
   releaseSharedRealtimeRoomSpeakerFloor,
   reserveSharedRealtimeRoomRuntime,
 } from "../runtime-registry";
@@ -23,7 +24,7 @@ describe("Realtime room turn actor context", () => {
     await resetSharedRealtimeRoomRouteTestState();
   });
 
-  it("freezes the active room speaker and falls back to the authenticated microphone owner", async () => {
+  it("freezes the active room speaker and does not relabel an unclaimed floor as the host", async () => {
     const app = createSharedRealtimeRoomTestApp();
     const owner = await signInSharedRealtimeRoomTestAgent({
       app,
@@ -70,6 +71,7 @@ describe("Realtime room turn actor context", () => {
       transportOwner: "host_browser",
       nowMs: 1_020,
     });
+    promoteSharedRealtimeRoomMediaBridge({ roomId, runtimeId, nowMs: 1_020 });
     const floor = claimSharedRealtimeRoomSpeakerFloor({
       roomId,
       runtimeId,
@@ -107,9 +109,9 @@ describe("Realtime room turn actor context", () => {
       nowMs: 1_060,
     });
     expect(ownerMicrophone).toMatchObject({
-      participant_id: ownerParticipantId,
-      resolution: "resolved",
-      resolution_source: "authenticated_realtime_participant",
+      participant_id: null,
+      resolution: "unavailable",
+      resolution_source: "speaker_unavailable",
     });
   });
 

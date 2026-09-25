@@ -1,0 +1,98 @@
+{
+  "schema": "casimirbot.ar2a.component-evidence.v1",
+  "synthetic": true,
+  "runtime_acceptance": false,
+  "api_calls": 0,
+  "native_effects": 0,
+  "checks": [
+    {
+      "name": "production room capacity remains two; fixture does not create a three-person room",
+      "status": "pass"
+    },
+    {
+      "name": "three synthetic profiles are distinct",
+      "status": "pass"
+    },
+    {
+      "name": "Alex cannot grant Dan's connection",
+      "status": "pass"
+    },
+    {
+      "name": "same room grant preserves separate Sam and Alex observation attribution",
+      "status": "pass"
+    },
+    {
+      "name": "outsider cannot read original room",
+      "status": "pass"
+    },
+    {
+      "name": "outsider cannot substitute their room into original grant",
+      "status": "pass"
+    },
+    {
+      "name": "wrong node is denied before read driver",
+      "status": "pass"
+    },
+    {
+      "name": "expired grant is denied",
+      "status": "pass"
+    },
+    {
+      "name": "tampered observation cannot re-enter",
+      "status": "pass"
+    },
+    {
+      "name": "exact issued observation can be projected as non-authoritative evidence",
+      "status": "pass"
+    },
+    {
+      "name": "revoke prevents new reads",
+      "status": "pass"
+    }
+  ],
+  "limitations": [
+    {
+      "name": "principal_binding_not_verified_here",
+      "observed": true,
+      "meaning": "Exact observation integrity is checked, but caller-selected principal is accepted. This probe cannot establish room/principal/mission authorization."
+    },
+    {
+      "name": "historical_observation_projection_after_revoke",
+      "observed": true,
+      "meaning": "Previously issued observation still projects after read grant revocation. Caller must decide current context-release permission; this is not a new read or effect."
+    },
+    {
+      "name": "mission_revision_not_an_input",
+      "observed": true,
+      "meaning": "reenterObservation takes observation, principalRuntimeRef and turnRef. Mission-revision validation must be proven in a qualified caller path."
+    }
+  ],
+  "mock_driver_reads": 2,
+  "scope": "RoomReadGrantLifecycle and capacity constant only; three profiles injected as trusted fixture data, no real authentication or capacity change.",
+  "expected_only_steps": [
+    {
+      "step": "disagreement-and-correction",
+      "expected": "Preserve Sam's constraint and speaker identity; make route conflict visible; update mission without an effect."
+    },
+    {
+      "step": "worker-return",
+      "expected": "Same room, authenticated sole principal, current mission revision and source epoch required; stale and foreign results denied."
+    },
+    {
+      "step": "owner-action",
+      "expected": "Exact owner grant precedes action; submitted/received/decision/admitted/native-verified are distinct; retry cannot duplicate effect."
+    },
+    {
+      "step": "interrupt-and-reconnect",
+      "expected": "Barge-in interrupts speech; departure/revoke prevent further scope use; reconnect preserves permitted history but not stale grants."
+    },
+    {
+      "step": "provider-failure",
+      "expected": "AI unavailable reported without inventing output or transferring authority; no silent managed-provider fallback."
+    },
+    {
+      "step": "BYO-connection",
+      "expected": "Qualified personal Helix Ask can use own provider without subscription; payer/scope visible; hosted entitlement and program grants separate."
+    }
+  ]
+}

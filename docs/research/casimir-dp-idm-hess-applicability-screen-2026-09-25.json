@@ -1,0 +1,36 @@
+{
+  "status": "conditional applicability screen; no likelihood recast",
+  "lz_benchmark": {
+    "m_H_GeV": 1080.0,
+    "delta_AH_keV": 369.0,
+    "delta_charged_GeV": 8.17,
+    "source": "https://arxiv.org/html/2609.06571"
+  },
+  "hess_scan": {
+    "m_H_min_GeV": 300.0,
+    "m_H_max_GeV": 30000.0,
+    "delta_neutral_min_GeV": 0.5,
+    "delta_neutral_max_GeV": 10.0,
+    "delta_charged_min_GeV": 0.5,
+    "delta_charged_max_GeV": 10.0,
+    "reported_excluded_mass_min_GeV": 1000.0,
+    "reported_excluded_mass_max_GeV": 8000.0,
+    "halo_profile": "Einasto",
+    "source": "https://arxiv.org/html/2411.05909"
+  },
+  "comparison": {
+    "lz_mass_inside_hess_mass_scan": true,
+    "lz_charged_gap_inside_hess_scan": true,
+    "lz_neutral_gap_inside_hess_scan": false,
+    "hess_neutral_gap_floor_over_lz_gap": 1355.0135501355014,
+    "co_traced_h_fraction_assumption": 0.9,
+    "annihilation_flux_ratio_at_fixed_cross_section_if_co_traced": 0.81
+  },
+  "limitations": [
+    "H.E.S.S. paper assumes a benchmark cuspy Einasto Galactic profile; a core can weaken the limits substantially.",
+    "The LZ-fit neutral splitting lies below the H.E.S.S. scan floor, so the reported mass exclusion cannot be assigned directly to this point.",
+    "The LZ paper's best-fit relic saturates the cosmic dark-matter abundance; a 10% second component requires a new relic calculation.",
+    "The 0.81 flux ratio assumes the local heavy-component fraction equals its cosmic fraction and holds the present-day annihilation cross section fixed.",
+    "No mapping from the freeze-out rate change to the present-day annihilation rate is made."
+  ]
+}

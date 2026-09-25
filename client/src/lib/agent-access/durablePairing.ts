@@ -70,7 +70,8 @@ async function request<T>(path: string, schema: z.ZodType<T>, body?: unknown): P
             if (failure?.schema === "helix.reasoning_task_binding_error.v1" && failure.ok === false &&
                 (isPairingStorageErrorCode(failure.error) ||
                   ["pairing_environment_unavailable", "pairing_request_cancelled", "pairing_account_link_required",
-                    "pairing_device_identity_mismatch", "pairing_device_trust_required"].includes(failure.error))) code = failure.error;
+                    "pairing_device_identity_mismatch", "pairing_device_trust_required",
+                    "pairing_registration_expired"].includes(failure.error))) code = failure.error;
           }
           throw new PairingRequestError(code, mutation);
         }

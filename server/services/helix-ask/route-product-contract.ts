@@ -206,6 +206,7 @@ const normalizeSourceTarget = (
     sourceTarget === "scholarly_research" ||
     sourceTarget === "internet_search" ||
     sourceTarget === "runtime_evidence" ||
+    sourceTarget === "room_mission_result" ||
     sourceTarget === "workspace_directory" ||
     sourceTarget === "workspace_diagnostic" ||
     sourceTarget === "theory_locator" ||
@@ -351,6 +352,12 @@ export function buildRouteProductContract(input: {
   const promptText = input.promptText ?? "";
   const sourceTargetRecord = input.sourceTargetIntent as
     Record<string, unknown> | null | undefined;
+  if (sourceTargetRecord?.target_source === "room_mission_result") {
+    return makeContract({ turnId: input.turnId, threadId: input.threadId,
+      sourceTarget: "room_mission_result", allowedCore: [],
+      allowedExtra: ["agent_provider_terminal_candidate", "model_synthesized_answer"],
+      precedenceReason: "explicit_room_result_requires_admitted_observation_and_solver" });
+  }
   const requestedOutputs = Array.isArray(sourceTargetRecord?.requested_outputs)
     ? sourceTargetRecord.requested_outputs
     : [];

@@ -8,9 +8,11 @@ observation freeze; this module intentionally has no subprocess launch path.
 import ctypes
 import hashlib
 import json
+import math
 import os
 import shutil
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -19,6 +21,50 @@ MODEL = ROOT / "configs/research/controlled-stellar-composition-transport-g1-mod
 ACCEPTANCE = ROOT / "configs/research/controlled-stellar-composition-transport-g1-acceptance-design.v1.json"
 STRUCTURAL = ROOT / "configs/research/controlled-stellar-composition-transport-g1-structural-source.v1.json"
 PROVENANCE = ROOT / "configs/research/controlled-stellar-composition-transport-g1-installed-provenance.v1.json"
+
+
+@dataclass(frozen=True)
+class ResourceSample:
+    elapsed_seconds: float
+    attempt_bytes: int
+    host_free_bytes: int
+    running_g1_jobs: int
+
+
+def runtime_stop_reason(sample: ResourceSample, resources: dict) -> str | None:
+    """Pure first-stop decision for a future monitor; no process control here."""
+    frozen_limits = {
+        "jobConcurrency": 1,
+        "pilotTimeoutSeconds": 7200,
+        "maximumAttemptWorkingAndOutputBytes": 5_000_000_000,
+        "stopBelowHostFreeBytes": 20_000_000_000,
+    }
+    if any(type(resources.get(key)) is not type(value) or resources.get(key) != value
+           for key, value in frozen_limits.items()):
+        return "STOP_RESOURCE_POLICY_DRIFT"
+    if any((isinstance(value, bool) or not isinstance(value, (int, float)))
+           for value in (sample.elapsed_seconds, sample.attempt_bytes,
+                         sample.host_free_bytes, sample.running_g1_jobs)):
+        return "STOP_INVALID_RESOURCE_SAMPLE"
+    if (not all(math.isfinite(float(value)) for value in
+                (sample.elapsed_seconds, sample.attempt_bytes, sample.host_free_bytes,
+                 sample.running_g1_jobs)) or
+            min(sample.elapsed_seconds, sample.attempt_bytes,
+                sample.host_free_bytes, sample.running_g1_jobs) < 0):
+        return "STOP_INVALID_RESOURCE_SAMPLE"
+    if int(sample.running_g1_jobs) != sample.running_g1_jobs:
+        return "STOP_INVALID_RESOURCE_SAMPLE"
+    if sample.running_g1_jobs > resources["jobConcurrency"]:
+        return "STOP_JOB_CONCURRENCY"
+    # Conservative one-minute, 500-MB and 1-GB margins leave time for a
+    # future monitor to stop before the frozen hard ceilings are crossed.
+    if sample.elapsed_seconds >= resources["pilotTimeoutSeconds"] - 60:
+        return "STOP_WALL_CLOCK_MARGIN"
+    if sample.attempt_bytes >= resources["maximumAttemptWorkingAndOutputBytes"] - 500_000_000:
+        return "STOP_ATTEMPT_BYTES_MARGIN"
+    if sample.host_free_bytes <= resources["stopBelowHostFreeBytes"] + 1_000_000_000:
+        return "STOP_HOST_FREE_MARGIN"
+    return None
 
 
 def available_memory_bytes() -> int | None:
@@ -67,15 +113,20 @@ def evaluate_preflight(
         "privileged": False, "dockerSocketMount": False,
         "automaticDeletion": False,
     }
-    if any(resources.get(key) != value for key, value in expected.items()):
+    if any(type(resources.get(key)) is not type(value) or resources.get(key) != value
+           for key, value in expected.items()):
         blockers.append("BLOCK_RESOURCE_POLICY_DRIFT")
     if model.get("image") != provenance.get("image"):
         blockers.append("BLOCK_IMAGE_IDENTITY_MISMATCH")
     if hashlib.sha256(inlist_bytes).hexdigest() != provenance.get("inlist", {}).get("sha256"):
         blockers.append("BLOCK_INLIST_HASH_MISMATCH")
-    if host_free_bytes is None or host_free_bytes < expected["minimumHostFreeBytesBeforeStart"]:
+    def valid_capacity(value: object) -> bool:
+        return type(value) is int and value >= 0
+
+    if (not valid_capacity(host_free_bytes) or
+            host_free_bytes < expected["minimumHostFreeBytesBeforeStart"]):
         blockers.append("BLOCK_HOST_DISK_CAPACITY")
-    if (host_available_memory_bytes is None or
+    if (not valid_capacity(host_available_memory_bytes) or
             host_available_memory_bytes < expected["minimumHostAvailableMemoryBytes"]):
         blockers.append("BLOCK_HOST_MEMORY_CAPACITY")
     for label, document in (("MODEL", model), ("ACCEPTANCE", acceptance),

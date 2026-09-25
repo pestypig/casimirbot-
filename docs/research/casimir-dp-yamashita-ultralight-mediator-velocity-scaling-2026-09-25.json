@@ -1,0 +1,48 @@
+{
+  "classification": "conditional_Coulomb_limit_scaling_not_full_model_or_exclusion",
+  "source_model": "Yamashita, arXiv:2609.02868v2, Table 1",
+  "inputs": {
+    "m_X_GeV": 420.0,
+    "alpha_eff": 0.2,
+    "finite_range_mediator_GeV": 0.4,
+    "counterfactual_mediator_eV": 1e-17,
+    "v_relative_freezeout": 0.3,
+    "v_relative_halo": 0.001,
+    "v_relative_dwarf": 0.0001,
+    "paper_sigma_v_halo_cm3_s": 2.7e-24,
+    "paper_sigma_v_dwarf_cm3_s": 6.5e-26
+  },
+  "derived": {
+    "alpha_mX_GeV": 84.0,
+    "finite_mediator_over_alpha_mX": 0.004761904761904762,
+    "ultralight_mediator_GeV": 1.0000000000000002e-26,
+    "ultralight_over_alpha_mX": 1.1904761904761906e-28,
+    "finite_mediator_over_mX_v_halo": 0.9523809523809524,
+    "finite_mediator_over_mX_v_dwarf": 9.523809523809524,
+    "ultralight_over_mX_v_halo": 2.3809523809523814e-26,
+    "ultralight_over_mX_v_dwarf": 2.3809523809523814e-25,
+    "finite_to_ultralight_mediator_mass_ratio": 3.9999999999999995e+25,
+    "paper_dwarf_over_halo_rate": 0.024074074074074074,
+    "Coulomb_pwave_dwarf_over_halo_rate": 10.0,
+    "change_in_dwarf_to_halo_rate_hierarchy": 415.38461538461536,
+    "conditional_dwarf_rate_if_halo_anchored_cm3_s": 2.7e-23,
+    "conditional_dwarf_rate_over_paper_dwarf_rate": 415.38461538461536
+  },
+  "assumptions": [
+    "Keep alpha_eff and the short-distance p-wave annihilation coefficient fixed while replacing the 400 MeV mediator by a 1e-17 eV mediator.",
+    "Use the attractive Coulomb asymptote for the p-wave Sommerfeld factor, S1 proportional to (alpha_eff/v_relative)^3; with bare sigma*v proportional to v_relative^2, the rate scales as 1/v_relative.",
+    "Use the paper's representative relative velocities rather than velocity-distribution averages.",
+    "Anchor the illustrative dwarf rate to the paper halo rate only to expose the changed hierarchy; this is not a refit or constraint comparison."
+  ],
+  "limits": [
+    "The scalar mediator must be solved with the model's actual potential, channel structure and velocity distributions; resonances, saturation, bound-state formation and self-interactions can change the result.",
+    "Changing mediator mass by 4e25 while retaining alpha_eff is a counterfactual parameter swap, not a UV-complete model; radiative stability and induced long-range forces are unaddressed.",
+    "An ultralight coherent star field is not automatically equivalent to a homogeneous particle-exchange mediator; its occupancy, profile, coupling and perturbations need an explicit field theory.",
+    "This calculation says nothing directly about xenon recoils or Casimir-DP response; the dark-photon paper's endothermic carbon channel remains kinematically closed."
+  ],
+  "checks": {
+    "ultralight_mediator_is_deep_coulomb_scale": true,
+    "conditional_hierarchy_reverses": true,
+    "hierarchy_change_exceeds_100": true
+  }
+}

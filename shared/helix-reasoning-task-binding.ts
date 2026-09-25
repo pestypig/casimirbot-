@@ -78,7 +78,8 @@ export type HelixReasoningSteeringEventProjection = z.infer<
 export type HelixReasoningSteeringDelivery = Readonly<{
   event: HelixReasoningSteeringEventProjection;
   instruction_text: string;
-  content_role: "operator_steering_advisory_not_execution" | "agent_steering_advisory_not_execution";
+  content_role: "operator_steering_advisory_not_execution" | "agent_steering_advisory_not_execution" |
+    "room_mission_suppressed_not_instruction";
   raw_provider_content_included: false;
   hidden_reasoning_included: false;
 }>;

@@ -1,0 +1,15 @@
+{
+  "schema": "casimirbot.g1.no_model_room_route_map_sources.v1",
+  "captured_at": "2026-09-21T19:57:00Z",
+  "sources": [
+    { "path": "server/routes/agi.realtime-room/index.ts", "sha256": "39560b23c770c6f598e82468057bf92a175b8fed8efa37a31937cbdb3a1b5ee2" },
+    { "path": "server/routes/agi.realtime-room/runtime-routes.ts", "sha256": "8bfbad6055416d50c0e6449cc495b42f33939426d739d788971d298c6e875967" },
+    { "path": "server/routes/agi.realtime-room/environment-routes.ts", "sha256": "29932f759fb52e100aebcdeb43ec9493d79316ef19dba04041b2968e14ae07b2" },
+    { "path": "server/services/environment-connectors/actions/action-broker.ts", "sha256": "8f59c420cbb813fb52532b9c11384c908b38a20cec8c0f72812cb5dd7c0c93ba" },
+    { "path": "server/services/environment-connectors/actions/authority-store.ts", "sha256": "7bbd742714a6c3e17f23691473c9a7190c9311e3b3f9f63c5c3392b312164411" },
+    { "path": "shared/contracts/helix-shared-live-room-agent.v1.ts", "sha256": "baf06bf90d58583cfba15e0f0c665143ac6f796be97700cfb85c70f1a58dc9fe" },
+    { "path": "server/routes/__tests__/helix-shared-live-room-oauth-e2e.test.ts", "sha256": "a923fa94124fd7e2e7f51693dec9ebf8e9fc95478228353e2633d497dd65825a" },
+    { "path": "server/routes/__tests__/helix-shared-live-room-transports.test.ts", "sha256": "c2d27748fdfc257b8b8b4a40fa703a9ee964d9cc44f40e19d2246a325f8982ba" },
+    { "path": "server/services/environment-connectors/actions/__tests__/action-admission-transaction.test.ts", "sha256": "07e7f987710e7b3d8b773c31a4c4408980d4958bcb763948a44eca9515f170b4" }
+  ]
+}

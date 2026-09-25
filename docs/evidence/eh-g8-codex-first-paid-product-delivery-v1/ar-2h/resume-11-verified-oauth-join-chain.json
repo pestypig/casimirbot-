@@ -1,0 +1,53 @@
+{
+  "schema": "casimirbot.ar2h.source_checkpoint.v1",
+  "observed_at": "2026-09-25T13:38:56Z",
+  "capability": "Verified OAuth account chain to real invitation membership",
+  "maturity": "implemented",
+  "test": {
+    "file": "server/routes/__tests__/helix-shared-live-room-oauth-e2e.test.ts",
+    "command": "npx vitest run server/routes/__tests__/helix-shared-live-room-oauth-e2e.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "passed": 2,
+    "failed": 0,
+    "fixture": "Synthetic signed HS256 tokens; isolated pg-mem database; real token verifier, account-link resolution, REST router, control service and room persistence",
+    "checks": [
+      "Wrong signature, unlinked subject, insufficient scope and forged profile do not change membership.",
+      "Linked guest joins once and repeated idempotency key returns current membership.",
+      "Guest role remains participant, media consents remain false and runtime remains idle.",
+      "No browser cookie, invitation plaintext, access token or answer authority appears in the join response.",
+      "Revoked account link prevents replay using the previously valid token.",
+      "Desktop guard independently rejects a valid room token without its native session.",
+      "Existing signed REST/MCP read parity and account-link revocation test also passes."
+    ]
+  },
+  "fresh_installed_observation": {
+    "via": "authenticated helix_room_inspect MCP",
+    "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+    "status": "waiting_for_participant",
+    "participant_count": 1,
+    "owner_presence": "present",
+    "media_consents": false,
+    "runtime_state": "idle",
+    "transport_owner": "unbound",
+    "public_result_count": 0
+  },
+  "fresh_domain_observation": {
+    "via": "in-app browser public fingerprint page",
+    "url": "https://casimirbot.com/api/agi/runtime-parity/fingerprint",
+    "source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+    "built_at": "2026-09-01T19:18:38.201Z",
+    "new_source_deployed": false
+  },
+  "connection_gaps": [
+    "Native account-link default scopes authorize Friends & Parties, not Shared Live Rooms.",
+    "Local account-link persistence does not establish an OAuth link on another service; domain coordination cookies do not replace it.",
+    "Installed general REST remains behind the desktop session guard; native guest transport must preserve that boundary and reach the same room/runtime/task authority."
+  ],
+  "not_proven": [
+    "Production Auth0/JWKS-to-join acceptance",
+    "Two independently authenticated installed EXEs",
+    "Remote owner task binding, instruction delivery and results",
+    "Guest mission denial, live media, reconnect and interruption",
+    "Earlier release-evaluator Casimir PASS, certificate or integrity"
+  ],
+  "runtime_changes": "None; no rebuild, deployment, new network exposure, provider configuration or paid call"
+}

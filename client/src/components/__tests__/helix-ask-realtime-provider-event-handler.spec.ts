@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHelixAskRealtimeProviderEventHandler } from "@/components/helix/ask-console/HelixAskRealtimeProviderEventHandler";
+import { useRoomMissionHandoffReview } from "@/components/helix/ask-console/shared-live-room/RoomMissionHandoffReview";
 
 type ServerHandoffOptions = {
   outcome?: "conversation_local" | "worker_grounded" | "durable_goal_bound" | "action_candidate";
@@ -139,8 +140,11 @@ const buildServerHandoff = (
 };
 
 describe("Helix Ask Realtime provider event handler", () => {
-  it("offers a finalized GPT Live transcript to the exact bound-agent destination before normal Ask routing", async () => {
-    const postEvent = vi.fn();
+  it("offers personal GPT Live speech to the bound task only after server attribution", async () => {
+    const postEvent = vi.fn(async () => ({ ok: true,
+      realtime_transcript_observations: [{ observation_ref: "obs:personal" }],
+      realtime_stage_play_ask_handoff: buildServerHandoff("obs:personal"),
+    }));
     const launchPrompt = vi.fn();
     const offerFinalizedSteering = vi.fn(() => true);
     const handler = createHelixAskRealtimeProviderEventHandler({
@@ -163,7 +167,7 @@ describe("Helix Ask Realtime provider event handler", () => {
         "gpt-live:realtime:test:event:transcript:bound-agent",
       transcript: "Acknowledge this advisory on the exact bound task.",
     });
-    expect(postEvent).not.toHaveBeenCalled();
+    expect(postEvent).toHaveBeenCalledOnce();
     expect(launchPrompt).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       event_kind: "input_transcript_final",
@@ -185,6 +189,40 @@ describe("Helix Ask Realtime provider event handler", () => {
       blocked_reason: "duplicate_realtime_transcript_event",
     });
     expect(offerFinalizedSteering).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["Do not move", "If we move later", "Yesterday we moved", 'The screen says "move"',
+    "How does movement work?", "Review this, but do not move"]) (
+    "never sends room speech through personal steering: %s", async transcript => {
+      useRoomMissionHandoffReview.setState({ entries: [] });
+      const handoff = { ...buildServerHandoff("obs:room"), thread_id: "helix-ask:room:room:one",
+        transcript_text_char_count: transcript.length };
+      const offer = vi.fn(() => true);
+      const handler = createHelixAskRealtimeProviderEventHandler({ realtimeSessionId: "realtime:test",
+        runtimeAgentAuthority: "observe_only", launchPrompt: vi.fn(), offerFinalizedSteering: offer,
+        postEvent: async () => ({ ok: true, realtime_transcript_observations: [{ observation_ref: "obs:room" }],
+          realtime_stage_play_ask_handoff: handoff }) });
+      await handler.handle({ type: "conversation.item.input_audio_transcription.completed", event_id: "event:room", transcript });
+      expect(offer).not.toHaveBeenCalled();
+      expect(useRoomMissionHandoffReview.getState().entries).toMatchObject([{ roomId: "room:one", text: transcript }]);
+      handler.dispose();
+      expect(useRoomMissionHandoffReview.getState().entries).toEqual([]);
+    });
+
+  it("does not offer unattributed speech or retain a late receipt after disconnect", async () => {
+    const offer = vi.fn(() => true);
+    let finish!: (value: unknown) => void;
+    const handler = createHelixAskRealtimeProviderEventHandler({ realtimeSessionId: "realtime:test",
+      runtimeAgentAuthority: "observe_only", offerFinalizedSteering: offer,
+      postEvent: () => new Promise(resolve => { finish = resolve; }) });
+    useRoomMissionHandoffReview.setState({ entries: [] });
+    const pending = handler.handle({ type: "conversation.item.input_audio_transcription.completed", event_id: "event:late", transcript: "Late speech" });
+    handler.dispose();
+    finish({ ok: true, realtime_transcript_observations: [{ observation_ref: "obs:late" }],
+      realtime_stage_play_ask_handoff: { ...buildServerHandoff("obs:late"), thread_id: "helix-ask:room:room:one", transcript_text_char_count: 11 } });
+    expect(await pending).toMatchObject({ reentry_status: "blocked", blocked_reason: "realtime_session_disposed" });
+    expect(offer).not.toHaveBeenCalled();
+    expect(useRoomMissionHandoffReview.getState().entries).toEqual([]);
   });
 
   it("requires a transcript observation receipt before read-only Ask re-entry", async () => {

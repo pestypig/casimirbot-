@@ -1,0 +1,37 @@
+{
+  "schema": "casimirbot.ar2h.readiness.v1",
+  "observed_at": "2026-09-25T05:45:58Z",
+  "artifact": "AR-2G release-ar2g-20260925, previously hash-verified in resume-1-readiness.json",
+  "device_registration": "active after owner-completed MFA",
+  "device_trust": "This device is trusted for Full Harness",
+  "task_registration": {
+    "state": "registered",
+    "task_id": "01a0798b-b5bd-7bf2-946a-9a77e086316a",
+    "created_at": "2026-09-25T05:39:17.203Z",
+    "expires_at": "2026-09-25T06:09:17.203Z",
+    "proof_basis": "authenticated_client_declaration",
+    "pairing_authority": false,
+    "execution_authority": false
+  },
+  "pairing_review": {
+    "exact_current_task_selected": true,
+    "duration_seconds": 3600,
+    "invitation_seconds": 900,
+    "historical_environment_excluded": true,
+    "approval_checked": false,
+    "invitation_issued": false,
+    "invitation_accepted": false,
+    "automatic_delivery_available": false
+  },
+  "pending": [
+    "owner pairing approval and opaque invitation acceptance",
+    "current binding verification",
+    "independently authenticated guest on supported shared room authority",
+    "separately admitted voice and cost scope",
+    "installed dispatch, pickup, result, disclosure, explanation and recovery"
+  ],
+  "provider_calls_started": false,
+  "environment_actions_started": false,
+  "live_acceptance_passed": false,
+  "credential_material_recorded": false
+}

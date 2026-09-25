@@ -11,6 +11,7 @@ import {
   interruptAudioFocusByKind,
 } from "@/lib/audio-focus";
 import { recordHelixAskLiveRuntimeStagePlayHandoff } from "./HelixAskLiveRuntimeDebugState";
+import { rememberRoomMissionHandoff, forgetRoomMissionHandoffs } from "./shared-live-room/RoomMissionHandoffReview";
 import {
   executeHelixAskRealtimeWorkerDispatch,
   parseHelixRealtimeWorkerAdmissionV2,
@@ -247,6 +248,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
     detail: HelixVoiceSteeringFinalizedDetail,
   ) => boolean;
 }): HelixAskRealtimeProviderEventHandler => {
+  let disposed = false;
   const consumedEventRefs = new Set<string>();
   const recordedPlaybackReceiptKeys = new Set<string>();
   const postEvent = input.postEvent ?? (async (path, body) => {
@@ -695,26 +697,6 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
           },
         ).catch(() => null);
       }
-      const steeringConsumed = offerFinalizedSteering({
-        clientEventRef: `gpt-live:${input.realtimeSessionId}:${eventRef}`,
-        transcript,
-      });
-      if (steeringConsumed) {
-        const projection = buildProjection({
-          eventRef,
-          type,
-          kind,
-          transcriptCharCount: transcript.length,
-          reentryStatus: "reentered",
-          qualifiedUserInterruption,
-          workerDispatchKind: "bound_agent_steering",
-          workerDispatchState: "exact_binding_dispatch_requested",
-          workerTurnDispatched: false,
-          runtimeGoalWakeRequested: false,
-        });
-        input.onProjection?.(projection);
-        return projection;
-      }
       const path = `/api/agi/realtime/session/${encodeURIComponent(input.realtimeSessionId)}/event`;
       try {
         const runtimeContext = input.getRuntimeContext?.() ?? {};
@@ -801,6 +783,20 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         ) {
           throw new Error("realtime_stage_play_ask_handoff_missing");
         }
+        if (disposed) throw new Error("realtime_session_disposed");
+        // A shared-room utterance must retain its server-attributed speaker.
+        // Never feed it through the personal composer's unscoped voice event.
+        if (typeof handoff.thread_id !== "string") throw new Error("realtime_stage_play_ask_handoff_missing");
+        if (!handoff.thread_id.startsWith("helix-ask:room:") && offerFinalizedSteering({
+          clientEventRef: `gpt-live:${input.realtimeSessionId}:${eventRef}`, transcript,
+        })) {
+          const projection = buildProjection({ eventRef, type, kind, transcriptCharCount: transcript.length,
+            reentryStatus: "reentered", qualifiedUserInterruption,
+            workerDispatchKind: "bound_agent_steering", workerDispatchState: "exact_binding_dispatch_requested",
+            workerTurnDispatched: false, runtimeGoalWakeRequested: false });
+          input.onProjection?.(projection);
+          return projection;
+        }
         recordHelixAskLiveRuntimeStagePlayHandoff({
           handoff: handoff as unknown as HelixRealtimeStagePlayAskHandoffV1,
           contextSync: Object.keys(contextSync).length > 0
@@ -808,6 +804,7 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
             : null,
           observedAtMs,
         });
+        rememberRoomMissionHandoff(handoff as unknown as HelixRealtimeStagePlayAskHandoffV1, transcript);
         const executeDispatch = () => executeHelixAskRealtimeWorkerDispatch({
           admission: workerAdmission,
           transcript,
@@ -923,6 +920,10 @@ export const createHelixAskRealtimeProviderEventHandler = (input: {
         return projection;
       }
     },
-    dispose: () => parallelDispatchCoordinator.dispose(),
+    dispose: () => {
+      disposed = true;
+      parallelDispatchCoordinator.dispose();
+      forgetRoomMissionHandoffs(input.realtimeSessionId);
+    },
   };
 };

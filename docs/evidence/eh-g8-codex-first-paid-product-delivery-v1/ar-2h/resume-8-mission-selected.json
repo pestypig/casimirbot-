@@ -1,0 +1,27 @@
+{
+  "schema": "casimirbot.ar2h.mission_selection_checkpoint.v1",
+  "observed_at": "2026-09-25T12:55:00Z",
+  "task_id": "01a0798b-b5bd-7bf2-946a-9a77e086316a",
+  "room_id": "shared_realtime_room:2fb2513b-9914-4428-961a-12442cc4c621",
+  "user_authorization": "User requested autonomous continuation after exact room-task selection confirmation.",
+  "installed_observations": {
+    "mission_status": "Selected",
+    "mission_revision": 1,
+    "connected_chat": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+    "confirmation": "Room mission selected. Review a captured instruction before sending it.",
+    "captured_instructions": 0,
+    "stale_results_panel": "No external mission is selected for this room yet."
+  },
+  "source_repair": {
+    "classification": "presentation",
+    "summary": "Invalidate owner results when a validated mission selection changes; clear old disclosure and abort stale reads.",
+    "installed": false,
+    "focused_tests_passed": 27
+  },
+  "limits": [
+    "No guest admitted; shared authority transport is still unqualified.",
+    "No voice capture, provider inference, dispatch, task result, environment action or deployment.",
+    "Running AR-2G package has not been rebuilt."
+  ],
+  "credential_included": false
+}

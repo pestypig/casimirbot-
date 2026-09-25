@@ -17,12 +17,8 @@ import { reconcileSharedRealtimeRoomRuntimeAfterLeave } from
   "../../services/helix-ask/realtime-room/room-runtime-reconciliation";
 import { sendSharedRealtimeRoomParticipantContextIfBound } from
   "../../services/helix-ask/realtime-room/participant-context";
-import {
-  buildRealtimeRequesterRef,
-  listAdmittedRealtimeSessions,
-} from "../../services/helix-ask/realtime-session/session-registry";
-import { buildRuntimeGoalProfileRef } from
-  "../../services/helix-ask/runtime-goals/runtime-goal-account-binding";
+import { assertNoPersonalRealtimeSession } from
+  "../../services/helix-ask/realtime-room/personal-session-admission";
 import { runWithSharedRealtimeProfileAdmissionLock } from
   "../../services/helix-ask/realtime-room/profile-admission-lock";
 import {
@@ -89,19 +85,7 @@ sharedRealtimeRoomLifecycleRouter.post(
     const room = await runWithSharedRealtimeProfileAdmissionLock(
       account.profileId,
       async () => {
-        const requesterRef = buildRealtimeRequesterRef(account.sessionId);
-        const profileRef = buildRuntimeGoalProfileRef(account.profileId);
-        const hasPersonalRealtimeSession = listAdmittedRealtimeSessions()
-          .some((session) =>
-            session.requesterRef === requesterRef ||
-            session.runtimeGoalAccountScope?.profile_ref === profileRef);
-        if (hasPersonalRealtimeSession) {
-          throw new SharedRealtimeRoomDomainError(
-            "shared_realtime_room_personal_session_blocked",
-            409,
-            "Stop your personal GPT Live session before joining a one-model room.",
-          );
-        }
+        assertNoPersonalRealtimeSession(account.profileId, account.sessionId);
         return withRuntimeProjection(await joinSharedRealtimeRoom({
           profileId: account.profileId,
           inviteCode,

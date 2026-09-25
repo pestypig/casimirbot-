@@ -1,0 +1,19 @@
+{
+  "screen": "equilibrium_contact_rate_at_x20",
+  "M_H_GeV": 1080.0,
+  "m_phi_eV": 1e-17,
+  "freezeout_x": 20.0,
+  "T_freezeout_GeV": 54.0,
+  "g_star": 106.75,
+  "n_H_equilibrium_GeV3": 0.0018431761083614235,
+  "H_radiation_GeV": 4.096372630664047e-15,
+  "kappa_naturalness_ceiling": 1.4e-56,
+  "sigma_v_at_kappa_ceiling_GeV_minus2": 8.357544808280684e-121,
+  "Gamma_over_H_at_kappa_ceiling": 3.76050430565587e-109,
+  "kappa_for_Gamma_over_H_equal_one": 0.022829951587763603,
+  "kappa_ceiling_over_kappa_contact": 6.1322950888357205e-55,
+  "radiative_delta_mphi2_GeV2_at_kappa_ceiling": 1.0340840002536994e-52,
+  "radiative_delta_mphi2_over_mphi2_at_kappa_ceiling": 1.034084000253699,
+  "radiative_delta_mphi2_over_mphi2_at_contact_kappa": 1.686291975962348e+54,
+  "interpretation": "Under the stated no-cancellation threshold-naturalness estimate, the renormalizable portal is far too weak for freeze-out-era chemical contact. Raising it to Gamma/H~1 needs a separate mass-protection completion; thermal daughters are relativistic and do not seed the cold ultralight boson-star component."
+}

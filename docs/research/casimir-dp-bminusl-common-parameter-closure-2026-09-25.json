@@ -1,0 +1,164 @@
+{
+  "classification": "common-parameter coupling and kinematic compatibility screen; not a B-L likelihood fit",
+  "model_source": "https://arxiv.org/html/2609.06909v1",
+  "LZ_comparator_source": "https://arxiv.org/html/2609.02823v1#A1.SS10",
+  "model_equation": "sigma_SI = mu_n^2 * gBL^4 / (16*pi*mZprime^4), using B-L paper Eq. 15 and mZprime=2*mS",
+  "inputs": {
+    "gBL": 0.5,
+    "mZprime_over_mS": 2.0,
+    "SHM_v0_km_s": 220.0,
+    "SHM_vEarth_km_s": 232.0,
+    "SHM_vesc_km_s": 544.0,
+    "SHM_max_lab_speed_km_s": 776.0,
+    "separate_frozen_outer_cap_km_s": 798.0,
+    "nucleon_mass_GeV": 0.93827208816,
+    "conversion_GeV_minus2_to_cm2": 3.893793721e-28
+  },
+  "mass_sweep": [
+    {
+      "mS_GeV": 1000.0,
+      "mZprime_GeV_assuming_resonance": 2000.0,
+      "gBL": 0.5,
+      "sigma_SI_nucleon_cm2_from_eq15": 2.6589252194021834e-44,
+      "sigma_over_1e_minus45": 26.589252194021835,
+      "delta_C_max_with_frozen_798_km_s_keV": 39.16229684893074,
+      "delta_C_max_with_selected_SHM_support_776_km_s_keV": 37.03273733723676
+    },
+    {
+      "mS_GeV": 2000.0,
+      "mZprime_GeV_assuming_resonance": 4000.0,
+      "gBL": 0.5,
+      "sigma_SI_nucleon_cm2_from_eq15": 1.6633871434506123e-45,
+      "sigma_over_1e_minus45": 1.6633871434506124,
+      "delta_C_max_with_frozen_798_km_s_keV": 39.37995704510832,
+      "delta_C_max_with_selected_SHM_support_776_km_s_keV": 37.23856165098704
+    },
+    {
+      "mS_GeV": 2300.0,
+      "mZprime_GeV_assuming_resonance": 4600.0,
+      "gBL": 0.5,
+      "sigma_SI_nucleon_cm2_from_eq15": 9.511633463267439e-46,
+      "sigma_over_1e_minus45": 0.9511633463267439,
+      "delta_C_max_with_frozen_798_km_s_keV": 39.40852600775671,
+      "delta_C_max_with_selected_SHM_support_776_km_s_keV": 37.26557709632305
+    },
+    {
+      "mS_GeV": 3000.0,
+      "mZprime_GeV_assuming_resonance": 6000.0,
+      "gBL": 0.5,
+      "sigma_SI_nucleon_cm2_from_eq15": 3.2867303862150227e-46,
+      "sigma_over_1e_minus45": 0.32867303862150227,
+      "delta_C_max_with_frozen_798_km_s_keV": 39.453049101313304,
+      "delta_C_max_with_selected_SHM_support_776_km_s_keV": 37.307679122041385
+    },
+    {
+      "mS_GeV": 4000.0,
+      "mZprime_GeV_assuming_resonance": 8000.0,
+      "gBL": 0.5,
+      "sigma_SI_nucleon_cm2_from_eq15": 1.0401046292448254e-46,
+      "sigma_over_1e_minus45": 0.10401046292448254,
+      "delta_C_max_with_frozen_798_km_s_keV": 39.489696972047305,
+      "delta_C_max_with_selected_SHM_support_776_km_s_keV": 37.3423341622219
+    },
+    {
+      "mS_GeV": 5000.0,
+      "mZprime_GeV_assuming_resonance": 10000.0,
+      "gBL": 0.5,
+      "sigma_SI_nucleon_cm2_from_eq15": 4.260668224870715e-47,
+      "sigma_over_1e_minus45": 0.04260668224870715,
+      "delta_C_max_with_frozen_798_km_s_keV": 39.511718393171414,
+      "delta_C_max_with_selected_SHM_support_776_km_s_keV": 37.36315810693148
+    }
+  ],
+  "mass_GeV_for_sigma_n_1e_minus45": 2271.383658745137,
+  "carbon_ceiling_keV_at_that_mass_with_SHM_support": 37.263306536376575,
+  "LZ_O1s_local_significance_grid": [
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 0,
+      "local_significance_sigma": 0.0
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 50,
+      "local_significance_sigma": 0.0
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 100,
+      "local_significance_sigma": 0.8
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 150,
+      "local_significance_sigma": 2.2
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 200,
+      "local_significance_sigma": 2.7
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 250,
+      "local_significance_sigma": 2.9
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 300,
+      "local_significance_sigma": 3.0
+    },
+    {
+      "mchi_GeV": 1000,
+      "delta_keV": 350,
+      "local_significance_sigma": 3.3
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 0,
+      "local_significance_sigma": 0.0
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 50,
+      "local_significance_sigma": 0.0
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 100,
+      "local_significance_sigma": 1.0
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 150,
+      "local_significance_sigma": 2.3
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 200,
+      "local_significance_sigma": 2.7
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 250,
+      "local_significance_sigma": 2.9
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 300,
+      "local_significance_sigma": 3.0
+    },
+    {
+      "mchi_GeV": 4000,
+      "delta_keV": 350,
+      "local_significance_sigma": 3.3
+    }
+  ],
+  "interpretation": [
+    "For the paper's gBL=0.5 and mZprime=2*mS branch, Eq. 15 places sigma_n near 1e-45 cm^2 around mS=2.3 TeV; the value scales approximately as mS^-4.",
+    "The B-L model's contact current maps most closely to LZ's isoscalar O1 inelastic SI comparator. LZ Table S8 has zero local significance at 0 and 50 keV for both 1 and 4 TeV; the carbon-open gap region lies below about 37 keV in the selected SHM support.",
+    "The LZ O1s local significance grows at 200-350 keV, where the independent carbon upscatter is closed. This supports a xenon-shape/carbon-bridge tradeoff, not a statistical exclusion of the B-L model.",
+    "No exact LZ coupling interval is quoted: the HEPData numeric payload is not accessible in this environment, and the available O1s significance grid is a comparator, not a B-L profile likelihood.",
+    "No Casimir-DP material response, lifetime, astrophysical population, boson-star solution, or gamma yield is changed by this single-nucleon cross-section calculation."
+  ]
+}

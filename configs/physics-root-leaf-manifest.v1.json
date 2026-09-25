@@ -234,6 +234,11 @@
       "id": "leaf_stellar_spectral_viability",
       "prompt_family": "stellar radiation null model viability",
       "statement": "Stellar radiation claims must preserve blackbody plus transfer as the null model and require explicit residual gains before structure-sensitive source terms are promoted."
+    },
+    {
+      "id": "leaf_boson_star_population_lab_encounter",
+      "prompt_family": "boson-star population to local laboratory encounter bridge",
+      "statement": "Compact boson-star populations imply rare-object encounter histories, not a continuous local xenon-scattering flux; any detector signal requires a separately modeled diffuse component or sourced particle-release process, and the path remains diagnostic."
     }
   ],
   "paths": [
@@ -1172,6 +1177,38 @@
         ],
         "strict_fail_reason": "ROOT_LEAF_STELLAR_CHEMICAL_INHERITANCE_BOUNDARY_FAIL"
       }
+    },
+    {
+      "id": "path_boson_star_population_to_lab_encounter",
+      "bundle_id": "bosonic-dark-sector.compatibility-screen",
+      "root_id": "physics_spacetime_gr",
+      "leaf_id": "leaf_boson_star_population_lab_encounter",
+      "nodes": [
+        "physics_spacetime_gr",
+        "physics_stellar_structure_nucleosynthesis",
+        "leaf_boson_star_population_lab_encounter"
+      ],
+      "dag_bridges": [
+        "bridge-relativistic-boson-star-structure-to-local-population",
+        "bridge-local-compact-object-population-to-laboratory-exposure"
+      ],
+      "falsifier": {
+        "observable": "conditional local compact-object number density, focused encounter rate, and distinction between bound-object passage and diffuse particle flux",
+        "reject_rule": "local_object_fraction_not_explicit OR encounter_cross_section_not_derived OR local_density_velocity_uncertainty_missing OR compact_star_count_substituted_for_continuous_xenon_flux_without_release_model",
+        "uncertainty_model": "deterministic_contract_gate(decision_mode=strict,strict_reason_required=true,replay_window=versioned-packet)",
+        "test_refs": [
+          "docs/research/casimir-dp-boson-star-local-encounter-screen-2026-09-25.py",
+          "tests/physics-root-leaf-manifest.spec.ts"
+        ]
+      },
+      "maturity_gate": {
+        "max_claim_tier": "diagnostic",
+        "required_evidence_types": [
+          "proxy",
+          "inferred"
+        ],
+        "strict_fail_reason": "ROOT_LEAF_BOSON_STAR_LOCAL_POPULATION_FAIL"
+      }
     }
   ],
   "maturity_propagation_policy": {
@@ -1265,6 +1302,15 @@
       "max_claim_tier": "diagnostic",
       "path_ids": [
         "path_stellar_transport_to_solar_khi_nanoflare_gate"
+      ]
+    },
+    {
+      "id": "bosonic-dark-sector.compatibility-screen",
+      "summary": "Diagnostic population bridge that separates stable ultralight boson-star structure and rare local encounters from diffuse xenon-scattering flux and requires explicit release physics before connecting them.",
+      "claim_scope": "cross_domain",
+      "max_claim_tier": "diagnostic",
+      "path_ids": [
+        "path_boson_star_population_to_lab_encounter"
       ]
     }
   ]

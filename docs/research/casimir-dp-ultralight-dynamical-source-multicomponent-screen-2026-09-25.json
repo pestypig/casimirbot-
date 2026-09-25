@@ -1,0 +1,633 @@
+{
+  "classification": "autonomous coupled homogeneous two-scalar toy with explicit trilinear U(1)-breaking source and stabilizing quartic; conditional multicomponent abundance screen",
+  "potential_and_dynamics": {
+    "dimensionless_fields": "X=x/F, Y=y/F, Z=S/F; u=m_phi*t; H/m_phi=1/(2u)",
+    "potential": "V=0.5*m^2*(x^2+y^2)+0.5*M^2*S^2+mu*S*x*y+lambda_phi*(x^2+y^2)^2/4",
+    "dimensionless_potential": "V/(m^2 F^2)=0.5*(X^2+Y^2)+0.5*r^2*Z^2+beta*Z*X*Y+lambda_hat*(X^2+Y^2)^2/4",
+    "coupled_equations": "X''+3H/m X'+X+beta*Z*Y+lambda_hat*(X^2+Y^2)X=0; Y analogous; Z''+3H/m Z'+r^2*Z+beta*X*Y=0",
+    "initial_conditions": "X=1,Y=0,Z=g_target^(1/4)/r and all dimensionless velocities zero at u=0.001",
+    "parameter_selection": "g_target=0.615 from prior epsilon=0.5 pulse fit; choose source energy fraction R_S and backreaction B equally at sqrt(g_target); lambda_hat=1.01*beta^2/(2r^2), just above the boundedness threshold",
+    "fitted_or_retuned_after_integration": false
+  },
+  "fixed_inputs": {
+    "m_phi_eV": 1e-17,
+    "g_target": 0.615,
+    "source_mass_ratios_M_over_m": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "phi_fraction_grid": [
+      0.01,
+      0.1,
+      0.5,
+      1.0
+    ],
+    "quartic_margin_over_boundedness_threshold": 1.01,
+    "initial_time_u": 0.001,
+    "final_time_u": 1000.0,
+    "targeted_long_run_final_time_u": 3000.0,
+    "Planck_Omega_DM_h2_normalization": 0.1198,
+    "IDM_profile_Omega_H_h2": 0.12014
+  },
+  "source_mass_ratio_screens": [
+    {
+      "source_mass_ratio_M_over_m": 0.5,
+      "integrated_final_time_u": 1000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        1.7711232109234027,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 1.7711232109234027,
+      "dimensionless_trilinear_mu_F_over_m2": 0.3472372764395991,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.784219357067906,
+      "source_backreaction_scale": 0.7842193570679061,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": -0.9847765114846453,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.006335229172116716,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_phi_action_over_unbroken_reference": 0.945664969647046,
+      "late_source_action_over_unbroken_reference": 2.3167594903280366,
+      "late_source_to_phi_action_ratio": 2.449873437939368,
+      "late_interaction_action_over_phi_action": -2.729660948782814e-06,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 3.2624218786303447,
+      "averaging_window_u": 50.26548245743669,
+      "solver_function_evaluations": 125318
+    },
+    {
+      "source_mass_ratio_M_over_m": 1.0,
+      "integrated_final_time_u": 1000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        0.8855616054617014,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 0.8855616054617014,
+      "dimensionless_trilinear_mu_F_over_m2": 0.6944745528791982,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.784219357067906,
+      "source_backreaction_scale": 0.7842193570679061,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": -0.7626938140231528,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.007536328844709297,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_phi_action_over_unbroken_reference": 0.9909915081822461,
+      "late_source_action_over_unbroken_reference": 0.7842318478654353,
+      "late_source_to_phi_action_ratio": 0.7913608152949106,
+      "late_interaction_action_over_phi_action": -3.5314078658836064e-06,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 1.7752198564524744,
+      "averaging_window_u": 25.132741228718345,
+      "solver_function_evaluations": 125318
+    },
+    {
+      "source_mass_ratio_M_over_m": 2.0,
+      "integrated_final_time_u": 1000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        0.4427808027308507,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 0.4427808027308507,
+      "dimensionless_trilinear_mu_F_over_m2": 1.3889491057583965,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.784219357067906,
+      "source_backreaction_scale": 0.7842193570679061,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": 0.5162081970163441,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.014590817586488895,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_phi_action_over_unbroken_reference": 1.1161969835036363,
+      "late_source_action_over_unbroken_reference": 0.0588931378952117,
+      "late_source_to_phi_action_ratio": 0.052762315940284785,
+      "late_interaction_action_over_phi_action": 2.3180266370728546e-05,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 1.1751159951422478,
+      "averaging_window_u": 25.132741228718345,
+      "solver_function_evaluations": 250298
+    },
+    {
+      "source_mass_ratio_M_over_m": 5.0,
+      "integrated_final_time_u": 1000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        0.17711232109234026,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 0.17711232109234026,
+      "dimensionless_trilinear_mu_F_over_m2": 3.4723727643959914,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.7842193570679059,
+      "source_backreaction_scale": 0.7842193570679064,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": -0.02586943272522065,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.028893374363752593,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_phi_action_over_unbroken_reference": 0.8986770534728998,
+      "late_source_action_over_unbroken_reference": 0.0681942515085813,
+      "late_source_to_phi_action_ratio": 0.07588293396949157,
+      "late_interaction_action_over_phi_action": 2.6218992377276322e-08,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 0.9668713285438879,
+      "averaging_window_u": 25.132741228718345,
+      "solver_function_evaluations": 625271
+    }
+  ],
+  "targeted_long_run_checks_for_slow_or_unsettled_ratios": [
+    {
+      "source_mass_ratio_M_over_m": 0.5,
+      "integrated_final_time_u": 3000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        1.7711232109234027,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 1.7711232109234027,
+      "dimensionless_trilinear_mu_F_over_m2": 0.3472372764395991,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.784219357067906,
+      "source_backreaction_scale": 0.7842193570679061,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": -0.9847646628537894,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.0027196270292930754,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_phi_action_over_unbroken_reference": 0.9456638232523878,
+      "late_source_action_over_unbroken_reference": 2.3167593109883184,
+      "late_source_to_phi_action_ratio": 2.449876218189643,
+      "late_interaction_action_over_phi_action": -9.65447965819725e-07,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 3.2624222212514917,
+      "averaging_window_u": 50.26548245743669,
+      "solver_function_evaluations": 375323,
+      "late_phi_charge_to_energy_ratio_relative_change_from_u1000": 1.2031796775941672e-05,
+      "source_to_phi_action_relative_change_from_u1000": 1.1348546548716591e-06
+    },
+    {
+      "source_mass_ratio_M_over_m": 1.0,
+      "integrated_final_time_u": 3000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        0.8855616054617014,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 0.8855616054617014,
+      "dimensionless_trilinear_mu_F_over_m2": 0.6944745528791982,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.784219357067906,
+      "source_backreaction_scale": 0.7842193570679061,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": -0.7632583737623425,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.0032639265149718684,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_phi_action_over_unbroken_reference": 0.9905688978385945,
+      "late_source_action_over_unbroken_reference": 0.7846511838756924,
+      "late_source_to_phi_action_ratio": 0.7921217651672576,
+      "late_interaction_action_over_phi_action": -4.6419590780202523e-07,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 1.7752196218962581,
+      "averaging_window_u": 25.132741228718345,
+      "solver_function_evaluations": 375323,
+      "late_phi_charge_to_energy_ratio_relative_change_from_u1000": 0.0007402180649816255,
+      "source_to_phi_action_relative_change_from_u1000": 0.0009615713308516616
+    },
+    {
+      "source_mass_ratio_M_over_m": 2.0,
+      "integrated_final_time_u": 3000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        0.4427808027308507,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 0.4427808027308507,
+      "dimensionless_trilinear_mu_F_over_m2": 1.3889491057583965,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.784219357067906,
+      "source_backreaction_scale": 0.7842193570679061,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": 0.2891094431406408,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.02623546869580363,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_phi_action_over_unbroken_reference": 0.941615357780132,
+      "late_source_action_over_unbroken_reference": 0.2334728949975586,
+      "late_source_to_phi_action_ratio": 0.24794932778918705,
+      "late_interaction_action_over_phi_action": 1.2159913352800399e-05,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 1.1750997027388528,
+      "averaging_window_u": 25.132741228718345,
+      "solver_function_evaluations": 750308,
+      "late_phi_charge_to_energy_ratio_relative_change_from_u1000": 0.43993635743934717,
+      "source_to_phi_action_relative_change_from_u1000": 3.699363994366937
+    },
+    {
+      "source_mass_ratio_M_over_m": 5.0,
+      "integrated_final_time_u": 3000.0,
+      "dimensionless_initial_state_X_Y_Z_dX_dY_dZ": [
+        1.0,
+        0.0,
+        0.17711232109234026,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "initial_source_to_phi_amplitude_ratio": 0.17711232109234026,
+      "dimensionless_trilinear_mu_F_over_m2": 3.4723727643959914,
+      "dimensionless_stabilizing_phi_quartic_lambda_F2_over_m2": 0.24355892682136498,
+      "quartic_boundedness_threshold_lambda_hat": 0.24114745229838117,
+      "initial_source_energy_fraction_relative_to_phi": 0.7842193570679059,
+      "source_backreaction_scale": 0.7842193570679064,
+      "min_mass_eigenvalue_over_m2_on_sampled_history": 0.385,
+      "late_phi_charge_to_energy_ratio_signed": -0.026055325982079585,
+      "late_phi_U1_current_exactly_conserved": false,
+      "late_window_phi_charge_fractional_span": 0.012408056928163571,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_phi_action_over_unbroken_reference": 0.8986756417877765,
+      "late_source_action_over_unbroken_reference": 0.06819427067767281,
+      "late_source_to_phi_action_ratio": 0.07588307450061829,
+      "late_interaction_action_over_phi_action": 2.4211257474325945e-09,
+      "late_total_phi_plus_source_action_over_unbroken_reference": 0.966869914641256,
+      "averaging_window_u": 25.132741228718345,
+      "solver_function_evaluations": 1875266,
+      "late_phi_charge_to_energy_ratio_relative_change_from_u1000": 0.007185826563475633,
+      "source_to_phi_action_relative_change_from_u1000": 1.8519464044198984e-06
+    }
+  ],
+  "multicomponent_cosmology_and_observable_scalings": [
+    {
+      "source_mass_ratio_M_over_m": 0.5,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.006335229172116716,
+      "phi_fraction": {
+        "f_phi": 0.01,
+        "f_source": 0.024498734379393677,
+        "f_heavy_remainder": 0.9655012656206063,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.9655012656206063,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.9321926939149926,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.0727395811269798,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.0386708947444614,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.9682414194629352,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.9655012656206063
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 780234650845715.8,
+          "source_initial_displacement_GeV": 1381891700079564.0,
+          "source_mass_eV": 5e-18,
+          "trilinear_mu_GeV": 4.4504211145098475e-68,
+          "phi_quartic_lambda_dimensionless": 4.000862115487964e-83
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 0.5,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.006335229172116716,
+      "phi_fraction": {
+        "f_phi": 0.1,
+        "f_source": 0.24498734379393677,
+        "f_heavy_remainder": 0.6550126562060632,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.6550126562060632,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.4290415797901223,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 2.3307764261197668,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.531020895455153,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.6568716236777665,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.6550126562060632
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 2467318606058682.5,
+          "source_initial_displacement_GeV": 4369925251933708.0,
+          "source_mass_eV": 5e-18,
+          "trilinear_mu_GeV": 1.4073467268756153e-68,
+          "phi_quartic_lambda_dimensionless": 4.000862115487964e-84
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 0.5,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.006335229172116716,
+      "phi_fraction": {
+        "f_phi": 0.5,
+        "f_source": 1.2249367189696838,
+        "f_heavy_remainder": -0.7249367189696838,
+        "conditional_co_tracing_observable_scalings": null
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 0.5,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.006335229172116716,
+      "phi_fraction": {
+        "f_phi": 1.0,
+        "f_source": 2.4498734379393676,
+        "f_heavy_remainder": -2.4498734379393676,
+        "conditional_co_tracing_observable_scalings": null
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 1.0,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.007536328844709297,
+      "phi_fraction": {
+        "f_phi": 0.01,
+        "f_source": 0.007913608152949106,
+        "f_heavy_remainder": 0.9820863918470509,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.9820863918470509,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.9644936810511593,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.0368134282747647,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.0211301895274056,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.9848736153297554,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.9820863918470509
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 762182403711613.4,
+          "source_initial_displacement_GeV": 674959473085515.0,
+          "source_mass_eV": 1e-17,
+          "trilinear_mu_GeV": 9.111658173913531e-68,
+          "phi_quartic_lambda_dimensionless": 4.192626891251384e-83
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 1.0,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.007536328844709297,
+      "phi_fraction": {
+        "f_phi": 0.1,
+        "f_source": 0.07913608152949106,
+        "f_heavy_remainder": 0.820863918470509,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.820863918470509,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.6738175726467585,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.4840812121773488,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.221686129544618,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.8231935823459677,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.820863918470509
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 2410232388230671.5,
+          "source_initial_displacement_GeV": 2134409263257344.2,
+          "source_mass_eV": 1e-17,
+          "trilinear_mu_GeV": 2.881359309045737e-68,
+          "phi_quartic_lambda_dimensionless": 4.192626891251386e-84
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 1.0,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.007536328844709297,
+      "phi_fraction": {
+        "f_phi": 0.5,
+        "f_source": 0.39568040764745527,
+        "f_heavy_remainder": 0.10431959235254473,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.10431959235254473,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.010882577348601109,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 91.88999700779009,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 9.613132498160134,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.10461565797357866,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.10431959235254473
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 5389443461655446.0,
+          "source_initial_displacement_GeV": 4772684204448666.0,
+          "source_mass_eV": 1e-17,
+          "trilinear_mu_GeV": 1.2885830565256184e-68,
+          "phi_quartic_lambda_dimensionless": 8.38525378250277e-85
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 1.0,
+      "late_window_phi_charge_span_below_one_percent": true,
+      "late_window_phi_charge_fractional_span": 0.007536328844709297,
+      "phi_fraction": {
+        "f_phi": 1.0,
+        "f_source": 0.7913608152949105,
+        "f_heavy_remainder": -0.7913608152949105,
+        "conditional_co_tracing_observable_scalings": null
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 2.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.014590817586488895,
+      "phi_fraction": {
+        "f_phi": 0.01,
+        "f_source": 0.0005276231594028479,
+        "f_heavy_remainder": 0.9894723768405972,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.9894723768405972,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.9790555845305807,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.0213924682115585,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.0135078926014536,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.9922805622172731,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.9894723768405972
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 718163720997060.8,
+          "source_initial_displacement_GeV": 317989108875253.25,
+          "source_mass_eV": 2e-17,
+          "trilinear_mu_GeV": 1.9340285023449153e-67,
+          "phi_quartic_lambda_dimensionless": 4.722338637951674e-83
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 2.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.014590817586488895,
+      "phi_fraction": {
+        "f_phi": 0.1,
+        "f_source": 0.0052762315940284785,
+        "f_heavy_remainder": 0.8947237684059716,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.8947237684059716,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.8005306217505826,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.249171453070992,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.1208353894808323,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.8972630512211471,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.8947237684059716
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 2271033091252402.0,
+          "source_initial_displacement_GeV": 1005569855173063.9,
+          "source_mass_eV": 2e-17,
+          "trilinear_mu_GeV": 6.115935127094233e-68,
+          "phi_quartic_lambda_dimensionless": 4.722338637951675e-84
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 2.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.014590817586488895,
+      "phi_fraction": {
+        "f_phi": 0.5,
+        "f_source": 0.026381157970142392,
+        "f_heavy_remainder": 0.4736188420298576,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.4736188420298576,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.2243148075257032,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 4.458020453622593,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 2.1173947791879546,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.47496300234947486,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.4736188420298576
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 5078184371191854.0,
+          "source_initial_displacement_GeV": 2248522552291589.2,
+          "source_mass_eV": 2e-17,
+          "trilinear_mu_GeV": 2.735129338032304e-68,
+          "phi_quartic_lambda_dimensionless": 9.44467727590335e-85
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 2.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.014590817586488895,
+      "phi_fraction": {
+        "f_phi": 1.0,
+        "f_source": 0.052762315940284785,
+        "f_heavy_remainder": -0.052762315940284785,
+        "conditional_co_tracing_observable_scalings": null
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 5.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.028893374363752593,
+      "phi_fraction": {
+        "f_phi": 0.01,
+        "f_source": 0.0007588293396949157,
+        "f_heavy_remainder": 0.989241170660305,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.989241170660305,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.9785980937293708,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.021869965216331,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.0137447704180005,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.9920486998591739,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.989241170660305
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 800372315683759.8,
+          "source_initial_displacement_GeV": 141755798568801.97,
+          "source_mass_eV": 5.0000000000000005e-17,
+          "trilinear_mu_GeV": 4.3384468657309037e-67,
+          "phi_quartic_lambda_dimensionless": 3.802068483767599e-83
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 5.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.028893374363752593,
+      "phi_fraction": {
+        "f_phi": 0.1,
+        "f_source": 0.007588293396949157,
+        "f_heavy_remainder": 0.8924117066030509,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.8924117066030509,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.7963986540821698,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 1.2556525489768384,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 1.1237392517589782,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.8949444276401548,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.8924117066030509
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 2530999493703987.5,
+          "source_initial_displacement_GeV": 448271195013451.25,
+          "source_mass_eV": 5.0000000000000005e-17,
+          "trilinear_mu_GeV": 1.371937360332836e-67,
+          "phi_quartic_lambda_dimensionless": 3.802068483767598e-84
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 5.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.028893374363752593,
+      "phi_fraction": {
+        "f_phi": 0.5,
+        "f_source": 0.037941466984745785,
+        "f_heavy_remainder": 0.46205853301525424,
+        "conditional_co_tracing_observable_scalings": {
+          "xenon_recoil_rate_ratio_at_fixed_direct_detection_cross_section": 0.46205853301525424,
+          "gamma_annihilation_flux_ratio_at_fixed_annihilation_cross_section": 0.21349808793220879,
+          "gamma_annihilation_cross_section_multiplier_to_restore_reference_flux": 4.683882697429713,
+          "thermal_annihilation_cross_section_multiplier_to_set_H_relic_fraction": 2.1703701842596588,
+          "gamma_flux_ratio_if_annihilation_cross_section_tracks_thermal_relic": 0.4633698844445128,
+          "Casimir_DP_H_scattering_rate_ratio_at_fixed_microphysics": 0.46205853301525424
+        },
+        "physical_normalization_at_m_phi_1e-17_eV": {
+          "field_amplitude_scale_GeV": 5659486918939667.0,
+          "source_initial_displacement_GeV": 1002364864405141.8,
+          "source_mass_eV": 5.0000000000000005e-17,
+          "trilinear_mu_GeV": 6.135490397151689e-68,
+          "phi_quartic_lambda_dimensionless": 7.604136967535195e-85
+        }
+      }
+    },
+    {
+      "source_mass_ratio_M_over_m": 5.0,
+      "late_window_phi_charge_span_below_one_percent": false,
+      "late_window_phi_charge_fractional_span": 0.028893374363752593,
+      "phi_fraction": {
+        "f_phi": 1.0,
+        "f_source": 0.07588293396949157,
+        "f_heavy_remainder": -0.07588293396949157,
+        "conditional_co_tracing_observable_scalings": null
+      }
+    }
+  ],
+  "falsification_and_validity": [
+    "Reject any mass ratio whose sampled mass matrix becomes non-positive. The real S*x*y term explicitly breaks the phi U(1), so its late charge-to-energy ratio is not an exact conserved Noether charge; compare multiple u_final values and report source-driven drift.",
+    "The within-window span of the comoving phi charge is only a local drift diagnostic and is not proof of asymptotic conservation.",
+    "The source is stable in this model. Its residual oscillation is an additional cold component, not an energy sink; include it in closure rather than renormalizing it away.",
+    "The phi quartic is near the boundedness threshold and its dimensionless strength at the cosmological field amplitude is substantial; it invalidates importing the free-field boson-star mass-radius curve without solving the coupled star equations.",
+    "The initial source displacement is unexplained; no thermal phase transition, inflationary initial-condition model, decay, or production mechanism is specified.",
+    "The model is homogeneous. It does not establish charge-seeded fragmentation, a stable two-field boson star, a local Galactic decomposition, or a gamma/xenon/Casimir-DP detection prediction.",
+    "Observable scaling assumes phi and source are absent from the xenon H-scattering channel, the heavy component co-traces locally, and detector/annihilation spectra retain their reference shapes.",
+    "All effects of changing the IDM relic fraction on coupled microscopic parameters are omitted; the thermal cross-section scaling is a first-order inverse-abundance estimate only."
+  ],
+  "next_tests": [
+    "Check late-time phi charge-to-energy ratio and component-action stabilization with increasing u_final for each mass ratio, and scan initial source phase/displacement without retuning to the target ratio.",
+    "Derive the source displacement from a concrete thermal or inflationary mechanism and include the source's own perturbations.",
+    "Solve the coupled two-field boson-star equilibrium and stability problem using this same potential before using any imaging or population limits."
+  ]
+}

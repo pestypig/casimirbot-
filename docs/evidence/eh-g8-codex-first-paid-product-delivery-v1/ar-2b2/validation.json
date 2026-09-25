@@ -1,0 +1,21 @@
+{
+  "schema": "ar2b2.ingress_validation.v1",
+  "date": "2026-09-21",
+  "goal_status": "active",
+  "component": "current_room_voice_ingress_and_backend_consumption",
+  "focused_tests": { "passed": 28, "failed": 0, "skipped": 0, "report": "tests.json" },
+  "full_discipline": { "status": "PASS", "exit_code": 0, "report": "discipline.log" },
+  "server_build": { "status": "PASS", "existing_unrelated_warnings": 4 },
+  "canonical_docs_audit": "PASS",
+  "diff_whitespace_check": "PASS",
+  "source_hashes": { "verified": 7, "mismatches": 0, "report": "source-manifest.json" },
+  "typescript_full_repository": "UNVERIFIED: previous turn exhausted default heap; not rerun",
+  "casimir_verification": "NOT_APPLICABLE: no physics, connector protocol, release verification or certificate changes",
+  "live_provider_test": false,
+  "installed_exe_test": false,
+  "domain_replit_test": false,
+  "external_task_dispatch_verified": false,
+  "external_task_terminal_return_verified": false,
+  "three_human_room_accepted": false,
+  "full_ar2_complete": false
+}

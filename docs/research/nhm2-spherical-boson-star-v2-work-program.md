@@ -4,7 +4,7 @@ Status: canonical program-control document.
 
 Active program gate: **G2H-E-S5-A4 — P8P observer progress and turnaround calibration**
 
-Status date: **September 21, 2026**
+Status date: **September 25, 2026**
 
 Current P8P control status: **no authenticated P=1024 turnaround result; P8Q
 STOP**. The [R39 build-only result](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r39-build-fixture-result.md)
@@ -44,9 +44,30 @@ is `R48_FAILED`: all preflight reads passed, but the detached safety child died
 before READY because the production CLI omitted the safety entry's required
 process-liveness port. The parent issued no clone/helper creation or other
 cloud mutation command, protected sources were re-read unchanged, and the R40
-archive remains unrecovered. R48 is not retryable. A locally verified additive
-R49 wrapper supplies only the missing lifecycle port; it is not yet an
-execution proposal or authorization. Batch remains the
+archive remains unrecovered. R48 is not retryable. The additive R49 wrapper
+supplies the missing lifecycle port in unit tests, but
+[production-entry qualification](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r49-production-entry-qualification.md)
+found fixed-root incompatibilities with the unchanged R48 parent and child.
+R49 is not execution-proposal-ready; the next lead is an additive, locally
+exercised composition correction, not another cloud attempt. The additive
+[R50 same-root ownership definition](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r50-same-root-ownership-definition.md)
+retains the original startup and safety paths. The combined local R48/R49/R50
+battery passes 31/31: a temporary-root R50 parent-to-detached-child fixture
+replays READY/STOP with a filesystem-fake provider; another reaches the real
+composed R48 controller's preflight failure boundary without mutation; and a
+full composed fixture reaches two fake provider effects, deliberately fails
+layout, and independently replays the detached safety STOP with valid
+cross-channel chronology. The test-only root is now mechanically confined to
+an immediate non-symlink OS-temporary directory. A source-disjoint Python
+auditor reconstructs the claim, reservation and first workload-record hashes
+and rejects four tamper classes, but an independent reviewer has not signed
+off. The exact R40 archive bytes were not found in the known local capture
+directories, so there is no successful R50 archive-capture fixture,
+production anchor, reviewer sign-off, execution packet or cloud authority.
+The [R50 production-binding review](./nhm2-spherical-boson-star-v2-g2h-e-s5-a4-h2-p8p-r50-production-binding-review.md)
+identifies the next local prerequisite: an inert override-free operator
+adapter and new full package audit. The consumed R48 launcher and package
+audit cannot certify R50, and no production R50 anchor exists. Batch remains the
 selected scheduler for a later unchanged P=1024 calibration, conditional on
 authenticated R39 classification, build-only PASS and a separate explicit
 resource/permission/cost authorization. Only

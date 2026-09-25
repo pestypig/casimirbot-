@@ -1,0 +1,54 @@
+{
+  "source": "LZ arXiv:2609.02823v1 Fig. 6 top panel (vector SVG)",
+  "source_url": "https://arxiv.org/html/2609.02823v1/Fig6_O1_L10_limit_stacked.svg",
+  "source_sha256": "9b85d09b5f363a536229b0c2ab2325a2f093aaa37a4532e625702d21969cc277",
+  "digitization": "local SVG paths in clip_8 (upper) and clip_9 (lower); linear interpolation in plotted x and log10(C); y-axis calibrated from printed ticks",
+  "model_comparator": "B-L Eq. 15, gBL=0.5, mZprime=2*mS, mS=1 TeV",
+  "rows": [
+    {
+      "delta_keV": 150,
+      "svg_x": 246.90571428571428,
+      "c_lower": 2.2749925922054878e-08,
+      "c_upper": 3.511678946229346e-07,
+      "sigma_n_lower_cm2": 6.7436320135153146e-46,
+      "sigma_n_upper_cm2": 1.0409471505145419e-44,
+      "bminusl_mS_1TeV_gBL_0p5_sigma_n_cm2": 2.6589252194021834e-44,
+      "bminusl_inside_digitized_interval": false
+    },
+    {
+      "delta_keV": 200,
+      "svg_x": 306.9742857142857,
+      "c_lower": 2.1048675284643158e-07,
+      "c_upper": 2.8426987155275203e-06,
+      "sigma_n_lower_cm2": 6.239339898421397e-45,
+      "sigma_n_upper_cm2": 8.426451201858998e-44,
+      "bminusl_mS_1TeV_gBL_0p5_sigma_n_cm2": 2.6589252194021834e-44,
+      "bminusl_inside_digitized_interval": true
+    },
+    {
+      "delta_keV": 250,
+      "svg_x": 367.04285714285714,
+      "c_lower": 1.3460884653119486e-06,
+      "c_upper": 1.805893301379386e-05,
+      "sigma_n_lower_cm2": 3.990133989360011e-44,
+      "sigma_n_upper_cm2": 5.353107487866003e-43,
+      "bminusl_mS_1TeV_gBL_0p5_sigma_n_cm2": 2.6589252194021834e-44,
+      "bminusl_inside_digitized_interval": false
+    },
+    {
+      "delta_keV": 300,
+      "svg_x": 427.1114285714286,
+      "c_lower": 5.981742779270962e-06,
+      "c_upper": 0.00012088735002600145,
+      "sigma_n_lower_cm2": 1.7731342177162637e-43,
+      "sigma_n_upper_cm2": 3.583395420527771e-42,
+      "bminusl_mS_1TeV_gBL_0p5_sigma_n_cm2": 2.6589252194021834e-44,
+      "bminusl_inside_digitized_interval": false
+    }
+  ],
+  "limitations": [
+    "Digitized visual cross-check, not an official likelihood or exact recast.",
+    "The interval is for isoscalar inelastic O1^s at 1 TeV; it cannot be extrapolated to 2.3 TeV.",
+    "B-L model normalization, nuclear response, and physical splitting convention require model-specific implementation."
+  ]
+}

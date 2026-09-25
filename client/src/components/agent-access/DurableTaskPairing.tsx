@@ -96,6 +96,8 @@ function PairingControls({ profileId, chatId, environment, onRuntimeBinding }: P
             ? "This request does not match the installed device. Keep it until the device and task identity are checked, or cancel it to review again."
           : error instanceof Error && error.message === "pairing_device_trust_required"
             ? "Device trust is not current. Review device trust in Agent Access, then reconcile this same request."
+          : error instanceof Error && error.message === "pairing_registration_expired"
+            ? "This task's registration expired. Ask the same task to refresh its registration, then use Cancel request and review again, refresh registered tasks, and approve the reviewed task again. Registration expiry does not revoke device trust."
           : error instanceof Error && error.message === "pairing_environment_unavailable"
             ? "The selected run is no longer available. Cancel this request to review another run."
             : error instanceof Error && error.message === "pairing_request_cancelled"

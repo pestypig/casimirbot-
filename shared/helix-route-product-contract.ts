@@ -12,6 +12,7 @@ export type HelixRouteProductSourceTarget =
   | "scholarly_research"
   | "internet_search"
   | "runtime_evidence"
+  | "room_mission_result"
   | "workspace_directory"
   | "workspace_diagnostic"
   | "theory_locator"

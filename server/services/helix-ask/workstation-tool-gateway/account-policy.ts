@@ -42,6 +42,9 @@ export type HelixWorkstationGatewayAccountContext = {
    * This control field is never accepted from model-authored arguments.
    */
   trusted_turn_actor_context?: HelixRealtimeRoomTurnActorContext | null;
+  /** Server-composed source reader for one explicit owner result selection.
+   * Never populated from public body fields or model-authored arguments. */
+  room_mission_result_source?: { turnId: string; read: () => Promise<Record<string, unknown>> };
 };
 
 export type HelixWorkstationGatewayPolicyGate = {

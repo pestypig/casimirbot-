@@ -1,0 +1,76 @@
+{
+  "classification": "conditional_minimal_portal_kinematic_screen",
+  "minimal_connector": "lambda_phiH |phi|^2 H^dagger H",
+  "reaction_tested": "H Hbar -> phi phi-star after nonrelativistic chemical freeze-out",
+  "inputs": {
+    "upstream_four_observable_packet_sha256": "3d1481ee7e36ca63340b999679c9d8d112c0c3a611366459c85fbd7dde3d0493",
+    "m_H_GeV": 1080.0,
+    "m_phi_eV": 1e-17,
+    "x_freezeout_bracket": [
+      20.0,
+      30.0
+    ],
+    "gstar_s_freezeout_bracket": [
+      86.25,
+      106.75
+    ],
+    "gstar_s_today": 3.91,
+    "T_CMB_today_eV": 0.0002348,
+    "z_equality": 3402.0
+  },
+  "rows": [
+    {
+      "x_freezeout": 20.0,
+      "gstar_s_freezeout": 86.25,
+      "T_freezeout_GeV": 54.0,
+      "p_phi_today_eV": 0.0016744311939240035,
+      "p_phi_today_over_mphi": 167443119392400.34,
+      "p_phi_equality_eV": 5.698089352923384,
+      "p_phi_equality_over_mphi": 5.6980893529233837e+17
+    },
+    {
+      "x_freezeout": 20.0,
+      "gstar_s_freezeout": 106.75,
+      "T_freezeout_GeV": 54.0,
+      "p_phi_today_eV": 0.0015595442895289411,
+      "p_phi_today_over_mphi": 155954428952894.1,
+      "p_phi_equality_eV": 5.307129217266986,
+      "p_phi_equality_over_mphi": 5.307129217266986e+17
+    },
+    {
+      "x_freezeout": 30.0,
+      "gstar_s_freezeout": 86.25,
+      "T_freezeout_GeV": 36.0,
+      "p_phi_today_eV": 0.0025116467908860053,
+      "p_phi_today_over_mphi": 251164679088600.5,
+      "p_phi_equality_eV": 8.547134029385075,
+      "p_phi_equality_over_mphi": 8.547134029385075e+17
+    },
+    {
+      "x_freezeout": 30.0,
+      "gstar_s_freezeout": 106.75,
+      "T_freezeout_GeV": 36.0,
+      "p_phi_today_eV": 0.002339316434293412,
+      "p_phi_today_over_mphi": 233931643429341.2,
+      "p_phi_equality_eV": 7.960693825900481,
+      "p_phi_equality_over_mphi": 7.960693825900481e+17
+    }
+  ],
+  "required_production_temperature_GeV": {
+    "to_be_nonrelativistic_today": 8709736094909413.0,
+    "to_be_nonrelativistic_by_equality": 2.9639231930976735e+19,
+    "Planck_mass_GeV": 1.22089e+19
+  },
+  "checks": {
+    "all_freezeout_products_relativistic_today": true,
+    "all_freezeout_products_relativistic_at_equality": true,
+    "equality_cold_threshold_above_planck_mass": true,
+    "upstream_relic_overlays_need_fresh_calculation": true
+  },
+  "limits": [
+    "This is a redshift/kinematics screen, not a portal cross-section or coupled Boltzmann calculation.",
+    "It tests freeze-out annihilation products only; earlier production, late decays, coherent conversion, and separate misalignment are different histories.",
+    "The freeze-out brackets are illustrative; the IDM point includes coannihilation and needs a model-specific thermal history.",
+    "The result does not calculate dark-radiation constraints, the phi condensate, star formation, gamma spectra, xenon likelihood, or Casimir-DP response."
+  ]
+}

@@ -9,6 +9,7 @@ import {
 describe("Shared Live Room sensitive text boundary", () => {
   it("redacts source bearers, delivery claims, chat claims, and generic bearer headers", () => {
     const values = [
+      `helix_live_${"a".repeat(32)}`,
       "helix_room_src_secret_value",
       "room_source_claim_secret_value",
       "agent_chat_claim_secret_value",

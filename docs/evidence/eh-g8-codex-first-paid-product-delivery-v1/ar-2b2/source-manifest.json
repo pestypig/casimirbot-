@@ -1,0 +1,33 @@
+{
+  "files": [
+    {
+      "sha256": "f79e94048ea82d209e72145221a8844f119dbe8c817cc6c2a93d61a1ad26ad90",
+      "path": "server/services/helix-ask/realtime-room/turn-actor-context.ts"
+    },
+    {
+      "sha256": "95d5f8d29460b3ca2d1d3ece6b0891ed265ff593a6f066371ad9e6ec5b50380b",
+      "path": "server/services/helix-ask/agent-providers/realtime-turn-actor-context.ts"
+    },
+    {
+      "sha256": "c2909bca5e86e91622e9f348daf231d5c562635d6db8ea117cab664401542e74",
+      "path": "server/services/helix-ask/agent-providers/codex-provider.ts"
+    },
+    {
+      "sha256": "86fc81dee1cc6e08999bcf2bc9b25bf947d729c4ad1a62e295b0687b6b9c386a",
+      "path": "server/routes/agi.realtime-session.ts"
+    },
+    {
+      "sha256": "4616126c9838b473c06df2a983fe4f4226ddd03843a1d2ce1a6b118092409abc",
+      "path": "server/services/helix-ask/realtime-room/__tests__/turn-actor-context.test.ts"
+    },
+    {
+      "sha256": "9096522eb0f292c5f4e671042033f76b236df46ef7195af0109a4def813519ab",
+      "path": "server/services/helix-ask/realtime-room/__tests__/voice-handoff-authority.test.ts"
+    },
+    {
+      "sha256": "9d6c6e61c3bd024e8ca738e30aac60b7b96b5be791ab4cff4208a4712bc3dfe7",
+      "path": "server/services/helix-ask/agent-providers/__tests__/codex-provider-realtime-context.test.ts"
+    }
+  ],
+  "schema": "ar2b2.source_manifest.v1"
+}

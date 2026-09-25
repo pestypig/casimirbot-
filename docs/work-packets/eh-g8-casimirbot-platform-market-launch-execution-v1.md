@@ -55,7 +55,14 @@ model credits and managed GPT Live. Customers use their own supported external
 reasoning client where reasoning is needed. Payment never transfers a ChatGPT,
 Codex or provider account.
 
-### Owner target modes and pending offer reconciliation
+The personal-use target also includes **Helix Ask with the user's own supported
+provider connection**, without a CasimirBot subscription. That customer
+configuration surface is specified, not yet accepted for release; free personal
+MCP remains the current selected baseline. User-funded inference and hosted
+collaboration eligibility are independent. See the
+[shared connection menu contract](#shared-connection-menu-helix-ask-and-environment-home).
+
+### Owner target modes and selected launch disposition
 
 The reviewed product conversations add a useful target split without changing
 the controlling CFP-1 offer by themselves:
@@ -63,7 +70,7 @@ the controlling CFP-1 offer by themselves:
 | Mode | Target experience | Commercial state |
 | --- | --- | --- |
 | Personal local | One owner uses the harness and supported connectors with their own external reasoning client. | Selected as free personal MCP. |
-| Human room | Authenticated people call, coordinate and share only explicitly exposed room state; no shared AI or seller-funded reasoning is present. | Product target. Whether this hosted mode is free or paid is unresolved. |
+| Human room | Authenticated people call, coordinate and share only explicitly exposed room state; no shared AI or seller-funded reasoning is present. | Selected paid no-model hosted mode for first launch; a free human-only mode remains a future proposal. |
 | Sponsored assisted room | An eligible host sponsors one shared GPT Live participant and qualified backend reasoning for invited members. Program access remains separately owner-granted. | Evaluation candidate only; provider, payer, limits, privacy and unit economics require AR-1–3 and CFP-1 selection. |
 | Program contribution | A member exposes an installed, compatible program capability to the room and grants a bounded effect. | Separate from all three communication/reasoning modes and conditional on connector admission and rights. |
 
@@ -278,7 +285,7 @@ parallel when they do not implement a blocked stage or claim its acceptance.
 
 | Order | CFP owner | Deliverable | Build and test before advancing | Current result | Exit evidence |
 | ---: | --- | --- | --- | --- | --- |
-| 0 | **CFP-1 — active** | **First-customer release freeze** | Close D03 exact rights-cleared action/fallback and schema; D07 price/capacity economics; D11 qualified rights/privacy/financial conditions; D12 exact claims, operations, versions and acceptance fixtures. Resolve whether human-only hosted rooms remain the selected paid benefit or become a free bounded service with sponsored assisted reasoning as a later paid benefit. Freeze the client-profile routing, governed-operation contract, Environment Home scope, GitHub source/artifact policy, credential/execution-profile boundary and C10/DIR first cohort without admitting child implementation. | The offer shape and many lifecycle terms are selected. The reviewed conversations expose one unresolved commercial amendment and several now-explicit platform contracts. Current code has a built-in connector directory/pairing backend and static panel registry, but no customer Environment Home, GitHub artifact installer or generic user credential/execution-profile surface. The work program still reports D03, D07, D11 and D12 open; child implementation is unadmitted. | Work-program CFP-1 closure entry plus frozen capability/claim/rights/version/test matrix, explicit human-room/assisted-room disposition and accepted package/profile trust boundary. |
+| 0 | **CFP-1 — active** | **First-customer release freeze** | Close D03 exact rights-cleared action/fallback and schema; D07 price/capacity economics; D11 qualified rights/privacy/financial conditions; D12 exact claims, operations, versions and acceptance fixtures. Retain the owner-selected paid no-model hosted benefit; assisted reasoning and free human-only rooms remain separately evaluated future proposals. Freeze the client-profile routing, governed-operation contract, Environment Home scope, GitHub source/artifact policy, credential/execution-profile boundary and C10/DIR first cohort without admitting child implementation. | The offer shape and many lifecycle terms are selected. The owner resolved the first-launch commercial amendment on 2026-09-21; the G1 matrix records the platform contracts and outstanding acceptance conditions. Current code has a built-in connector directory/pairing backend and static panel registry, but no customer Environment Home, GitHub artifact installer or generic user credential/execution-profile surface. The work program still reports D03, D07, D11 and D12 open; child implementation is unadmitted. | Work-program CFP-1 closure entry plus frozen capability/claim/rights/version/test matrix, explicit human-room/assisted-room disposition and accepted package/profile trust boundary. |
 | 1 | **CFP-2 — blocked until row 0 closes** | **Privately signed personal harness qualification** | Build the accepted source tuple; sign the private evaluation artifact; install under isolated ordinary-user data; prove the exact free personal MCP journey through external Codex, one useful task, measured result, interruption, stop, revoke, reconnect and return. | Directory package, runtime-tree and service-boundary checks pass. Packaged-launch smoke was not run because the workstation failed its 4-GiB free-memory precondition. This is diagnostic evidence, not CFP-2 acceptance. | Accepted private signing tuple plus P1/PNA2 ordinary-user installed evidence on the same artifact. |
 | 2 | **CFP-3 — blocked until row 1 closes** | **Public read-only connector kit and GitHub-backed curated catalog slice** | Build the reviewed C10 package from exact selected public bytes; external clean checkout imports/builds it; publish the approved system-clock row with pinned source and immutable artifact identity; render it through the Environment Home/Store; prove schema parity, hash/provenance verification, listing/pairing agreement, withdrawal, incompatible version and already-claimed-device cutover. Do not execute arbitrary repository setup or a mutable branch. | In-repository kit, built-in database catalog and pairing surfaces exist. The standalone package, rights disposition, public directory policy, GitHub artifact fields, installer and Environment Home are unaccepted. | C10 package hash/notices, pinned source/release identity, independent developer probe, DIR-01–06 and ordinary-user discover/install/tile/connect evidence. Broad developer-platform and custom-provider claims still wait DEV-01–06 and their separately admitted contracts. |
 | 3 | **CFP-3** | **No-model hosted room and governed shared action** | Two verified accounts create/join the selected first-party room without OpenAI/provider calls; guest requests the exact selected action; program owner grants it; connector executes once; measured result returns with complete attribution. Exercise denial, stale state, duplicate/uncertain effect, revoke, expiry, reconnect and explicit eligible-host handoff. | Room, binding, entitlement, connector and federation components exist separately. Current provider-backed experimental room and guest action denial do not implement the selected path. | Zero-funded-provider-call trace, room/member/grant/action/native-result chain, negative matrix and personal/self-owner regressions. |
@@ -417,24 +424,24 @@ lane only. This does not close CFP-1 or admit customer CFP-2/3 implementation.
 - [ ] **G1.1 / D03** Freeze the exact rights-cleared first operation, non-game
   fallback, schema, clocks, owner/grant path and denial behavior. Minecraft
   remains conditional until its exact component/distribution review returns.
-- [ ] **G1.2 / D07** Freeze the trial/subscription capacity candidate and cost
+- [x] **G1.2 / D07** Freeze the trial/subscription capacity candidate and cost
   measurement method without reviving customer credits or bundling model/API
   usage.
-- [ ] **G1.3 / D11** Record the qualified rights, privacy and financial-review
+- [x] **G1.3 / D11** Record the qualified rights, privacy and financial-review
   questions, reviewer status and explicit public-launch hold. Agent review is
   preparation, not qualified professional approval.
 - [ ] **G1.4 / D12** Freeze exact release claims, operations, versions, fixtures,
   supported clients, failure language and acceptance matrix.
-- [ ] **G1.5** Resolve the selected commercial relationship among free personal
+- [x] **G1.5** Resolve the selected commercial relationship among free personal
   MCP, human-only hosted rooms and separately evaluated sponsored assisted
   reasoning. Preserve a zero-funded-provider-call room path.
-- [ ] **G1.6** Freeze Environment Home, pinned GitHub artifact, credential
+- [x] **G1.6** Freeze Environment Home, pinned GitHub artifact, credential
   connection, execution profile, runtime supervisor and C10/DIR boundaries.
-- [ ] **G1.7** Ask the canonical work program to record either CFP-1 closure or
+- [x] **G1.7** Ask the canonical work program to record either CFP-1 closure or
   a narrowly admitted, test-only engineering lane. The lane may build and test
   disabled/noncommercial surfaces while D11 continues to block public sale,
   production billing and launch claims; this guide cannot self-admit it.
-- [ ] **G1.8** Obtain independent review of the complete freeze and update the
+- [x] **G1.8** Obtain independent review of the complete freeze and update the
   work program with `PASS`, `FAIL`, `BLOCKED` or `MISSING` for each closure row.
 
 **Exit:** a frozen release matrix plus an explicit canonical admission decision.
@@ -484,6 +491,9 @@ credits from a future verified balance; only 400 is reserved in the active run.
 - [ ] **G3.5** Keep package installation, credential connection, execution
   profile and program grants separate; no renderer-visible provider key and no
   manifest-derived action authority.
+  Apply the shared Helix Ask/Home connection-menu contract to the admitted
+  configuration slice. A model picker alone does not prove customer credential
+  setup; broader provider support still requires separate admission and evidence.
 - [ ] **G3.6** Prove wrong hash/signature, mutable branch, incompatible version,
   withdrawn artifact and already-claimed-device denials plus safe uninstall.
 - [ ] **G3.7** Complete DIR-01–06 evidence and an independent ordinary-user
@@ -622,14 +632,149 @@ AR work never consumes a selected-offer goal's budget or silently changes its
 exit. Fund it only from a separately verified balance and development OpenAI
 project.
 
-- [ ] **AR-1 — contract/source audit.** `gpt-6-astra` high, initial cap 250.
+- [x] **AR-1 — contract/source audit.** `gpt-6-astra` high, initial cap 250.
   Freeze participant, principal, worker, provider, payer, consent, context,
   usage and failure identities against current source.
+  [2026-09-21 audit packet](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-1/contract-source-audit.md)
+  completed with independent audit-only review. Focused checks: 120/121 pass;
+  a reproducible routing precedence expectation remains open for separate triage.
+  Three-human capacity, exact mission joins, provider access, usage/cost controls
+  and live acceptance remain AR-2 prerequisites. No runtime or offer promotion.
 - [ ] **AR-2 — controlled three-member evaluation.** `gpt-5.6-sol` medium with
   `gpt-6-astra` escalation, initial cap 700 plus separately measured API cost.
   Run the stable Dan/Sam/Alex scenario, interruption, correction,
   disagreement, reconnect and cross-room denial. Record model/API usage
   separately from Codex development credits.
+  **AR-2A preparation completed:** [goal prompt](eh-g8-ar2a-deterministic-assisted-room-preparation-v1.md)
+  and [component evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2a/result.md).
+  Eleven offline checks pass; 133/134 existing tests pass with the documented
+  routing expectation still unresolved. Real caller authority joins, three-human
+  capacity and funded-test controls remain prerequisites; full AR-2 stays open.
+  **AR-2B route qualification completed:** [goal prompt](eh-g8-ar2b-room-principal-route-qualification-v1.md)
+  and [source-backed route map](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b/route-qualification.md).
+  Existing component checks pass, but no single current caller proves the Live
+  speaker, selected external mission task, current revision and return-to-room
+  result as one verified transaction. AR-2B1 proposes the smallest later
+  implementation packet; it is not admitted by this checklist note.
+  **AR-2B1 first code slice:** [admitted packet](eh-g8-ar2b1-external-mission-association-v1.md)
+  and [Ready up evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b1/first-slice.md).
+  The existing external-task preparation path now denies a wrong owner, room,
+  participant, run or goal revision before its first observation; 63 focused
+  tests pass. Live turn-to-task dispatch and result-return authority remain
+  separate work, so AR-2 remains open.
+  **AR-2B2 private association qualified:** [goal prompt and implementation order](eh-g8-ar2b2-live-room-mission-ingress-v1.md)
+  and [integrated evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/private-association-qualification.md).
+  Current room speaker/consent, exact external task/mission dispatch and
+  correlated private result return passed deterministic qualification. This
+  does not establish an Ask answer, room-visible terminal result or full AR-2.
+  [First ingress evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/ingress-progress.md):
+  28 focused checks pass for current speaker/consent/runtime and backend
+  rejection. The next caller freeze now covers exact task pickup and
+  acknowledgement through the real MCP tools; these verify continuation,
+  conversation, mission, run and epoch before queue disclosure or receipt
+  mutation. [Pickup evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/exact-task-pickup-progress.md).
+  The authenticated owner can now persist and revoke an exact external-task
+  room mission selection with a server-authored revision
+  ([selection evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/room-mission-selection-progress.md)).
+  An affirmative owner HTTP caller now dispatches the exact retained handoff
+  against the current mission, speaker consent and selected task. In-memory
+  and encrypted durable MCP pickup/acknowledgement recheck those authorities
+  ([dispatch and pickup evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/mission-dispatch-pickup-progress.md)).
+  The acknowledged exact task can submit one encrypted, event-correlated
+  `completed` or `unable` observation through an authenticated MCP caller;
+  retry is idempotent and its receipt carries no answer authority
+  ([result evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/mission-result-progress.md)).
+  A server-only evidence read rechecks the encrypted result against the
+  acknowledged event, current task, room mission and captured speaker
+  ([source admission evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/result-source-admission-progress.md)).
+  An owner-only HTTP caller now checks room membership and mission identity
+  before and after that read and returns a nonterminal source receipt without
+  result text ([intake evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/owner-result-intake-progress.md)).
+  The integrated private association path is now
+  [deterministically qualified](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/private-association-qualification.md)
+  through real HTTP and MCP callers. This does not close full AR-2.
+  Its receipt remains nonterminal; the AR-2C slice below adds the explicit
+  solver/route-product gate. Task pickup suppresses revoked room instructions while preserving
+  cursor progress for later valid traffic
+  ([queue evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2b2/revoked-queue-progress.md)).
+  Installed/domain and controlled live AR-2 acceptance remain open.
+  **AR-2C deterministically verified:** [goal and caller freeze](eh-g8-ar2c-room-result-answer-v1.md),
+  [qualification](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2c/room-result-answer-qualification.md).
+  The developer owner can explicitly admit an exact private result to a new room
+  Ask turn. Existing Codex normalization and solver/terminal gates precede room
+  projection, with current authority checked again. All 82 final focused fixtures
+  pass, including exact report text in the fake-provider prompt. This qualifies
+  the API slice only.
+  **AR-2D deterministically verified:** [owner UI packet](eh-g8-ar2d-room-result-owner-ui-v1.md),
+  [qualification and runtime readiness](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2d/owner-ui-qualification.md).
+  The present developer owner can discover returned report metadata, explicitly
+  select/disclose a result for explanation and observe its attributed shared
+  answer. All 101 focused fixtures pass. No installed/domain acceptance is
+  implied: the inspected EXE package and domain report older sources, browser
+  automation was unavailable and no deployment or paid call was made.
+  **AR-2E deterministically verified:** [developer-package packet](eh-g8-ar2e-developer-package-smoke-v1.md),
+  [artifact and startup qualification](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2e/developer-package-qualification.md).
+  A fresh unsigned developer EXE at `release-ar2e-20260925/win-unpacked` contains
+  the qualified owner UI/server path. Packaged artifact identity, isolated
+  service boundary and disposable-profile startup passed; existing main and NAV
+  rollback packages remain intact. This does not qualify real sign-in, room/task
+  pairing or live reasoning. Browser initialization is still unavailable.
+  **AR-2F deterministically verified:** [owner mission workflow](eh-g8-ar2f-room-mission-owner-workflow-v1.md),
+  [evidence](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2f/owner-mission-workflow-qualification.md).
+  The developer owner can review the current paired task, select/revoke its room
+  mission, and explicitly send one server-attributed captured utterance. Private
+  discovery and exact dispatch preserve current task, speaker consent and mission
+  revision checks. Personal voice steering now waits for server attribution and
+  cannot consume shared-room speech. No selection/refresh starts a model call.
+  Qualification includes 124 focused cases, the 101-case full discipline
+  battery, client/server builds and the docs audit.
+  AR-2E does not contain this new source; AR-2G below packages it.
+  **AR-2G deterministically verified:** [owner workflow package](eh-g8-ar2g-owner-workflow-package-v1.md),
+  [artifact, startup and next walkthrough](../evidence/eh-g8-codex-first-paid-product-delivery-v1/ar-2g/developer-package-qualification.md).
+  The unsigned `release-ar2g-20260925/win-unpacked` EXE includes AR-2F. Actual
+  packaged bytes, runtime-tree, service-boundary and disposable-profile startup
+  checks pass; existing main, AR-2E and NAV packages remain unchanged. Supported
+  browser entry points still fail before inventory, so no authenticated room or
+  live reasoning acceptance is claimed. Next: restore browser control, establish
+  approved keyed account/room/task readiness and execute the recorded owner/guest
+  walkthrough; then controlled multi-member evaluation. Full AR-2 stays open.
+  **AR-2H live acceptance pending:** [installed owner/guest packet](eh-g8-ar2h-installed-room-acceptance-v1.md).
+  Browser initialization failed at its first checkpoint. On resume, browser and
+  native control recovered, the verified EXE opened its saved local owner
+  session, and this task's authenticated MCP presence succeeded. The owner
+  completed native device-registration MFA and Full Harness trust. Finite
+  registration for this exact task succeeded. On the owner's later return, the
+  submitted pairing request was unconfirmed and the old registration had
+  expired. After same-task registration renewal and owner recovery/approval,
+  the one-hour chat-only pairing was accepted. The installed room recognizes
+  the paired task. Refreshing the existing connector fixed stale steering
+  schemas; an empty queue read now succeeds with fresh task presence. Room
+  mission selection is confirmed at revision 1; instruction/result delivery is
+  untested. Pairing expires at `2026-09-25T13:30:35.074Z`. A source-only repair
+  exposes registration-expiry recovery guidance and synchronizes the results
+  panel after mission changes. The AR-2H packet defines the shared-authority
+  transport prerequisite before guest/voice acceptance;
+  the running AR-2G package is unchanged. The domain sign-in independently returns
+  `auth0_not_configured`. Topology must be proven before voice spending: the Friends
+  & Parties domain broker does not proxy assisted Shared Live Room or mission
+  APIs. Verify the owner and guest reach the same authoritative room/task path;
+  label a same-service demonstration separately from two-EXE/domain acceptance.
+  The OAuth baseline exposed and now covers fixture tenant-claim isolation and
+  current non-answer error-schema validation (13 targeted tests pass). The
+  release-evaluation repair still requires an authenticated Casimir adapter
+  run; the installed endpoint returned `401 desktop_session_required`.
+  OAuth invitation joining is now implemented in source with strict account/scope
+  admission, current-membership retries and uncertain-outcome protection. A
+  deterministic two-account persistence test admits the guest once without owner
+  authority or media consent. The installed package is unchanged; verified live
+  OAuth joining and native shared-authority transport remain open. See the AR-2H
+  packet for exact evidence and the outstanding older MCP catalog assertion.
+  The signed-token test now covers the real account-link-to-join persistence
+  chain. Installed/domain acceptance remains distinct: native sign-in defaults
+  to Friends & Parties scopes, account linking is local to its authority, the
+  desktop guard rejects room REST without its native session, and the domain
+  still serves its September 1 build. Resolve that connection contract before
+  packaging or renewing another short-lived owner pairing.
 - [ ] **AR-3 — offer decision.** `gpt-6-astra` high, initial cap 250. Decide from
   measured usefulness, privacy behavior, reliability and unit economics whether
   assisted reasoning receives its own offer and implementation rows.
@@ -751,6 +896,64 @@ The product separates five objects:
 | Credential Connection | An owner-scoped opaque reference to an OS-protected or provider-vault credential. The native broker releases it only to the exact admitted package, provider, role and operation. |
 | Runtime supervisor | Starts, monitors, stops and receipts isolated package processes under declared filesystem, network, command and resource policy. The existing secret-bearing developer “opaque launcher” is an implementation precedent, not a customer configuration surface. |
 
+### Shared connection menu: Helix Ask and Environment Home
+
+Owner clarification, 2026-09-21: **Helix Ask/Helix Chat and environment tiles use
+the same three-dot entry point, “Configure connection.”** It opens the same
+connection/profile flow, scoped to the chat or environment being configured.
+The menu is a discoverable configuration affordance; selecting it does not
+start a paid session, install a package or grant program control.
+
+The target flow shows the supported provider/runtime, interpreter role,
+model where applicable, connection status, configuration scope and **who pays**:
+
+| Choice | Customer meaning |
+| --- | --- |
+| My connection | Use an admitted provider connection owned by this user. Personal harness/Helix Ask use needs no CasimirBot subscription; any provider charges remain the user's responsibility. |
+| My external reasoning client | Use the supported client over the admitted connection, such as personal MCP; no separate harness-managed interpreter is implied. |
+| Local / no provider | Use an admitted local model or deterministic interpreter, with its actual capabilities and local requirements shown. |
+| CasimirBot-managed | Future option only after offer admission; show included usage, limits and payer before explicit start. The selected launch subscription does not include this option. |
+
+Users can add, inspect, test, select, replace and disconnect supported
+connections. Secret entry is through the protected native/broker flow; the
+ordinary chat and tile renderer sees only an opaque connection reference and
+safe status. Secrets never become prompts, room messages, package metadata or
+debug exports. Reusing a connection across apps requires explicit scope
+selection; it does not grant every installed package access to that credential.
+Web-only setup needs its own reviewed custody flow and must not silently
+upload a locally held key to the domain.
+
+Keep the active provider and payer visible near the chat composer or active
+environment. No key/model-access failure may silently switch to a paid managed
+provider or consume an included allowance. Changing a profile affects future
+work at an explicit safe boundary; do not switch an in-flight principal, replay
+an action or transfer a guest's credentials. Provider choice never grants an
+environment effect or creates a second reasoning principal.
+
+Free personal access and user-funded inference do not confer hosted-room
+eligibility. Conversely, a hosted subscription must not force a person to use
+CasimirBot-funded inference. For any later admitted managed offer, describe its
+actual included usage rather than inventing a customer credit product. Private
+demonstration credentials prove only the tested developer configuration, not
+customer setup or general provider/model availability.
+
+Current source anchors: the
+[Ask runtime picker](../../client/src/components/helix/ask-console/HelixAskRuntimePicker.tsx),
+[language-model picker](../../client/src/components/helix/ask-console/HelixAskLanguageModelPicker.tsx)
+and [composer toolbar](../../client/src/components/helix/ask-console/HelixAskComposerActionToolbarSurface.tsx)
+provide selection/UI integration points. They do not establish a completed
+customer credential menu. This clarification remains **specified** and does not
+admit a runtime patch or expand the first catalog cohort.
+
+Acceptance for the later admitted connection slice must demonstrate: a
+non-subscriber configures and uses personal Helix Ask with a supported own
+connection; the same configuration semantics work from an environment tile;
+provider/payer/scope remain visible; failed or revoked credentials produce no
+managed-provider fallback; no secret appears in renderer state, logs or room
+exports; disconnect/restart preserves the intended boundary; and hosted-room
+and program grants remain independently enforced. Record installed-build and
+provider evidence separately from mocked UI checks.
+
 ### GitHub-backed package policy
 
 GitHub is the preferred public source and artifact channel for reviewed open
@@ -787,10 +990,12 @@ environment authority:
 | CasimirBot-sponsored managed reasoning | Uses seller-controlled provider credentials, metering and subscription limits. It remains outside the selected initial no-model offer until CFP-1 and AR-3 admit it. |
 | Local/model-free interpreter | Runs admitted deterministic procedures or local models without a provider call, while retaining the same evidence, permission and stop contracts. |
 
-User-supplied credentials can move inference cost to the user's provider account;
-they do not make the complete service free. Distribution, catalog review,
-updates, hosted rooms, relay traffic, support and security maintenance retain
-their own costs. A package may contribute procedural interpretation, planning
+User-supplied credentials support free personal harness/Helix Ask access without
+a CasimirBot subscription once that connection path is qualified; inference may
+still incur provider charges. Hosted rooms and other separately priced services
+retain their own eligibility and costs. Distribution, catalog review, updates,
+support and security maintenance also retain operating costs; those costs alone
+do not change the free personal-use policy. A package may contribute procedural interpretation, planning
 or action selection, but the capability contract must identify which role made
 each proposal and which trusted boundary admitted and executed it.
 
@@ -878,7 +1083,7 @@ Every implementation or audit agent receives this instruction:
 > before editing. Produce working code or executable evidence and update the
 > owning row with PASS, FAIL, BLOCKED or MISSING plus an artifact link. Do not
 > create another roadmap, restate settled product philosophy, treat a proposed
-> assisted-room mode or unresolved free human-room candidate as the selected
+> assisted-room mode or future free human-room proposal as the selected
 > offer, route a continuing mission around its sole principal, or promote
 > maturity from a plan, mock or component-only test. Do not clone or execute a
 > mutable GitHub branch as an installed package, expose provider keys in the
@@ -897,9 +1102,9 @@ the canonical work program records any resulting stage or maturity change.
 The primary row is **0 — CFP-1 first-customer release freeze**. The coordinator
 must reduce current work to the four recorded closure groups: D03 selected
 action/fallback, D07 validated price/capacity, D11 qualified conditions and D12
-claim/version/acceptance freeze. It must also record whether the owner-directed
-free human-room/paid assisted-room split amends the selected paid no-model room,
-then freeze the client-profile routing and governed-operation contract against
+claim/version/acceptance freeze. It must preserve the owner decision retaining paid no-model hosting; the
+free human-room/paid assisted-room split remains a future proposal,
+with client-profile routing and governed-operation contracts frozen against
 that decision. The first technical subtask is the source-backed no-model room
 and guest-action route map because it determines the hosted benefit,
 provider-call denial fixture and selected action path.

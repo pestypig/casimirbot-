@@ -1,0 +1,74 @@
+{
+  "status": "fixed-radius nonlinear O(3)/O(2) sigma-model test; no radial-mode or charge-generation calculation",
+  "model": {
+    "action": "L=f^2/2[(d theta)^2+sin(theta)^2(d phi)^2]-m^2 f^2 sin(theta)^2/2",
+    "f_GeV": 6.7e+17,
+    "mass_eV": 1e-17,
+    "soft-breaking_potential": "V=m^2 f^2 sin(theta)^2/2; exact residual U(1) in phi",
+    "cosmology": "same finite-temperature e+e- equation of state; instantaneous neutrino decoupling at 2 MeV",
+    "initial_condition_map": "Cartesian harmonic-screen alpha,beta mapped to the tangent bundle of the radius-f sphere; Xi then retuned to 10% DM",
+    "alpha": 678772.562466697,
+    "beta": -150.92778505790557
+  },
+  "outputs": {
+    "initial_Xi_GeV": 922998340553511.8,
+    "initial_theta_rad": 0.20945220561886846,
+    "initial_theta_dot_over_m": -955.955424306954,
+    "initial_phi_dot_over_m": 29.79660725718339,
+    "initial_transverse_radius_over_f": 0.20792410875605033,
+    "initial_scalar_over_radiation": 0.0005800333392543152,
+    "late_m_nQ_over_rho": 0.28081630305936284,
+    "comoving_charge_relative_drift_over_final_cycle": 4.3170967381198936e-16,
+    "cycle_comoving_energy_relative_scatter": 0.011154682649140733,
+    "BBN_samples": [
+      {
+        "temperature_MeV": 2,
+        "theta_rad": 0.03794046389310675,
+        "rho_phi_over_radiation": 2.3135112650799328e-05,
+        "m_phi_nQ_over_rho": 0.0003531540951539773
+      },
+      {
+        "temperature_MeV": 1,
+        "theta_rad": 0.016482510817930417,
+        "rho_phi_over_radiation": 5.7109769607177455e-06,
+        "m_phi_nQ_over_rho": 0.0028618332742103725
+      },
+      {
+        "temperature_MeV": 0.5,
+        "theta_rad": 0.005794324680570135,
+        "rho_phi_over_radiation": 1.3662581551195224e-06,
+        "m_phi_nQ_over_rho": 0.023982220380215174
+      },
+      {
+        "temperature_MeV": 0.2,
+        "theta_rad": 0.0016095001389835914,
+        "rho_phi_over_radiation": 1.8382472400792206e-07,
+        "m_phi_nQ_over_rho": 0.45898272580487054
+      },
+      {
+        "temperature_MeV": 0.1,
+        "theta_rad": 0.0019461010001108167,
+        "rho_phi_over_radiation": 8.32615543339216e-07,
+        "m_phi_nQ_over_rho": 0.21822054777537542
+      },
+      {
+        "temperature_MeV": 0.05,
+        "theta_rad": 0.0006305011623995472,
+        "rho_phi_over_radiation": 1.4055401473858417e-06,
+        "m_phi_nQ_over_rho": 0.2700452577038683
+      }
+    ]
+  },
+  "numerics": {
+    "solver": "DOP853 rtol=1e-9 atol=1e-11 max_step=.001 in ln(a)",
+    "thermal_grid_points": 420,
+    "abundance_root": "Brent root in log Xi; repeated integration of nonlinear field equation"
+  },
+  "limitations": [
+    "Radial mode is frozen; this is the nonlinear sigma-model limit, not the full linear O(3) theory.",
+    "Initial alpha,beta are imported from a harmonic-model optimizer; no physical history generates them.",
+    "The abundance is retuned after changing the field-space metric; this is not a prediction from fixed initial conditions.",
+    "Rotating-background isocurvature and perturbation transfer, star formation, and profile-dependent Q/M are not computed.",
+    "No xenon, gamma-ray, or Casimir-DP observable is coupled to this field."
+  ]
+}

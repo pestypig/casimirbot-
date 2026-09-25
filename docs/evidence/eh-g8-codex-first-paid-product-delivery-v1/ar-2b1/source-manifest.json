@@ -1,0 +1,19 @@
+{
+  "schema": "casimirbot.ar2b1.source-snapshot.v1",
+  "captured_at_utc": "2026-09-21T21:22:56.8316190Z",
+  "git_head": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "files": [
+    {
+      "path": "server/services/environment-connectors/session/prepare-browser-session.ts",
+      "sha256": "ac129776681dd504cbf0ef719aedba88715efeee2412f1c774eabe40e263c2ba"
+    },
+    {
+      "path": "server/services/environment-connectors/session/__tests__/prepare-browser-session.test.ts",
+      "sha256": "783890fd71648b004703b3ef10267cfe631bed4f7c8352ffb06da9bc775c2185"
+    },
+    {
+      "path": "server/services/local-supervisor/reasoning-task-binding-store.ts",
+      "sha256": "579bd5adebc505ca62351c70d090482a31d3f1d20f1d4d5f701ec4c8c78945fa"
+    }
+  ]
+}

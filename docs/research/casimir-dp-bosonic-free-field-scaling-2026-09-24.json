@@ -1,0 +1,67 @@
+{
+  "evidence_class": "reproducible analytic scaling and kinematic screen",
+  "constants": {
+    "planck_mass_GeV": 1.22089e+19,
+    "Kaup_coefficient": 0.633,
+    "xenon_isotope_mass_GeV": 120.16273921218,
+    "speed_cap_km_s": 798.0,
+    "LZ_candidate_recoil_keV": 248.0
+  },
+  "ultralight_SgrA_benchmark": {
+    "field_mass_eV": 1e-17,
+    "free_field_max_star_mass_solar": 8458760.485072244,
+    "SgrA_mass_solar": 4020000.0,
+    "max_mass_to_SgrA_ratio": 2.104169274893593
+  },
+  "benchmarks": [
+    {
+      "benchmark": "EHT Sgr A* illustrative field",
+      "particle_mass_GeV": 1e-26,
+      "free_field_Kaup_max_mass_kg": 1.6819991461751608e+37,
+      "free_field_Kaup_max_mass_solar": 8458760.485072246,
+      "elastic_Xe129_max_recoil_keV_at_798_km_s": 1.1793006899485677e-53
+    },
+    {
+      "benchmark": "LZ illustrative inelastic model",
+      "particle_mass_GeV": 45.0,
+      "free_field_Kaup_max_mass_kg": 3737775880.389246,
+      "free_field_Kaup_max_mass_solar": 1.8797245522382767e-21,
+      "elastic_Xe129_max_recoil_keV_at_798_km_s": 126.40523661870944
+    },
+    {
+      "benchmark": "cluster line energy floor",
+      "particle_mass_GeV": 43.2,
+      "free_field_Kaup_max_mass_kg": 3893516542.0721307,
+      "free_field_Kaup_max_mass_solar": 1.9580464085815378e-21,
+      "elastic_Xe129_max_recoil_keV_at_798_km_s": 119.07639339880504
+    },
+    {
+      "benchmark": "Milky Way continuum lower fit",
+      "particle_mass_GeV": 500.0,
+      "free_field_Kaup_max_mass_kg": 336399829.23503214,
+      "free_field_Kaup_max_mass_solar": 1.691752097014449e-22,
+      "elastic_Xe129_max_recoil_keV_at_798_km_s": 1106.860431783779
+    },
+    {
+      "benchmark": "Milky Way continuum upper fit",
+      "particle_mass_GeV": 800.0,
+      "free_field_Kaup_max_mass_kg": 210249893.27189508,
+      "free_field_Kaup_max_mass_solar": 1.0573450606340306e-22,
+      "elastic_Xe129_max_recoil_keV_at_798_km_s": 1287.1076755300153
+    }
+  ],
+  "quartic_repulsive_scaling_lambda_required": {
+    "formula_scope": "Mmax/Msun ~= 0.1 sqrt(lambda)/(m/GeV)^2; asymptotic repulsive quartic model only",
+    "45_GeV_for_1_solar_mass": 410062500.0,
+    "45_GeV_for_SgrA_mass": 6.626774025e+21,
+    "500_GeV_for_SgrA_mass": 1.010025e+26,
+    "800_GeV_for_SgrA_mass": 6.61929984e+26
+  },
+  "limits": [
+    "Free-field Kaup limit applies only to the minimally coupled massive scalar with no self-interaction; alternative potentials change the result.",
+    "798 km/s is an inherited illustrative speed cap, not a universal halo model or official LZ assumption.",
+    "Elastic recoil uses nonrelativistic two-body kinematics and Xe-129 mass approximation; no detector response or rate likelihood is computed.",
+    "The quartic coupling values are scaling illustrations, not perturbative-consistency checks or viable particle models.",
+    "No astrophysical occurrence rate, annihilation yield, local population, or interferometer observable is inferred."
+  ]
+}

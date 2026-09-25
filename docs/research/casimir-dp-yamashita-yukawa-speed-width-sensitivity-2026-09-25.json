@@ -1,0 +1,193 @@
+{
+  "classification": "Maxwell_proxy_velocity_width_sensitivity_not_astrophysical_fit",
+  "inputs": {
+    "m_X_GeV": 420.0,
+    "alpha_eff": 0.2,
+    "mediator_mass_GeV": 0.4,
+    "distribution": "untruncated Maxwell relative-speed PDF, mean varied by 0.5x, 1x, 2x around the paper's representative speed",
+    "base_mean_relative_speeds": {
+      "milky_way": 0.001,
+      "dwarf": 0.0001
+    },
+    "mean_multipliers": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "quadrature_orders": [
+      24,
+      48
+    ]
+  },
+  "averaged_rates": {
+    "milky_way": {
+      "0.5": {
+        "mean_relative_speed": 0.0005,
+        "quadrature": {
+          "24": {
+            "Cassel_avg_v2S1": 5.82072511642275,
+            "exact_Yukawa_avg_v2S1": 36.234380407679936
+          },
+          "48": {
+            "Cassel_avg_v2S1": 5.820725116422718,
+            "exact_Yukawa_avg_v2S1": 36.23436787419103
+          }
+        }
+      },
+      "1.0": {
+        "mean_relative_speed": 0.001,
+        "quadrature": {
+          "24": {
+            "Cassel_avg_v2S1": 11.411827121298272,
+            "exact_Yukawa_avg_v2S1": 38.066514932336986
+          },
+          "48": {
+            "Cassel_avg_v2S1": 11.411826645245553,
+            "exact_Yukawa_avg_v2S1": 38.060447003032195
+          }
+        }
+      },
+      "2.0": {
+        "mean_relative_speed": 0.002,
+        "quadrature": {
+          "24": {
+            "Cassel_avg_v2S1": 13.737744334353694,
+            "exact_Yukawa_avg_v2S1": 26.780934221669778
+          },
+          "48": {
+            "Cassel_avg_v2S1": 13.736650652258586,
+            "exact_Yukawa_avg_v2S1": 26.704672163290063
+          }
+        }
+      }
+    },
+    "dwarf": {
+      "0.5": {
+        "mean_relative_speed": 5e-05,
+        "quadrature": {
+          "24": {
+            "Cassel_avg_v2S1": 0.09087440378615712,
+            "exact_Yukawa_avg_v2S1": 1.419216857630108
+          },
+          "48": {
+            "Cassel_avg_v2S1": 0.09087440378615728,
+            "exact_Yukawa_avg_v2S1": 1.4192168576338937
+          }
+        }
+      },
+      "1.0": {
+        "mean_relative_speed": 0.0001,
+        "quadrature": {
+          "24": {
+            "Cassel_avg_v2S1": 0.3569632557826836,
+            "exact_Yukawa_avg_v2S1": 5.1899837233915855
+          },
+          "48": {
+            "Cassel_avg_v2S1": 0.3569632557826879,
+            "exact_Yukawa_avg_v2S1": 5.1899837234215385
+          }
+        }
+      },
+      "2.0": {
+        "mean_relative_speed": 0.0002,
+        "quadrature": {
+          "24": {
+            "Cassel_avg_v2S1": 1.3338187602754874,
+            "exact_Yukawa_avg_v2S1": 15.659422715753966
+          },
+          "48": {
+            "Cassel_avg_v2S1": 1.333818760275486,
+            "exact_Yukawa_avg_v2S1": 15.659422715399533
+          }
+        }
+      }
+    }
+  },
+  "dwarf_halo_combinations_order48": {
+    "halo_x0.5_dwarf_x0.5": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.01561221359341679,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.03916770019450986
+    },
+    "halo_x0.5_dwarf_x1.0": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.06132625208078357,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.14323373161749714
+    },
+    "halo_x0.5_dwarf_x2.0": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.22914993125379196,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.43217044022322815
+    },
+    "halo_x1.0_dwarf_x0.5": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.00796317772878348,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.03728849683559491
+    },
+    "halo_x1.0_dwarf_x1.0": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.031280115522207615,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.1363616071825973
+    },
+    "halo_x1.0_dwarf_x2.0": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.11688039099605388,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.4114355964908131
+    },
+    "halo_x2.0_dwarf_x0.5": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.006615470254476893,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.053144889738988794
+    },
+    "halo_x2.0_dwarf_x1.0": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.025986193055291526,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.1943474045173271
+    },
+    "halo_x2.0_dwarf_x2.0": {
+      "Cassel_dwarf_over_halo_rate_ratio": 0.0970992707058601,
+      "exact_Yukawa_dwarf_over_halo_rate_ratio": 0.5863926214726564
+    }
+  },
+  "derived": {
+    "exact_ratio_envelope": [
+      0.03728849683559491,
+      0.5863926214726564
+    ],
+    "Cassel_ratio_envelope": [
+      0.006615470254476893,
+      0.22914993125379196
+    ],
+    "exact_ratios_all_below_unity": true,
+    "exact_ratios_exceed_Cassel_for_all_pairs": true,
+    "quadrature_24_to_48_changes": {
+      "milky_way_x0.5": {
+        "Cassel_24_to_48_relative_change": 5.440092820663267e-15,
+        "exact_24_to_48_relative_change": 3.4590046149585163e-07
+      },
+      "milky_way_x1.0": {
+        "Cassel_24_to_48_relative_change": 4.171573175781873e-08,
+        "exact_24_to_48_relative_change": 0.0001594033316572041
+      },
+      "milky_way_x2.0": {
+        "Cassel_24_to_48_relative_change": 7.961147539869984e-05,
+        "exact_24_to_48_relative_change": 0.0028476250211617593
+      },
+      "dwarf_x0.5": {
+        "Cassel_24_to_48_relative_change": 1.7763568394002505e-15,
+        "exact_24_to_48_relative_change": 2.667421838964401e-12
+      },
+      "dwarf_x1.0": {
+        "Cassel_24_to_48_relative_change": 1.199040866595169e-14,
+        "exact_24_to_48_relative_change": 5.771383371211414e-12
+      },
+      "dwarf_x2.0": {
+        "Cassel_24_to_48_relative_change": 9.992007221626409e-16,
+        "exact_24_to_48_relative_change": 2.263389475842814e-11
+      }
+    }
+  },
+  "limits": [
+    "Mean speed variation is a proxy width sensitivity, not an uncertainty posterior or a source-specific velocity distribution.",
+    "No truncation, anisotropy, substructure, spatially varying central halo, or dwarf-specific Jeans model is included.",
+    "Gauss-Laguerre order convergence does not guarantee narrow resonance peaks between nodes are resolved; targeted adaptive integration remains necessary.",
+    "No Fermi-LAT spectral likelihood, LZ refit, xenon scattering change, or Casimir-DP response is calculated."
+  ],
+  "checks": {
+    "all_exact_24_to_48_changes_below_1_percent": true,
+    "all_Cassel_24_to_48_changes_below_1_percent": true,
+    "dwarf_rate_lower_than_halo_over_tested_proxy_grid": true
+  }
+}

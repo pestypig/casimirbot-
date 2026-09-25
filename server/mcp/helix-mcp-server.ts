@@ -490,6 +490,8 @@ import {
   type HelixReasoningTaskBindingStore,
 } from "../services/local-supervisor/reasoning-task-binding-store";
 import { agentChatSteeringDispatchSchema } from "../services/local-supervisor/exact-chat-steering-dispatch";
+import { RoomExternalMissionError } from "../services/local-supervisor/room-external-mission-store";
+import { RoomMissionResultError, type RoomMissionResultRepository } from "../services/local-supervisor/room-mission-result";
 import {
   readEnvironmentActionExecutionLeaseClaim,
   type EnvironmentActionExecutionLeaseClaim,
@@ -3421,6 +3423,7 @@ export const createHelixMcpServer = (input: {
   service?: HelixAgentApiService;
   localSupervisorCoordinationStore?: HelixLocalSupervisorCoordinationStore;
   reasoningTaskBindingStore?: HelixReasoningTaskBindingStore;
+  roomMissionResultRepository?: () => Promise<RoomMissionResultRepository>;
   environmentSessionReadyUp?: typeof readyUpEnvironmentSession;
   environmentSessionAutoPrepare?: typeof prepareBrowserEnvironmentSession;
   desktopMcpTunnelTransitionStore?: DesktopMcpTunnelTransitionStore;
@@ -3910,7 +3913,8 @@ export const createHelixMcpServer = (input: {
           structuredContent: value,
         };
       }
-      if (error instanceof HelixReasoningTaskBindingError) {
+      if (error instanceof HelixReasoningTaskBindingError || error instanceof RoomExternalMissionError ||
+          error instanceof RoomMissionResultError) {
         return toolError(new HelixAgentApiServiceError(
           error.status,
           error.code,
@@ -4595,7 +4599,7 @@ export const createHelixMcpServer = (input: {
       if ((Object.keys(current) as Array<keyof typeof current>).some(key => current[key] !== destination[key])) {
         throw new HelixLocalSupervisorCoordinationError("pairing_destination_mismatch", 403);
       }
-    }) : null;
+    }, undefined, undefined, undefined, input.roomMissionResultRepository) : null;
     durableReasoningAccess = reasoningAccess;
     const supervisorPresenceSchema = z.object({
       client_continuation_ref: localSupervisorContinuationSchema,
@@ -4897,6 +4901,9 @@ export const createHelixMcpServer = (input: {
             client_continuation_ref: localSupervisorContinuationSchema,
             reasoning_binding_id: localSupervisorContinuationSchema,
             binding_epoch: z.number().int().positive(),
+            helix_conversation_id: localSupervisorContinuationSchema,
+            mission_id: localSupervisorContinuationSchema.nullable(),
+            run_id: localSupervisorContinuationSchema.nullable(),
             after_cursor: z.number().int().nonnegative().default(0),
           }).strict(),
           annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -4913,11 +4920,16 @@ export const createHelixMcpServer = (input: {
           return {
             ok: true,
             reasoning_binding_id: args.reasoning_binding_id,
-            deliveries: await reasoningAccess!.read({
+            deliveries: await reasoningAccess!.readForTask({
               profileRef: input.principal.accountProfileId,
+              authenticatedMcpClientRef: identity.authenticatedClientRef,
               clientSessionRef: identity.clientSessionRef,
+              clientContinuationRef: args.client_continuation_ref,
               bindingId: args.reasoning_binding_id,
               bindingEpoch: args.binding_epoch,
+              helixConversationId: args.helix_conversation_id,
+              missionId: args.mission_id,
+              runId: args.run_id,
               afterCursor: args.after_cursor,
             }),
             ...localSupervisorFlags,
@@ -4934,6 +4946,9 @@ export const createHelixMcpServer = (input: {
             client_continuation_ref: localSupervisorContinuationSchema,
             reasoning_binding_id: localSupervisorContinuationSchema,
             binding_epoch: z.number().int().positive(),
+            helix_conversation_id: localSupervisorContinuationSchema,
+            mission_id: localSupervisorContinuationSchema.nullable(),
+            run_id: localSupervisorContinuationSchema.nullable(),
             steering_event_ref: localSupervisorContinuationSchema,
           }).strict(),
           annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -4949,15 +4964,66 @@ export const createHelixMcpServer = (input: {
           });
           return {
             ok: true,
-            event: await reasoningAccess!.acknowledge({
+            event: await reasoningAccess!.acknowledgeForTask({
               profileRef: input.principal.accountProfileId,
+              authenticatedMcpClientRef: identity.authenticatedClientRef,
               clientSessionRef: identity.clientSessionRef,
+              clientContinuationRef: args.client_continuation_ref,
               bindingId: args.reasoning_binding_id,
               bindingEpoch: args.binding_epoch,
+              helixConversationId: args.helix_conversation_id,
+              missionId: args.mission_id,
+              runId: args.run_id,
               eventRef: args.steering_event_ref,
             }),
             ...localSupervisorFlags,
           };
+        }),
+      );
+
+      server.registerTool(
+        "helix_reasoning_room_mission_result_submit",
+        {
+          title: "Return an observation for one acknowledged room mission instruction",
+          description: "Records a bounded task-authenticated result against one exact acknowledged room steering event and current mission. The result is encrypted private evidence, not a room-visible answer; terminal publication remains a separate governed decision.",
+          inputSchema: z.object({
+            client_continuation_ref: localSupervisorContinuationSchema,
+            reasoning_binding_id: localSupervisorContinuationSchema,
+            binding_epoch: z.number().int().positive(),
+            helix_conversation_id: localSupervisorContinuationSchema,
+            mission_id: localSupervisorContinuationSchema.nullable(),
+            run_id: localSupervisorContinuationSchema.nullable(),
+            steering_event_ref: localSupervisorContinuationSchema,
+            result_status: z.enum(["completed", "unable"]),
+            result_text: z.string().trim().min(1).max(12_000),
+            evidence_refs: z.array(localSupervisorContinuationSchema).max(16).default([]),
+          }).strict(),
+          annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+          _meta: oauthToolMeta(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES),
+        },
+        async (args) => callLocalSupervisorTool(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES, async () => {
+          requireAllAgentScopes(HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES);
+          const identity = localSupervisorIdentity(args.client_continuation_ref);
+          coordinationStore.authenticateClient({
+            profileRef: input.principal.accountProfileId,
+            accountSessionId: identity.accountSessionId,
+            clientSessionRef: identity.clientSessionRef,
+          });
+          const receipt = await reasoningAccess!.submitRoomMissionResult({
+            profileRef: input.principal.accountProfileId,
+            authenticatedMcpClientRef: identity.authenticatedClientRef,
+            clientSessionRef: identity.clientSessionRef,
+            clientContinuationRef: args.client_continuation_ref,
+            bindingId: args.reasoning_binding_id,
+            bindingEpoch: args.binding_epoch,
+            helixConversationId: args.helix_conversation_id,
+            missionId: args.mission_id,
+            runId: args.run_id,
+            request: { steeringEventRef: args.steering_event_ref,
+              status: args.result_status, resultText: args.result_text,
+              evidenceRefs: args.evidence_refs },
+          });
+          return { ok: true, receipt, ...localSupervisorFlags };
         }),
       );
     }
@@ -5964,6 +6030,7 @@ export const createHelixMcpServer = (input: {
           ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
           ["helix_reasoning_prompt_submit", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
           ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+          ["helix_reasoning_room_mission_result_submit", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ] as Array<[string, RequiredOAuthScopes]> : []),
         ...ROOM_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
         ...ENVIRONMENT_TRANSITION_SHADOW_TOOL_SCOPES.entries(),
@@ -10442,6 +10509,7 @@ export const createHelixMcpServer = (input: {
         ["helix_reasoning_steering_read", HELIX_LOCAL_SUPERVISOR_READ_MCP_SCOPES],
         ["helix_reasoning_prompt_submit", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
         ["helix_reasoning_steering_acknowledge", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
+        ["helix_reasoning_room_mission_result_submit", HELIX_LOCAL_SUPERVISOR_WRITE_MCP_SCOPES],
       ] as Array<[string, RequiredOAuthScopes]> : []),
       ...(input.desktopMcpTunnelTransitionStore ? [
         ["helix_desktop_tunnel_transition_request", [HELIX_DESKTOP_TUNNEL_TRANSITION_REQUEST_SCOPE]],

@@ -107,6 +107,8 @@ import { resolveHelixAgentProvider } from "../services/helix-ask/agent-providers
 import { selectHelixAgentRuntime } from "../services/helix-ask/agent-providers/runtime-select";
 import { buildHelixAgentRuntimeSelectionTrace } from "../services/helix-ask/agent-providers/runtime-debug";
 import { buildHelixAgentProviderAskPayload } from "../services/helix-ask/agent-providers/provider-response-projection";
+import { readRoomResultAskAdmission, authorizeRoomResultTerminal, roomResultAskFailure,
+  ROOM_RESULT_TURN_PREFIX, ROOM_RESULT_READ_CAPABILITY } from "../services/helix-ask/realtime-room/mission-result-ask";
 import {
   hasSelectedHelixAgentRuntime,
   hasWorkstationGatewayCallsForTurn,
@@ -949,6 +951,7 @@ import {
   assertHelixExternalExecutionActive,
   currentHelixExternalCapabilityPolicy,
   helixExternalPolicyAllowsCapability,
+  runWithHelixExternalCapabilityPolicy,
 } from "../services/helix-ask/runtime/external-capability-policy";
 import { assertNoLiveSourceSecondLoop } from "../services/helix-ask/live-source-second-loop-guard";
 import { presentTerminalArtifact } from "../services/helix-ask/universal-terminal-presenter";
@@ -170454,7 +170457,7 @@ const applyHelixProviderSolverCompletionBoundary = (args: {
       args.payload.route_metadata ??
       args.payload.routeMetadata,
   );
-  if (!realtimeRouteMetadata.success) return args.payload;
+  if (!realtimeRouteMetadata.success && !args.turnId.startsWith(ROOM_RESULT_TURN_PREFIX)) return args.payload;
 
   const prompt = readHelixAskRuntimePrompt(args.body);
   const threadId =
@@ -170545,6 +170548,11 @@ const enforceHelixSharedRoomAskSessionAccess = async (args: {
   body: Record<string, unknown>;
   turnId: string;
 }): Promise<HelixSharedRoomAskGuardFailure | null> => {
+  if ((Object.hasOwn(args.body, "room_mission_result") ||
+       readHelixAskRuntimeTurnId(args.body)?.startsWith(ROOM_RESULT_TURN_PREFIX)) &&
+      (!readRoomResultAskAdmission(args.req) || args.req.path !== "/ask/turn")) {
+    return { statusCode: 403, payload: roomResultAskFailure(args.turnId, null) };
+  }
   const askSessionId = readHelixAskRuntimeSessionId(args.body);
   if (!readHelixSharedRoomIdFromAskSession(askSessionId)) {
     return null;
@@ -170725,6 +170733,10 @@ planRouter.post("/ask/turn", async (req, res) => {
   maybeRecordAskTurnSteering(req);
   const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
   const admissionTurnId = readHelixAskRuntimeTurnId(body) ?? `ask:${crypto.randomUUID()}`;
+  const roomResultAdmission = readRoomResultAskAdmission(req);
+  if ((body.room_mission_result || admissionTurnId.startsWith(ROOM_RESULT_TURN_PREFIX)) && !roomResultAdmission) {
+    return res.status(403).json(roomResultAskFailure(admissionTurnId, null));
+  }
   if (readHelixAskRuntimeTurnId(body) === null) {
     body.turn_id = admissionTurnId;
   }
@@ -170876,7 +170888,7 @@ planRouter.post("/ask/turn", async (req, res) => {
         .status(transportExecutionClaim.status === "already_in_flight" ? 202 : 409)
         .json(payload);
     }
-    const runtimeGoalCommand = await routeHelixRuntimeGoalCommand({
+    const runtimeGoalCommand = roomResultAdmission ? { handled: false as const } : await routeHelixRuntimeGoalCommand({
       body,
       headers: req.headers,
       route: "/ask/turn",
@@ -170923,6 +170935,13 @@ planRouter.post("/ask/turn", async (req, res) => {
       body,
       headers: req.headers,
     });
+    if (roomResultAdmission && provider.id !== "codex") {
+      runtimeReleaseOutcome = "rejected";
+      const payload = roomResultAskFailure(admissionTurnId, null);
+      recordHelixAskRuntimeTerminalCheckpoint({ body, payload, route: "/ask/turn", statusCode: 409 });
+      recordHelixAskRuntimeCompletionCheckpoint({ body, payload, route: "/ask/turn", statusCode: 409 });
+      return res.status(409).json(payload);
+    }
     const runtimeAccountAccess = await resolveHelixAskRuntimeAccountAccess(
       req,
       provider.id,
@@ -170964,7 +170983,7 @@ planRouter.post("/ask/turn", async (req, res) => {
         body,
         headers: environmentInteractionHeadersForProvider(req),
       });
-      const providerBody = attachHelixProviderConversationMemoryContext({
+      const providerBody = roomResultAdmission ? { ...body } : attachHelixProviderConversationMemoryContext({
         body: attachHelixProviderPreflightRouteContext({
           body,
           turnId: admissionTurnId,
@@ -170972,7 +170991,7 @@ planRouter.post("/ask/turn", async (req, res) => {
         turnId: admissionTurnId,
       });
       const providerPreflightTerminal =
-        maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload({
+        roomResultAdmission ? null : maybeBuildHelixProviderProcedureMemoryPreflightTerminalPayload({
           body: providerBody,
           turnId: admissionTurnId,
         });
@@ -171015,15 +171034,69 @@ planRouter.post("/ask/turn", async (req, res) => {
         provider,
         gatewayManifest,
       });
-      const providerResult = await provider.runTurn({
+      const roomResultObservation = roomResultAdmission ? await callWorkstationGatewayCapability({
+        capabilityId: ROOM_RESULT_READ_CAPABILITY, agentRuntime: "codex", mode: "read", arguments: {},
+        turnId: admissionTurnId, conversationThreadId: readHelixAskRuntimeSessionId(body),
+        accountContext: roomResultAdmission.accountContext,
+      }) : null;
+      if (roomResultObservation && !roomResultObservation.ok) {
+        runtimeReleaseOutcome = "rejected";
+        const payload = roomResultAskFailure(admissionTurnId, null);
+        recordHelixAskRuntimeTerminalCheckpoint({ body, payload, route: "/ask/turn", statusCode: 409 });
+        recordHelixAskRuntimeCompletionCheckpoint({ body, payload, route: "/ask/turn", statusCode: 409 });
+        return res.status(409).json(payload);
+      }
+      if (roomResultObservation) {
+        providerBody.source_target_intent = {
+          schema: "helix.ask_source_target_intent.v1", turn_id: admissionTurnId,
+          thread_id: readHelixAskRuntimeSessionId(body), target_source: "room_mission_result",
+          target_kind: "room_mission_result", strength: "hard",
+          explicit_cues: ["owner_selected_room_result"], reasons: ["explicit_source_selection"],
+          requested_outputs: [], suppressed_routes: ["no_tool_direct", "workspace_action"],
+          precedence_reason: "owner_selected_room_result", must_enter_backend_ask: true,
+          allow_client_shortcut: false, allow_no_tool_direct: false, confidence: 1,
+          assistant_answer: false, raw_content_included: false,
+        };
+        providerBody.canonical_goal_frame = {
+          schema: "helix.canonical_goal_frame.v1", turn_id: admissionTurnId,
+          goal_kind: "room_mission_result_explanation", answer_scope: "room_mission_result",
+          requested_capability: ROOM_RESULT_READ_CAPABILITY,
+          required_terminal_kind: "agent_provider_terminal_candidate",
+          allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "typed_failure", "request_user_input"],
+          forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "direct_answer_text", "no_tool_direct"],
+          required_evidence: roomResultObservation.artifact_refs,
+          allows_workspace_context: false, allows_prior_artifacts: false,
+          assistant_answer: false, raw_content_included: false,
+        };
+        providerBody.route_product_contract = {
+          schema: "helix.route_product_contract.v1", turn_id: admissionTurnId,
+          thread_id: readHelixAskRuntimeSessionId(body), source_target: "room_mission_result",
+          goal_kind: "room_mission_result_explanation",
+          required_terminal_kind: "agent_provider_terminal_candidate",
+          evidence_reentry_required: true, followup_reasoning_required: true,
+          allowed_terminal_artifact_kinds: ["agent_provider_terminal_candidate", "model_synthesized_answer", "typed_failure", "request_user_input"],
+          forbidden_terminal_artifact_kinds: ["workspace_action_receipt", "live_pipeline_receipt", "direct_answer_text", "no_tool_direct"],
+          required_artifact_refs: roomResultObservation.artifact_refs,
+          precedence_reason: "explicit_owner_selected_room_result_requires_exact_evidence_reentry",
+          assistant_answer: false, raw_content_included: false,
+        };
+      }
+      const runProvider = () => provider.runTurn({
         runtime: provider.id,
         route: "/ask/turn",
         body: providerBody,
         headers: environmentInteractionHeadersForProvider(req),
         signal: askTurnAbortBoundary.signal,
         workstationAccountContext:
-          getAdmittedEnvironmentInteraction(req)?.accountContext,
+          roomResultAdmission?.accountContext ?? getAdmittedEnvironmentInteraction(req)?.accountContext,
+        ...(roomResultObservation ? { reenteredWorkstationGatewayCallResults: [roomResultObservation] } : {}),
       });
+      const providerResult = roomResultAdmission ? await runWithHelixExternalCapabilityPolicy({
+        runId: admissionTurnId, tenantId: roomResultAdmission.roomId,
+        accountProfileId: roomResultAdmission.profileId, accountType: "developer",
+        accountPolicy: roomResultAdmission.accountContext.account_policy,
+        allowedCapabilities: [], readOnly: true, signal: askTurnAbortBoundary.signal,
+      }, runProvider) : await runProvider();
       if (askTurnAbortBoundary.signal.aborted) {
         runtimeReleaseOutcome = "aborted";
         return;
@@ -171053,6 +171126,28 @@ planRouter.post("/ask/turn", async (req, res) => {
         turnId: admissionTurnId,
         route: "/ask/turn",
       });
+      if (roomResultAdmission && roomResultObservation) {
+        try {
+          await authorizeRoomResultTerminal(roomResultAdmission, payload, roomResultObservation.artifact_refs[0]);
+        } catch (error) {
+          const sourceFailureCode = payload.terminal_error_code ?? null;
+          const sourceSolver = (payload.ask_turn_solver_trace ?? {}) as Record<string, unknown>;
+          const sourceReentry = (payload.provider_reasoning_reentry ?? {}) as Record<string, unknown>;
+          payload = { ...roomResultAskFailure(admissionTurnId, error),
+            room_result_source_failure_code: sourceFailureCode,
+            room_result_gate_diagnostic: {
+              completed_solver_path: sourceSolver.completed_solver_path ?? false,
+              route_authority_ok: sourceSolver.route_authority_ok ?? false,
+              poison_audit_ok: sourceSolver.poison_audit_ok ?? false,
+              terminal_authority_ok: sourceSolver.terminal_authority_ok ?? false,
+              evidence_reentered: sourceReentry.evidence_reentered ?? false,
+              observation_refs: sourceReentry.input_observation_refs ?? [],
+              terminal_artifact_kind: payload.terminal_artifact_kind,
+              route_product_schema: (payload.route_product_contract as Record<string, unknown> | undefined)?.schema,
+              route_product_allowed: (payload.route_product_contract as Record<string, unknown> | undefined)?.allowed_terminal_artifact_kinds,
+              raw_content_included: false } };
+        }
+      }
       attachHelixAskRuntimeMemoryGovernorAdmission({
         payload,
         admission: runtimeAdmission,

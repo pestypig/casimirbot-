@@ -148,6 +148,16 @@ authenticatedActor?: {
       preparationRepairs, uncertain, { room_id: roomId });
   }
   const identity = goal.identity;
+  // A room-scoped lookup is not proof that the returned goal still belongs to
+  // this exact owner, participant and task. Check before the first probe.
+  if (identity.owner_profile_id !== input.profileRef ||
+      identity.room_id !== roomId ||
+      identity.goal_owner_participant_id !== member.participantId ||
+      identity.participant_id !== member.participantId ||
+      identity.run_id !== input.runId ||
+      !Number.isSafeInteger(goal.revision) || goal.revision < 1) {
+    return fail("environment_session_goal_identity_mismatch");
+  }
   if (bootstrap && (identity.environment_binding_id !== bootstrap.environment_binding_id ||
       identity.subject_binding_id !== bootstrap.subject_binding_id ||
       identity.action_authority_id !== bootstrap.action_authority_id ||

@@ -77,6 +77,7 @@ const roomProjection = {
 };
 
 type ControlDouble = {
+  joinRoom: ReturnType<typeof vi.fn>;
   listRooms: ReturnType<typeof vi.fn>;
   inspectRoom: ReturnType<typeof vi.fn>;
   createRoom: ReturnType<typeof vi.fn>;
@@ -132,6 +133,8 @@ const controlDouble = (): ControlDouble => {
     command_execution_enabled: false,
   };
   return {
+    joinRoom: vi.fn().mockResolvedValue({ status: 201, idempotencyReplayed: false,
+      body: { ...createReceipt, schema: "helix.shared_live_room.join_receipt.v1", operation: "room.join" } }),
     listRooms: vi.fn().mockResolvedValue(listReceipt),
     inspectRoom: vi.fn().mockResolvedValue({
       ...listReceipt,
@@ -270,6 +273,45 @@ const restApp = (input?: {
 };
 
 describe("Shared Live Room REST facade", () => {
+  const invite = `helix_live_${"x".repeat(32)}`;
+  it("accepts a purpose-bound invitation and derives joining identity from OAuth", async () => {
+    const control = controlDouble();
+    const response = await request(restApp({ control })).post("/api/v1/rooms/join")
+      .set("Idempotency-Key", "join-rest-001").send({ room_id: ROOM_ID, invite_code: invite }).expect(201);
+    expect(control.joinRoom).toHaveBeenCalledWith({ actor: expect.objectContaining({ profileId: "profile-room-transport", authKind: "external_oauth" }),
+      idempotencyKey: "join-rest-001", request: { room_id: ROOM_ID, invite_code: invite } });
+    expect(response.headers["cache-control"]).toContain("no-store");
+    expect(response.headers["set-cookie"]).toBeUndefined();
+    expect(JSON.stringify(response.body)).not.toContain(invite);
+  });
+
+  it.each(["profile_id", "consent", "provider_api_key"])("rejects extra %s at the invitation boundary", async (field) => {
+    const control = controlDouble();
+    const response = await request(restApp({ control })).post("/api/v1/rooms/join")
+      .set("Idempotency-Key", "join-rest-001").send({ room_id: ROOM_ID, invite_code: invite, [field]: "forged" }).expect(400);
+    expect(control.joinRoom).not.toHaveBeenCalled();
+    expect(JSON.stringify(response.body)).not.toContain(invite);
+  });
+
+  it("requires both read and manage scopes before invitation redemption", async () => {
+    for (const scopes of [[HELIX_SHARED_LIVE_ROOM_READ_SCOPE], [HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE]]) {
+      const control = controlDouble();
+      await request(restApp({ control, authPrincipal: principal(scopes) })).post("/api/v1/rooms/join")
+        .set("Idempotency-Key", "join-rest-001").send({ room_id: ROOM_ID, invite_code: invite }).expect(403);
+      expect(control.joinRoom).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not permit invitations in query parameters or other operations", async () => {
+    const control = controlDouble();
+    await request(restApp({ control })).post("/api/v1/rooms/join").query({ invite_code: invite })
+      .set("Idempotency-Key", "join-rest-001").send({ room_id: ROOM_ID, invite_code: invite }).expect(400);
+    await request(restApp({ control })).post("/api/v1/rooms")
+      .set("Idempotency-Key", "join-rest-001").send({ title: "Room", invite_code: invite }).expect(400);
+    expect(control.joinRoom).not.toHaveBeenCalled();
+    expect(control.createRoom).not.toHaveBeenCalled();
+  });
+
   it("derives identity from OAuth principal and preserves durable create idempotency", async () => {
     const control = controlDouble();
     const response = await request(restApp({ control }))

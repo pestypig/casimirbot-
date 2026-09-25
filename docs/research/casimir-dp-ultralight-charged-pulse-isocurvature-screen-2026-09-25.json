@@ -1,0 +1,205 @@
+{
+  "classification": "linear two-component separate-universe perturbation response of one prescribed homogeneous charge-generation pulse; conditional isocurvature screen only",
+  "pulse_model": {
+    "source_artifact": "casimir-dp-ultralight-charge-pulse-evolution-2026-09-25.py",
+    "sigma_in_m_phi_t_units": 0.2,
+    "target_late_charge_asymmetry": 0.5,
+    "fitted_g0": 0.6148992773348799,
+    "positive_definite_mass_matrix_minimum_eigenvalue_over_m2": 0.3851007226651201,
+    "reproduced_late_charge_asymmetry": -0.49999999999997297,
+    "target_charge_asymmetry_relative_error": 5.4067861299245124e-14
+  },
+  "inputs": {
+    "beta_iso_95pct_upper_limit": 0.038,
+    "A_s_at_k_0p05_Mpc_inverse": 2.1e-09,
+    "phi_fraction_grid": [
+      0.01,
+      0.1,
+      0.5,
+      1.0
+    ],
+    "inflation_Hubble_scale_grid_GeV": [
+      1000000000.0,
+      10000000000.0,
+      100000000000.0,
+      1000000000000.0,
+      10000000000000.0
+    ],
+    "initial_field_inflation_fluctuations": "independent canonical real components; delta_x=delta_y=H_inf/(2pi)",
+    "perturbation_limit": "superhorizon separate-universe (k/a neglected) in the same fixed radiation background as the homogeneous pulse"
+  },
+  "quadratic_energy_response": {
+    "matrix_for_initial_vector_(x0,y0)": [
+      [
+        0.3953461514017363,
+        0.04992657233678005
+      ],
+      [
+        0.04992657233678005,
+        0.3953461514017363
+      ]
+    ],
+    "eigenvalues": [
+      0.3454195790649563,
+      0.44527272373851634
+    ],
+    "positive_definite": true,
+    "mixed_initial_state_quadratic_form_relative_error": 9.299775624587761e-11,
+    "unbroken_energy_action_for_unit_x": 0.3700875033490246,
+    "pulse_to_unbroken_energy_action_ratio_for_background_(1,0)": 1.0682504754257822,
+    "initial_y_response_ratio_kxy_over_kxx": 0.12628571736378558,
+    "isocurvature_gradient_norm_squared_times_X_squared_over_four": 1.015948082410086
+  },
+  "equations": {
+    "late_comoving_energy_action": "E_c=(x0,y0) K (x0,y0)^T",
+    "component_density_isocurvature_power": "P_S=(f_phi*H_inf/(2pi))^2*|grad_(x0,y0) ln(E_c)|^2",
+    "for_background_(X,0)": "|grad ln(E_c)|^2=4/X^2*[1+(K_xy/K_xx)^2]",
+    "beta_iso": "P_S/(A_s+P_S)"
+  },
+  "fractions": [
+    {
+      "global_phi_fraction": 0.01,
+      "required_initial_radial_field_value_GeV_for_fixed_final_abundance": 734103571965983.1,
+      "conditional_H_inf_upper_bound_GeV": 2083940726294.8435,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.095734947144748e-09,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.095726756645096e-07,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.094907781164158e-05,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.009013748363140036,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.47632285511115324,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.1,
+      "required_initial_radial_field_value_GeV_for_fixed_final_abundance": 2321439325877839.0,
+      "conditional_H_inf_upper_bound_GeV": 658999920387.725,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.095734202553263e-08,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.095652298233916e-06,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.0009087469308584839,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.08337388283223143,
+          "passes_adopted_Planck_bound": false
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.9009482720138141,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 0.5,
+      "required_initial_radial_field_value_GeV_for_fixed_final_abundance": 5190896138304134.0,
+      "conditional_H_inf_upper_bound_GeV": 294713723830.7806,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 4.54786544662962e-07,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 4.547660693355209e-05,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.004527278054145031,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.312614031593879,
+          "passes_adopted_Planck_bound": false
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.9784847567882275,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    },
+    {
+      "global_phi_fraction": 1.0,
+      "required_initial_radial_field_value_GeV_for_fixed_final_abundance": 7341035719659832.0,
+      "conditional_H_inf_upper_bound_GeV": 208394072629.48434,
+      "benchmark_inflation_scales": [
+        {
+          "H_inf_GeV": 1000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.095726756645094e-07,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 10000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 9.094907781164156e-05,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 100000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.00901374836314003,
+          "passes_adopted_Planck_bound": true
+        },
+        {
+          "H_inf_GeV": 1000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.47632285511115324,
+          "passes_adopted_Planck_bound": false
+        },
+        {
+          "H_inf_GeV": 10000000000000.0,
+          "predicted_beta_iso_if_uncorrelated": 0.9891253934921899,
+          "passes_adopted_Planck_bound": false
+        }
+      ]
+    }
+  ],
+  "validity_limits": [
+    "The charge-generation pulse is an externally prescribed time-dependent quadratic mixing, not a UV theory; its source energy and perturbations are absent.",
+    "This propagates k=0 background perturbations only. It does not calculate finite-wavelength transfer, metric perturbations, or correlated curvature-isocurvature modes.",
+    "The inflationary fluctuations assume both canonical components are light, independent, and unsuppressed during inflation.",
+    "The density response is evaluated about the chosen radial background; perturbations of conserved charge and their later effect on star formation are not evolved.",
+    "The Planck limit is applied as the uncorrelated scale-invariant CDI limit, which may not match the actual pulse-generated spectrum.",
+    "No fragmentation, boson-star population, gamma-ray, xenon, or Casimir-DP signal is predicted by this calculation."
+  ],
+  "next_tests": [
+    "Derive the temporary U(1)-breaking source and its perturbations from a dynamical sector, then include the coupled metric and field perturbations.",
+    "Evolve the joint density and charge perturbations into the nonlinear fragmentation regime and calculate the resulting star mass-charge distribution."
+  ],
+  "source_references": {
+    "Planck_CDI_bound": "https://arxiv.org/abs/1807.06211",
+    "Planck_scalar_amplitude": "https://arxiv.org/abs/1807.06209"
+  }
+}

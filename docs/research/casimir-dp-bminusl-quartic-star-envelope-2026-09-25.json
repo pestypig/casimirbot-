@@ -1,0 +1,68 @@
+{
+  "purpose": "Optimistic scale envelope only; not a solution of the gauged, split B-L field equations.",
+  "inputs": {
+    "mS_TeV": [
+      1.0,
+      2.0,
+      3.0,
+      5.0
+    ],
+    "SgrA_reference_mass_solar_masses": 4020000.0,
+    "non_reduced_Planck_mass_GeV": 1.22089e+19,
+    "GeV_to_kg": 1.78266192e-27,
+    "solar_mass_kg": 1.98847e+30,
+    "strong_quartic_scaling_coefficient": 0.062,
+    "chosen_perturbative_comparison_lambda_eff": 12.566370614359172,
+    "quartic_convention": "V_quartic=lambda_eff*|phi1|^4/4; the 2026 paper writes lambda1*|phi1|^4/2, hence lambda_eff=2*lambda1."
+  },
+  "definitions": {
+    "free_complex_scalar_Kaup_scale": "Mmax=0.633*Mpl^2/m",
+    "repulsive_quartic_strong_coupling_scale": "Mmax approximately 0.062*sqrt(lambda_eff)*Mpl^3/m^2",
+    "required_coupling": "lambda_eff=(Mtarget*m^2/(0.062*Mpl^3))^2"
+  },
+  "rows": [
+    {
+      "mS_TeV": 1.0,
+      "free_kaup_max_kg": 168199914.4639187,
+      "free_kaup_max_solar_masses": 8.458760477347845e-23,
+      "quartic_upper_envelope_lambda_eff_4pi_kg": 7.130093396098181e+23,
+      "quartic_upper_envelope_lambda_eff_4pi_solar_masses": 3.5857183644199715e-07,
+      "quartic_fraction_of_SgrA_reference": 8.919697423930279e-14,
+      "lambda_eff_required_for_SgrA_reference": 1.5794635911096705e+27
+    },
+    {
+      "mS_TeV": 2.0,
+      "free_kaup_max_kg": 84099957.23195934,
+      "free_kaup_max_solar_masses": 4.2293802386739225e-23,
+      "quartic_upper_envelope_lambda_eff_4pi_kg": 1.7825233490245452e+23,
+      "quartic_upper_envelope_lambda_eff_4pi_solar_masses": 8.964295911049929e-08,
+      "quartic_fraction_of_SgrA_reference": 2.2299243559825697e-14,
+      "lambda_eff_required_for_SgrA_reference": 2.5271417457754727e+28
+    },
+    {
+      "mS_TeV": 3.0,
+      "free_kaup_max_kg": 56066638.154639564,
+      "free_kaup_max_solar_masses": 2.819586825782615e-23,
+      "quartic_upper_envelope_lambda_eff_4pi_kg": 7.922325995664646e+22,
+      "quartic_upper_envelope_lambda_eff_4pi_solar_masses": 3.984131516022191e-08,
+      "quartic_fraction_of_SgrA_reference": 9.910774915478088e-15,
+      "lambda_eff_required_for_SgrA_reference": 1.2793655087988329e+29
+    },
+    {
+      "mS_TeV": 5.0,
+      "free_kaup_max_kg": 33639982.89278373,
+      "free_kaup_max_solar_masses": 1.6917520954695687e-23,
+      "quartic_upper_envelope_lambda_eff_4pi_kg": 2.8520373584392727e+22,
+      "quartic_upper_envelope_lambda_eff_4pi_solar_masses": 1.4342873457679889e-08,
+      "quartic_fraction_of_SgrA_reference": 3.567878969572112e-15,
+      "lambda_eff_required_for_SgrA_reference": 9.871647444435441e+29
+    }
+  ],
+  "limitations": [
+    "The quartic formula assumes a complex scalar with a conserved global charge and minimally coupled Einstein gravity.",
+    "The B-L candidate is gauge charged before symmetry breaking; the gauge field and symmetry-breaking sector alter the star equations.",
+    "The S/P mass splitting and model interactions can invalidate a stationary single-complex-field ansatz.",
+    "lambda_eff=4*pi is a chosen perturbativity comparison, not a universal sharp unitarity bound.",
+    "Couplings inferred far above this range are outside the controlled perturbative theory; they are not predictions."
+  ]
+}

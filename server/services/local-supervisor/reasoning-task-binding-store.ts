@@ -11,6 +11,8 @@ import {
 } from "@shared/helix-reasoning-task-binding";
 import type { HelixLocalSupervisorPresence } from
   "@shared/helix-local-supervisor-coordination";
+import { roomMissionSteeringEnvelopeSchema,
+  type RoomMissionSteeringEnvelope } from "./room-mission-steering";
 
 const digest = (value: string): string =>
   crypto.createHash("sha256").update(value, "utf8").digest("hex");
@@ -29,6 +31,13 @@ type PrivateBinding = HelixReasoningTaskBindingProjection & {
 };
 type PrivateEvent = HelixReasoningSteeringEventProjection & {
   instructionText: string;
+  roomMission?: RoomMissionSteeringEnvelope;
+};
+
+export type HelixReasoningTaskAssociation = {
+  profileRef: string; authenticatedMcpClientRef: string; clientSessionRef: string;
+  clientContinuationRef: string; bindingId: string; bindingEpoch: number;
+  helixConversationId: string; missionId: string | null; runId: string | null;
 };
 
 export class HelixReasoningTaskBindingError extends Error {
@@ -325,6 +334,7 @@ export class HelixReasoningTaskBindingStore {
     origin: "typed" | "gpt_live_finalized" | "agent_submitted";
     instructionText: string;
     expiresInSeconds?: number;
+    roomMission?: RoomMissionSteeringEnvelope;
   }): HelixReasoningSteeringEventProjection {
     const binding = this.requireActiveOwnedBinding(input);
     const instruction = input.instructionText.trim();
@@ -337,7 +347,8 @@ export class HelixReasoningTaskBindingStore {
     if (replayRef) {
       const prior = this.events.find((event) => event.steering_event_ref === replayRef);
       if (!prior || prior.instruction_sha256 !== digest(instruction) || prior.origin !== input.origin ||
-          Date.parse(prior.expires_at) - Date.parse(prior.created_at) !== lifetimeMs) {
+          Date.parse(prior.expires_at) - Date.parse(prior.created_at) !== lifetimeMs ||
+          JSON.stringify(prior.roomMission ?? null) !== JSON.stringify(input.roomMission ?? null)) {
         throw new HelixReasoningTaskBindingError("reasoning_steering_request_conflict", 409);
       }
       return this.inspectEvent({ ...input, eventRef: prior.steering_event_ref });
@@ -366,6 +377,7 @@ export class HelixReasoningTaskBindingStore {
       answer_authority: false,
       terminal_eligible: false,
       instructionText: instruction,
+      ...(input.roomMission ? { roomMission: roomMissionSteeringEnvelopeSchema.parse(input.roomMission) } : {}),
     };
     this.projectEvent(event);
     this.events.push(event);
@@ -382,6 +394,22 @@ export class HelixReasoningTaskBindingStore {
   }): HelixReasoningSteeringDelivery[] {
     const binding = this.requireActiveOwnedBinding(input);
     return this.projectDeliveries(binding, input.afterCursor ?? 0);
+  }
+
+  /** Provider pickup must prove the calling task, not merely its client session. */
+  readForTask(input: HelixReasoningTaskAssociation & { afterCursor?: number }): HelixReasoningSteeringDelivery[] {
+    this.verifyTaskAssociation(input);
+    return this.read(input);
+  }
+
+  /** Internal-only envelope lookup. Public event projections omit room control state. */
+  readRoomMissionEnvelope(input: { profileRef: string; bindingId: string;
+    bindingEpoch: number; eventRef: string }): RoomMissionSteeringEnvelope | null {
+    this.requireActiveOwnedBinding(input);
+    const event = this.events.find(row => row.steering_event_ref === input.eventRef &&
+      row.reasoning_binding_id === input.bindingId && row.binding_epoch === input.bindingEpoch);
+    if (!event) throw new HelixReasoningTaskBindingError("reasoning_steering_not_found", 404);
+    return event.roomMission ? clone(event.roomMission) : null;
   }
 
   /** Owner display only. Does not authenticate as the provider or acknowledge pickup. */
@@ -445,6 +473,11 @@ export class HelixReasoningTaskBindingStore {
     return this.projectEvent(this.events[index]);
   }
 
+  acknowledgeForTask(input: HelixReasoningTaskAssociation & { eventRef: string }): HelixReasoningSteeringEventProjection {
+    this.verifyTaskAssociation(input);
+    return this.acknowledge(input);
+  }
+
   inspectEvent(input: {
     profileRef: string;
     bindingId: string;
@@ -485,11 +518,7 @@ export class HelixReasoningTaskBindingStore {
   }
 
   /** Exact association preflight only. Does not admit an environment effect. */
-  verifyTaskAssociation(input: {
-    profileRef: string; authenticatedMcpClientRef: string; clientSessionRef: string;
-    clientContinuationRef: string; bindingId: string; bindingEpoch: number;
-    helixConversationId: string; missionId: string | null; runId: string | null;
-  }): HelixReasoningTaskBindingProjection {
+  verifyTaskAssociation(input: HelixReasoningTaskAssociation): HelixReasoningTaskBindingProjection {
     const binding = this.requireActiveOwnedBinding(input);
     if (binding.service_instance_ref !== this.presence.serviceInstanceRef ||
         binding.authenticated_mcp_client_ref !== input.authenticatedMcpClientRef ||
@@ -528,7 +557,7 @@ export class HelixReasoningTaskBindingStore {
    */
   resolveOwnedPreparationTarget(input: {
     profileRef: string; bindingId: string; bindingEpoch: number;
-    helixConversationId: string; missionId: string | null; runId: string;
+    helixConversationId: string; missionId: string | null; runId: string | null;
   }) {
     const binding = this.requireActiveOwnedBinding(input);
     if (binding.helix_conversation_id !== input.helixConversationId ||
@@ -590,7 +619,7 @@ export class HelixReasoningTaskBindingStore {
   }
 
   private projectEvent(event: PrivateEvent): HelixReasoningSteeringEventProjection {
-    const { instructionText: _private, ...projection } = event;
+    const { instructionText: _private, roomMission: _roomMission, ...projection } = event;
     return clone(helixReasoningSteeringEventProjectionSchema.parse(projection));
   }
 }

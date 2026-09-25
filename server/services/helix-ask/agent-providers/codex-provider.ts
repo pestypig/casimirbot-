@@ -103,6 +103,8 @@ import {
   type HelixToolLifecycleTrace,
 } from "@shared/helix-tool-lifecycle";
 import { callWorkstationGatewayCapability } from "../workstation-tool-gateway/registry";
+import { ROOM_RESULT_READ_CAPABILITY, ROOM_RESULT_OBSERVATION_SCHEMA } from "../realtime-room/mission-result-ask";
+import { hashHelixTerminalText } from "../turn-terminal-authority";
 import {
   HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY,
   HELIX_BOUND_ROOM_EVIDENCE_OBSERVATION_SCHEMA,
@@ -14979,6 +14981,9 @@ export const typedObservationKindForGatewayCapability = (
   if (capabilityId === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
     return "bound_room_evidence_observation";
   }
+  if (capabilityId === ROOM_RESULT_READ_CAPABILITY) {
+    return "room_mission_result_observation";
+  }
   if (capabilityId === "workspace_os.status")
     return "workspace_os_status_observation";
   if (capabilityId === "helix_ask.inspect_capability_catalog")
@@ -15079,6 +15084,9 @@ const schemaForTypedObservationKind = (kind: string): string => {
   }
   if (kind === "bound_room_evidence_observation") {
     return HELIX_BOUND_ROOM_EVIDENCE_OBSERVATION_SCHEMA;
+  }
+  if (kind === "room_mission_result_observation") {
+    return ROOM_RESULT_OBSERVATION_SCHEMA;
   }
   if (kind === "live_environment_observation") {
     return "helix.live_environment_observation.v1";
@@ -15856,6 +15864,22 @@ const normalizeGatewayObservationForHelix = (input: {
   if (!kind) return null;
   const observation = readGatewayObservationRecord(input.result);
   if (!observation) return null;
+  if (input.result.capability_id === ROOM_RESULT_READ_CAPABILITY) {
+    const packet = input.result.observation_packet;
+    const report = readString(observation.result_text);
+    if (input.result.ok !== true ||
+        input.result.gateway_admission.admission_status !== "admitted" ||
+        input.result.gateway_admission.requested_capability !== ROOM_RESULT_READ_CAPABILITY ||
+        packet.turn_id !== input.turnId || packet.capability_key !== ROOM_RESULT_READ_CAPABILITY ||
+        packet.terminal_eligible !== false || packet.post_tool_model_step_required !== true ||
+        observation.schema !== ROOM_RESULT_OBSERVATION_SCHEMA ||
+        observation.current_turn_id !== input.turnId ||
+        !report || report.length > 12_000 || observation.result_sha256 !== hashHelixTerminalText(report) ||
+        !["completed", "unable"].includes(readString(observation.task_status) ?? "") ||
+        observation.content_role !== "untrusted_external_task_observation" ||
+        observation.answer_authority !== false || observation.assistant_answer !== false ||
+        observation.terminal_eligible !== false) return null;
+  }
   const normalizedObservation =
     kind === "live_environment_tool_observation"
       ? compactLiveSourceMailboxObservationForHelix(observation)
@@ -17156,7 +17180,8 @@ export const buildCodexNormalizedObservationArtifacts = (input: {
       );
       return;
     }
-    if (result.capability_id === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY) {
+    if (result.capability_id === HELIX_BOUND_ROOM_EVIDENCE_CAPABILITY ||
+        result.capability_id === ROOM_RESULT_READ_CAPABILITY) {
       missingNormalizationFailures.push(
         `provider_observation_normalization_missing:${result.capability_id}`,
       );
@@ -24636,11 +24661,21 @@ export const codexProvider: HelixAgentProvider = {
             readHelixSessionCookie(requestCookieHeader),
           ));
     const workstationAccountContext: HelixWorkstationGatewayAccountContext =
-      bindTrustedRealtimeTurnActorContext({
+      await bindTrustedRealtimeTurnActorContext({
         accountContext: baseWorkstationAccountContext,
         realtimeConversationContext,
         gatewayConversationThreadId,
       });
+    if (realtimeConversationContext?.audit.status === "materialized" &&
+        gatewayConversationThreadId.startsWith("helix-ask:room:") &&
+        workstationAccountContext.trusted_turn_actor_context?.resolution !== "resolved") {
+      // Rejected source authority must not reach a model, even for read-only
+      // conversation. The ordinary request failure path owns presentation.
+      const code = "realtime_room_handoff_authority_unavailable";
+      request.signal?.removeEventListener("abort", onTurnAbort);
+      completeCodexProviderStageLedger({ turnId, status: "failed", failReason: code });
+      throw Object.assign(new Error(code), { code, status: 409 });
+    }
     delete request.body.trusted_room_environment_intent_context;
     delete request.body.trusted_room_environment_intent_context_audit;
     const trustedRoomEnvironmentIntentContextResolution =

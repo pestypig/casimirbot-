@@ -1,0 +1,28 @@
+{
+  "schema": "casimirbot.ar2d.runtime_readiness.v1",
+  "observed_at": "2026-09-25T03:56:10.6464121Z",
+  "local_head": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "local_worktree": "contains uncommitted AR work and unrelated prior changes",
+  "browser_check": "cua initialization failed: failed to write kernel assets, path not found",
+  "local_exe_running": false,
+  "local_port_5050": "connection failed",
+  "package_manifest": {
+    "path": "apps/desktop/release/win-unpacked/resources/runtime/runtime-manifest.json",
+    "generated_at": "2026-09-21T17:09:08.913Z",
+    "source_commit": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93"
+  },
+  "domain": {
+    "url": "https://casimirbot.com",
+    "homepage_http_status": 200,
+    "fingerprint_schema": "helix.runtime_parity_fingerprint.v1",
+    "source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+    "built_at": "2026-09-01T19:18:38.201Z",
+    "build_id": "42c5b19b4be2",
+    "source_tree_sha256": "sha256:f979d12d016d10fc504bece0c0f1f4929a76c14d60351e12130d2f70611c00db",
+    "experience_contract_sha256": "sha256:c45aa0665f1cbcb8c12636cb2edb115f3ff419a9c7f609cf4f003cf4e3f826d1"
+  },
+  "installed_acceptance": false,
+  "domain_parity_acceptance": false,
+  "deployment_performed": false,
+  "paid_provider_calls": 0
+}

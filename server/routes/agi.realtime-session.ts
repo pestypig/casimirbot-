@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import type { Request, Response } from "express";
 import { getAccountCapabilityPolicy } from "../services/helix-account/account-session-store";
 import { resolveHelixRuntimeAgentAccess } from "@shared/helix-account-session";
@@ -63,7 +64,7 @@ import {
 } from "../services/helix-ask/realtime-session/source-binding";
 import { resolveWorkstationGatewayAccountContext } from "../services/helix-ask/workstation-tool-gateway/account-policy";
 import { buildRuntimeGoalAccountScope } from "../services/helix-ask/runtime-goals/runtime-goal-account-binding";
-import { resolveRealtimeRoomTurnActorContext } from "../services/helix-ask/realtime-room/turn-actor-context";
+import { resolveRealtimeRoomTurnActorContext, roomIdFromHelixAskThread } from "../services/helix-ask/realtime-room/turn-actor-context";
 
 export const realtimeSessionRouter = Router();
 
@@ -367,18 +368,46 @@ const respondRealtimeBoundary = async (input: {
   }
 
   if (input.action === "record_event" && isHelixRealtimeTranscriptEventType(body.event_type)) {
-    const response = buildRealtimeTranscriptEventResponse({
-      accountPolicy,
-      body,
-      realtimeSessionId: input.realtimeSessionId ?? null,
-      adapterResult,
-    });
     const session = input.realtimeSessionId
       ? readAdmittedRealtimeSession({
           realtimeSessionId: input.realtimeSessionId,
           requesterRef: requesterRefForRequest(input.req),
         })
       : null;
+    // Room speech may later become a task instruction. Its identity must be
+    // derived from the exact text admitted here, never caller-authored metadata.
+    if (body.event_type === "transcript.final" && session &&
+        roomIdFromHelixAskThread(session.threadId)) {
+      const text = readString(body.transcript_text ?? body.transcriptText ?? body.text);
+      const claimedHash = body.transcript_text_hash ?? body.transcriptTextHash;
+      const claimedLength = body.transcript_text_char_count ?? body.transcriptTextCharCount;
+      const actualHash = text
+        ? `sha256:${crypto.createHash("sha256").update(text).digest("hex")}`
+        : null;
+      if (!text || text.length > 16_000 ||
+          (claimedHash !== undefined && claimedHash !== actualHash) ||
+          (claimedLength !== undefined && claimedLength !== text.length)) {
+        return input.res.status(409).json({
+          schema: "helix.realtime_session.room_handoff_rejection.v1",
+          ok: false,
+          error: "realtime_room_transcript_identity_mismatch",
+          blocked_reason: "realtime_room_transcript_identity_mismatch",
+          realtime_session_id: session.realtimeSessionId,
+          answer_authority: false,
+          assistant_answer: false,
+          terminal_eligible: false,
+          raw_content_included: false,
+        });
+      }
+      body.transcript_text_hash = actualHash;
+      body.transcript_text_char_count = text.length;
+    }
+    const response = buildRealtimeTranscriptEventResponse({
+      accountPolicy,
+      body,
+      realtimeSessionId: input.realtimeSessionId ?? null,
+      adapterResult,
+    });
     const currentWorkstationSourceBinding = readSafeRealtimeSourceBinding(
       body.workstation_source_binding ?? body.workstationSourceBinding,
     );
@@ -413,6 +442,22 @@ const respondRealtimeBoundary = async (input: {
             realtimeSessionId: contextualSession.realtimeSessionId,
           }).catch(() => null)
         : null;
+    if (body.event_type === "transcript.final" && contextualSession &&
+        roomIdFromHelixAskThread(contextualSession.threadId) &&
+        trustedTurnActorContext?.resolution !== "resolved") {
+      return input.res.status(409).json({
+        schema: "helix.realtime_session.room_handoff_rejection.v1",
+        ok: false,
+        error: "realtime_room_speaker_authority_unavailable",
+        blocked_reason: "realtime_room_speaker_authority_unavailable",
+        message: "Establish a current consenting speaker floor before sending room speech to the agent.",
+        realtime_session_id: contextualSession.realtimeSessionId,
+        answer_authority: false,
+        assistant_answer: false,
+        terminal_eligible: false,
+        raw_content_included: false,
+      });
+    }
     const handoff = contextualSession && observation && transcriptText && providerEventRef && body.event_type === "transcript.final"
       ? bridgeRealtimeTranscriptToStagePlay({
           realtimeSessionId: contextualSession.realtimeSessionId,

@@ -1,0 +1,24 @@
+
+> rest-express@1.0.0 helix:environment-harness:docs-audit
+> tsx scripts/audit-environment-harness-work-program.ts
+
+{
+  "schema": "casimirbot.environment_harness_work_program_audit.v1",
+  "work_program": "docs/helix-environment-harness-work-program-v1.md",
+  "active_gate": "G8",
+  "backlink_files_checked": 6,
+  "canonical_link_targets_checked": 7,
+  "capability_status_rows_checked": 40,
+  "allowed_maturity_terms": [
+    "projected",
+    "specified",
+    "implemented",
+    "deterministically verified",
+    "live accepted",
+    "integrated accepted",
+    "release-ready"
+  ],
+  "acceptance_claims_checked": 14,
+  "ok": true,
+  "failures": []
+}

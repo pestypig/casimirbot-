@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-09-25T05:14:11.4538897Z",
+  "goal_turn": 2,
+  "browser_reset": "succeeded",
+  "browser_inventory": "kernel_assets_path_missing_os_error_3",
+  "windows_reset": "succeeded",
+  "windows_initialization": "kernel_assets_path_missing_os_error_3",
+  "casimirbot_process_count": 0,
+  "node_or_casimirbot_listener_count": 0,
+  "public_fingerprint": {
+    "endpoint": "https://casimirbot.com/api/agi/runtime-parity/fingerprint",
+    "http_status": 200,
+    "schema": "helix.runtime_parity_fingerprint.v1",
+    "source_commit": "42c5b19b4be2a95d2d2de937ef9f550df8b6f2b4",
+    "built_at": "2026-09-01T19:18:38.201Z",
+    "source_tree_sha256": "sha256:f979d12d016d10fc504bece0c0f1f4929a76c14d60351e12130d2f70611c00db",
+    "execution_mode": "compiled_production"
+  },
+  "authenticated_acceptance_run": false,
+  "deployment_performed": false,
+  "provider_call_started": false
+}

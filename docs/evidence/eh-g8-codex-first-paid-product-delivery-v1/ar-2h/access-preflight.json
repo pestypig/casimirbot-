@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-09-25T05:12:58.8169808Z",
+  "browser_control": "initialization_failed",
+  "windows_control": "initialization_failed",
+  "error": "failed to write kernel assets: The system cannot find the path specified. (os error 3)",
+  "casimirbot_process_count": 0,
+  "node_or_casimirbot_listeners": [],
+  "authenticated_walkthrough_run": false,
+  "provider_call_started": false,
+  "deployment_performed": false,
+  "launcher_invoked": false
+}

@@ -1,0 +1,73 @@
+{
+  "status": "pinned public-data audit; no model recast",
+  "source": "https://github.com/RadicceJustino/IDM-indirect-detection/tree/bbf6c4a6a37b4baa1e200569bc228e311a99100b",
+  "commit": "bbf6c4a6a37b4baa1e200569bc228e311a99100b",
+  "table_path": "data/CA_sig_continuous3",
+  "table_git_blob_sha": "b6970000d511ee1c3fdcff6c713f85243c5f17dc",
+  "nearest_benchmark_table_path": "data/CA_sig_13all",
+  "nearest_benchmark_table_sha": "f72800d0dfff4c80091f5b235dd8c3f869349074",
+  "nearest_benchmark_gap_header": "d0 d+ = 0.500000 5.000000",
+  "hess_limit_table_path": "data/ID_HESS13_546h.dat",
+  "hess_limit_table_sha": "70cac8193b7b45ac3a2f5f1908c826ad9b3200d0",
+  "table_bytes": 89860,
+  "table_rows": 809,
+  "table_columns": [
+    "Lambda345",
+    "MDM",
+    "d0",
+    "d+",
+    "Omega",
+    "SigmaV",
+    "BRWW",
+    "BRZZ",
+    "BRhh",
+    "BRtt",
+    "BRAWW"
+  ],
+  "tracked_spectrum_all_files": [],
+  "scan_min_neutral_gap_GeV": 0.50223,
+  "lz_point": {
+    "m_H_GeV": 1080.0,
+    "delta_AH_GeV": 0.000369,
+    "delta_charged_GeV": 8.17,
+    "lambda_L": -0.000192
+  },
+  "nearest_point_in_declared_neighborhood": {
+    "Lambda345": 0.01737,
+    "MDM": 1178.9,
+    "d0": 0.50964,
+    "d+": 8.1815,
+    "Omega": 0.11839,
+    "SigmaV": 5.5471e-26,
+    "BRWW": 0.805056,
+    "BRZZ": 0.119001,
+    "BRhh": 0.000916,
+    "BRtt": 0.000241,
+    "BRAWW": 0.074984
+  },
+  "nearest_neutral_gap_over_lz_gap": 1381.1382113821137,
+  "nearest_charged_gap_difference_GeV": 0.011499999999999844,
+  "nearest_mass_difference_GeV": 98.90000000000009,
+  "nearby_benchmark_sensitivity_diagnostic": {
+    "benchmark_neutral_gap_GeV": 0.5,
+    "benchmark_charged_gap_GeV": 5.0,
+    "nearest_scan_point_charged_gap_GeV": 8.1815,
+    "hess_546h_limit_at_nearest_scan_mass_source_units": 4.4543027374097015e-26,
+    "interpolation": "linear in log10(limit) against log10(mass), bracketed by nearest rows",
+    "scan_sigma_v_over_hess_limit": 1.245335202165848,
+    "co_traced_90pct_density_squared_ratio_at_fixed_sigma_v": 1.0087215137543368,
+    "max_heavy_local_fraction_if_rate_shape_fixed": 0.8961008055127432,
+    "min_other_local_fraction_if_components_co_trace": 0.10389919448725682,
+    "xenon_rate_fraction_at_proxy_hess_threshold_if_microphysics_fixed": 0.8961008055127432,
+    "status": "nearby benchmark stress-test only; not an exact-point recast"
+  },
+  "interpretation_limits": [
+    "The public continuous scan has no neutral splitting below 0.5 GeV, far above the 369 keV LZ point.",
+    "The nearest record is a neighboring scan point, not the LZ best-fit parameter set; Lambda345 and lambda_L use the same coupling combination here, but their fitted values differ in sign and magnitude.",
+    "The nearest record is near the full-DM relic abundance, not the reduced Omega h^2=0.10782 target for a 10% ultralight component.",
+    "The paper's H.E.S.S. baseline uses tree-level spectra/rates; Sommerfeld effects are a separate comparison and are not included in this source-table diagnostic.",
+    "The nearby H.E.S.S. sensitivity curve uses d0=0.5 GeV and d+=5 GeV, versus the neighboring scan record's d+=8.1815 GeV; its benchmark spectrum is not the neighboring record's spectrum.",
+    "The repository tree does not contain the Spectrum*_all.dat files referenced by its H.E.S.S. notebook, so its model-specific response fold is not reproducible from the tracked tree alone.",
+    "No likelihood or exclusion is inferred from proximity in parameter space."
+  ]
+}

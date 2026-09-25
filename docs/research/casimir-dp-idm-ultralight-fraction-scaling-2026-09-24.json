@@ -1,0 +1,139 @@
+{
+  "classification": "conditional abundance-budget and linear local-density scaling; not a joint model fit",
+  "source": "https://arxiv.org/abs/2609.06571",
+  "inputs": {
+    "published_IDM_profile_benchmark_omega_H_h2": 0.12014,
+    "adopted_total_DM_omega_h2_central": 0.1198,
+    "adopted_total_DM_omega_h2_sigma": 0.0012,
+    "phi_fraction_grid": [
+      0.0,
+      0.01,
+      0.05,
+      0.1,
+      0.25,
+      0.5
+    ]
+  },
+  "outputs": [
+    {
+      "phi_fraction_of_total_DM": 0.0,
+      "required_omega_H_h2_by_planck_case": {
+        "minus_1sigma": 0.1186,
+        "central": 0.1198,
+        "plus_1sigma": 0.12100000000000001
+      },
+      "H_abundance_ratio_to_published_IDM_benchmark_by_planck_case": {
+        "minus_1sigma": 0.9871816214416514,
+        "central": 0.9971699683702347,
+        "plus_1sigma": 1.0071583152988182
+      },
+      "conditional_LZ_rate_ratio_if_local_fraction_tracks_cosmic_fraction": {
+        "minus_1sigma": 0.9871816214416514,
+        "central": 0.9971699683702347,
+        "plus_1sigma": 1.0071583152988182
+      }
+    },
+    {
+      "phi_fraction_of_total_DM": 0.01,
+      "required_omega_H_h2_by_planck_case": {
+        "minus_1sigma": 0.11741399999999999,
+        "central": 0.118602,
+        "plus_1sigma": 0.11979000000000001
+      },
+      "H_abundance_ratio_to_published_IDM_benchmark_by_planck_case": {
+        "minus_1sigma": 0.9773098052272349,
+        "central": 0.9871982686865324,
+        "plus_1sigma": 0.99708673214583
+      },
+      "conditional_LZ_rate_ratio_if_local_fraction_tracks_cosmic_fraction": {
+        "minus_1sigma": 0.9773098052272349,
+        "central": 0.9871982686865324,
+        "plus_1sigma": 0.99708673214583
+      }
+    },
+    {
+      "phi_fraction_of_total_DM": 0.05,
+      "required_omega_H_h2_by_planck_case": {
+        "minus_1sigma": 0.11266999999999999,
+        "central": 0.11381,
+        "plus_1sigma": 0.11495000000000001
+      },
+      "H_abundance_ratio_to_published_IDM_benchmark_by_planck_case": {
+        "minus_1sigma": 0.9378225403695688,
+        "central": 0.947311469951723,
+        "plus_1sigma": 0.9568003995338773
+      },
+      "conditional_LZ_rate_ratio_if_local_fraction_tracks_cosmic_fraction": {
+        "minus_1sigma": 0.9378225403695688,
+        "central": 0.947311469951723,
+        "plus_1sigma": 0.9568003995338773
+      }
+    },
+    {
+      "phi_fraction_of_total_DM": 0.1,
+      "required_omega_H_h2_by_planck_case": {
+        "minus_1sigma": 0.10674,
+        "central": 0.10782,
+        "plus_1sigma": 0.10890000000000001
+      },
+      "H_abundance_ratio_to_published_IDM_benchmark_by_planck_case": {
+        "minus_1sigma": 0.8884634592974863,
+        "central": 0.8974529715332112,
+        "plus_1sigma": 0.9064424837689363
+      },
+      "conditional_LZ_rate_ratio_if_local_fraction_tracks_cosmic_fraction": {
+        "minus_1sigma": 0.8884634592974863,
+        "central": 0.8974529715332112,
+        "plus_1sigma": 0.9064424837689363
+      }
+    },
+    {
+      "phi_fraction_of_total_DM": 0.25,
+      "required_omega_H_h2_by_planck_case": {
+        "minus_1sigma": 0.08895,
+        "central": 0.08985,
+        "plus_1sigma": 0.09075000000000001
+      },
+      "H_abundance_ratio_to_published_IDM_benchmark_by_planck_case": {
+        "minus_1sigma": 0.7403862160812386,
+        "central": 0.7478774762776761,
+        "plus_1sigma": 0.7553687364741136
+      },
+      "conditional_LZ_rate_ratio_if_local_fraction_tracks_cosmic_fraction": {
+        "minus_1sigma": 0.7403862160812386,
+        "central": 0.7478774762776761,
+        "plus_1sigma": 0.7553687364741136
+      }
+    },
+    {
+      "phi_fraction_of_total_DM": 0.5,
+      "required_omega_H_h2_by_planck_case": {
+        "minus_1sigma": 0.0593,
+        "central": 0.0599,
+        "plus_1sigma": 0.060500000000000005
+      },
+      "H_abundance_ratio_to_published_IDM_benchmark_by_planck_case": {
+        "minus_1sigma": 0.4935908107208257,
+        "central": 0.4985849841851174,
+        "plus_1sigma": 0.5035791576494091
+      },
+      "conditional_LZ_rate_ratio_if_local_fraction_tracks_cosmic_fraction": {
+        "minus_1sigma": 0.4935908107208257,
+        "central": 0.4985849841851174,
+        "plus_1sigma": 0.5035791576494091
+      }
+    }
+  ],
+  "interpretation_limits": [
+    "The paper's IDM benchmark already supplies essentially all adopted total dark matter; any phi fraction requires a new H abundance calculation.",
+    "The conditional LZ rate ratio follows linear scaling with local free-H density at fixed Z-mediated cross section, velocity distribution, detector response, and total local density.",
+    "The rate ratio equals the cosmological H fraction only under the explicit co-tracing assumption. Boson stars, diffuse phi, and free H may cluster differently, so local fraction is an independent prediction of structure formation.",
+    "The source paper states that a full LZ likelihood reconstruction needs detector-level information that is not public. These rate ratios are not likelihood contours, event-count predictions, or evidence that a reduced fraction is acceptable.",
+    "The Planck plus/minus one-sigma cases are a simple uncertainty bracket, not a joint posterior or model-selection calculation."
+  ],
+  "next_required_evidence": [
+    "A coupled cosmological abundance history yielding Omega_H and Omega_phi without retuning to the LZ event.",
+    "A local Galactic decomposition predicting the unbound H density and velocity distribution after phi structure formation.",
+    "Public detector-level response or collaboration likelihood inputs to test the rescaled xenon spectrum."
+  ]
+}

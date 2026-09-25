@@ -1,0 +1,87 @@
+{
+  "classification": "conditional_IDM_plus_ultralight_phi_four_observable_gate_verdict",
+  "inputs": {
+    "upstream_sha256": {
+      "branch": "a53f50531239b0735d53fb31efc84e20ec0deee54a95be0394e0bf8553cc3e87",
+      "abundance": "9d8ce3f2634b947dc7ce7d3d2fbe76cbc731c4615c3abd01bfa38a1b3c22ea39",
+      "bridge": "8065b6712a61715e7d8671159779f80ebaf2890467eb0060fa80c6af81787db4",
+      "star": "396743a9b6c33606d01f97393284e3ad76498c7b19804813b3f62e50ed1d95b5",
+      "encounter": "7827c4482faaa56d7d14076b2c958f3b1092e9c4998f3403271157123bd63caf",
+      "overlay": "a8631ae5043e11bdb16179a48d106ced636d1d31117a17d9f31b38fe00c4db3a",
+      "excited": "4c6af865eb1897a7bc5a1a44f35bc38ec567787372b8e8ed2ed2b091512f4c71"
+    },
+    "f_phi_cosmic_scenario": 0.1,
+    "f_H_cosmic_assumed": 0.9,
+    "IDM_profile_relic_Omega_h2": 0.12014,
+    "total_DM_Omega_h2_central": 0.1198,
+    "total_DM_Omega_h2_sigma": 0.0012,
+    "design_precision_is_forecast": true
+  },
+  "gates": {
+    "star_structure_and_population": {
+      "phi_mass_eV": 1e-17,
+      "phi_free_Kaup_cap_Msun": 8458760.485072244,
+      "SgrA_reference_over_IDM_quartic_star_proxy": 22869000421630.457,
+      "reference_phi_star_R99_AU": 0.523790880968725,
+      "10y_encounter_probability_at_rho0p4_f0p1_v220": 3.961288021006545e-18,
+      "status": "mass scales motivate separate light-star and heavy-recoil fields; formation, mass function and local fractions are not predicted"
+    },
+    "abundance_and_local_population": {
+      "fixed_profile_plus_10pct_phi_total_Omega_h2": 0.13212,
+      "overclosure_sigma": 10.266666666666653,
+      "max_phi_fraction_at_1sigma_upper_with_fixed_IDM_profile": 0.007178631051753035,
+      "required_Omega_H_h2_for_f_phi_0p1": 0.10782,
+      "required_H_relic_reduction_fraction": 0.10254702846678876,
+      "local_H_fraction_if_cosmically_co_traced": 0.9,
+      "status": "published IDM profile cannot be added unchanged to a 10% phi component; needs a new relic calculation"
+    },
+    "xenon_recoil": {
+      "m_H_GeV": 1080.0,
+      "delta_keV": 369.0,
+      "Xe131_speed_for_248keV_km_s": 786.0095622467645,
+      "C12_endothermic_threshold_km_s": 2448.5225881804045,
+      "assumed_halo_cap_km_s": 798.0,
+      "conditional_rate_factor_at_f_H_0p9_before_halo_refold": 0.9,
+      "status": "LZ benchmark is kinematically open in the extreme Xe tail; the same ground-state inelastic channel is closed on independent carbon"
+    },
+    "astrophysical_photons": {
+      "conditional_H_density_squared_factor_at_f_H_0p9": 0.81,
+      "provided_continuum_fit": "0.5-0.8 TeV b-bbar with (5-8)e-25 cm^3/s; not the 1.08 TeV IDM benchmark's published channel prediction",
+      "exact_IDM_present_day_channel_spectrum_available_in_benchmark_table": false,
+      "HESS_neutral_splitting_scan_covers_369keV_point": false,
+      "status": "no exact common gamma prediction; supplied gamma features remain distinct stress tests"
+    },
+    "Casimir_DP": {
+      "IDM_Higgs_elastic_exponent_ceiling": 6.906000754266512e-19,
+      "same_kernel_overlay_exponent_ceiling": 6.3e-19,
+      "registered_one_sigma_precision": 0.005816050749546031,
+      "registered_SNR5_visibility_loss": 0.029080253747730156,
+      "DP_precision_over_exponent_ceiling": 8421734888970129.0,
+      "Z_inelastic_carbon_channel": "closed for ground-state H; excited A lifetime is 5.08 days",
+      "status": "conditional local-scattering contribution is null at the forecast sensitivity for the tested IDM channels"
+    }
+  },
+  "decision": {
+    "best_current_architecture": "complex ultralight phi for boson-star structure plus heavy IDM-like H for xenon; separately produced unless a connector is specified",
+    "prediction_status": "not a complete four-observable prediction model; the published IDM point fails the 10% shared-abundance overlay unchanged, and the tested Casimir-DP channels give a null-scale prediction",
+    "measurable_shared_scattering_status": "not established; exact IDM ground-state Z channel is closed on carbon and its elastic Higgs channel is far below the registered precision",
+    "next_falsification_gate": "Only reopen IDM-Casimir overlap with an explicit late-time excited-state source or a separately derived elastic/collective material operator, then recompute xenon, lifetime, abundance, gamma and target response from one Lagrangian."
+  },
+  "validity_and_uncertainty_limits": [
+    "The 0.1/0.9 fractions assume cosmic co-tracing; local and Galactic-center fractions are independent outputs of a formation/structure model.",
+    "The IDM 248-keV rate is sensitive to the high-speed halo tail; the quoted 786 km/s value is a kinematic point, not a detector-folded event prediction.",
+    "The phi encounter calculation assumes identical SgrA-scale objects tracing the local halo; it is not a mass function or formation model.",
+    "The H-star number is a repulsive-quartic scaling proxy, not a solved charged IDM boson star; the inert neutral state is not an exact conserved-charge complex scalar.",
+    "The gamma comparison lacks exact LZ-point branching spectra, a compatible HESS scan at the small neutral splitting, and joint Fermi/HESS likelihoods.",
+    "The Casimir-DP benchmark is a design forecast; the Higgs result is a deliberately generous elastic Born/contact coherence ceiling, not an exact solid-state response.",
+    "The excited-state lifetime assumes the standard tree-level ZHA interaction and no late-time repopulation."
+  ],
+  "checks": {
+    "fixed_IDM_plus_10pct_phi_overcloses_by_more_than_5sigma": true,
+    "Xe_candidate_speed_below_halo_cap": true,
+    "C12_transition_closed": true,
+    "elastic_DP_below_precision_by_more_than_10_orders": true,
+    "excited_state_short_lived_compared_with_universe": true,
+    "decision_is_not_misreported_as_four_gate_pass": true
+  }
+}

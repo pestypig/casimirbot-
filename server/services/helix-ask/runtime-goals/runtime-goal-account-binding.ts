@@ -1,4 +1,6 @@
 import crypto from "node:crypto";
+import { buildRuntimeGoalProfileRef } from "./runtime-goal-profile-ref";
+export { buildRuntimeGoalProfileRef } from "./runtime-goal-profile-ref";
 import type { HelixAccountCapabilityPolicy, HelixAccountType } from "@shared/helix-account-session";
 import type { HelixWorkstationGatewayAccountContext } from "../workstation-tool-gateway/account-policy";
 import { listAccountAuthorizedWorkstationGatewayCapabilities } from "../workstation-tool-gateway/account-policy";
@@ -101,9 +103,6 @@ export const fingerprintRuntimeGoalAccountPolicy = (
 
 const opaqueRef = (kind: "session" | "profile", value: string): string =>
   `runtime-goal-${kind}:sha256:${hash(value).slice(0, 24)}`;
-
-export const buildRuntimeGoalProfileRef = (profileId: string): string =>
-  opaqueRef("profile", profileId.trim());
 
 export const buildRuntimeGoalAccountScope = (
   context: HelixWorkstationGatewayAccountContext | null | undefined,

@@ -1,0 +1,132 @@
+{
+  "status": "finite-temperature two-component harmonic U(1) toy; exploratory charge-bearing abundance screen",
+  "model": {
+    "potential": "m^2(X^2+Y^2)/2",
+    "mass_eV": 1e-17,
+    "initial_conditions": "X=Xi, Xdot=0, Y=0, Ydot=alpha*m*Xi at T=10 MeV",
+    "symmetry": "exact O(2) rotation of (X,Y); homogeneous Noether charge is conserved",
+    "cosmology": "radiation domination; finite-mass e+e- thermodynamics; instantaneous neutrino decoupling at 2 MeV",
+    "DM_fraction_normalized": 0.1,
+    "general_initial_conditions": "X=Xi, Y=beta*Xi, Xdot=0, Ydot=alpha*m*Xi"
+  },
+  "outputs": {
+    "H_over_m_initial": 4458.825806848992,
+    "T_initial_MeV": 10.000000000000004,
+    "T_stop_MeV": 0.020012467628255367,
+    "comoving_charge_relative_drift": 2.390541730554091e-10,
+    "late_energy_basis_X_GeV2": 1.5982802780475738e-79,
+    "late_energy_basis_rotation_GeV2": 7.90245160799933e-87,
+    "alpha_for_equal_basis_energy_if_Y_i_zero": 4497.23464595435,
+    "energy_cross_term_X_rotation_basis_GeV2": 3.553839910541304e-83,
+    "orthogonal_rotation_basis_energy_GeV2": 3.4690006631493175e-91,
+    "charge_maximizing_initial_conditions": {
+      "alpha_ydot_over_mX": 678772.562466697,
+      "beta_Y_i_over_X_i": -150.92778505790557,
+      "late_charge_fraction_mn_over_rho": 0.9998710385082095,
+      "required_initial_field_scale_GeV": 1741653496234525.0,
+      "initial_Y_over_reference_f": -0.3923341858582599,
+      "required_initial_scalar_fraction_of_radiation_by_temperature": [
+        {
+          "temperature_MeV": 2.0,
+          "rho_phi_over_radiation": 7.881389855851266e-05
+        },
+        {
+          "temperature_MeV": 1.0,
+          "rho_phi_over_radiation": 1.9458413127504546e-05
+        },
+        {
+          "temperature_MeV": 0.5,
+          "rho_phi_over_radiation": 4.675866951678586e-06
+        },
+        {
+          "temperature_MeV": 0.2,
+          "rho_phi_over_radiation": 7.946268514470684e-07
+        },
+        {
+          "temperature_MeV": 0.1,
+          "rho_phi_over_radiation": 7.014860682914559e-07
+        },
+        {
+          "temperature_MeV": 0.05,
+          "rho_phi_over_radiation": 1.3574231290430069e-06
+        }
+      ],
+      "initial_scalar_to_radiation_ratio": 0.0019759770553699706
+    },
+    "rotation_scan_beta_zero": [
+      {
+        "initial_rotation_alpha_ydot_over_mX": 0,
+        "required_initial_field_scale_GeV": 2463069995329383.5,
+        "late_charge_fraction_mn_over_rho": 0.0,
+        "initial_scalar_to_radiation_ratio": 8.57755109748507e-15
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 0.01,
+        "required_initial_field_scale_GeV": 2463069995323294.0,
+        "late_charge_fraction_mn_over_rho": 2.9461150723879564e-08,
+        "initial_scalar_to_radiation_ratio": 8.578408852552398e-15
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 0.1,
+        "required_initial_field_scale_GeV": 2463069994720470.0,
+        "late_charge_fraction_mn_over_rho": 2.946115070945862e-07,
+        "initial_scalar_to_radiation_ratio": 8.66332660417647e-15
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 1,
+        "required_initial_field_scale_GeV": 2463069934438027.0,
+        "late_charge_fraction_mn_over_rho": 2.9461149267363903e-06,
+        "initial_scalar_to_radiation_ratio": 1.7155101346762467e-14
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 10,
+        "required_initial_field_scale_GeV": 2463063906216123.5,
+        "late_charge_fraction_mn_over_rho": 2.9461005058605964e-05,
+        "initial_scalar_to_radiation_ratio": 8.663283774182516e-13
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 100,
+        "required_initial_field_scale_GeV": 2462461307453422.5,
+        "late_charge_fraction_mn_over_rho": 0.00029446591308756573,
+        "initial_scalar_to_radiation_ratio": 8.574169486047351e-11
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 1000,
+        "required_initial_field_scale_GeV": 2404347463942770.5,
+        "late_charge_fraction_mn_over_rho": 0.002807311845506793,
+        "initial_scalar_to_radiation_ratio": 8.173436640963776e-09
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 3000,
+        "required_initial_field_scale_GeV": 2049010358702351.0,
+        "late_charge_fraction_mn_over_rho": 0.006116539167393513,
+        "initial_scalar_to_radiation_ratio": 5.34245253034924e-08
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 5000,
+        "required_initial_field_scale_GeV": 1647147305454193.5,
+        "late_charge_fraction_mn_over_rho": 0.006587658583876858,
+        "initial_scalar_to_radiation_ratio": 9.58991400328247e-08
+      },
+      {
+        "initial_rotation_alpha_ydot_over_mX": 10000,
+        "required_initial_field_scale_GeV": 1010240308558709.9,
+        "late_charge_fraction_mn_over_rho": 0.004956163034129016,
+        "initial_scalar_to_radiation_ratio": 1.442976294308757e-07
+      }
+    ]
+  },
+  "numerics": {
+    "solver": "DOP853 rtol=2e-9 atol=2e-11 max_step=0.001 in ln(a)",
+    "cycle_comoving_energy_relative_scatter_X": 12.204195996109549,
+    "cycle_comoving_energy_relative_scatter_rotation": 12.196334522179233,
+    "cycle_charge_relative_scatter": 4.165409936397014e-14
+  },
+  "limitations": [
+    "This is a harmonic two-real-component toy, not the exact O(3)/O(2) nonlinear pNGB potential or its radial mode.",
+    "The initial rotation alpha is a free parameter; no inflationary, reheating, baryogenesis-like, or other charge-generation mechanism is specified.",
+    "Isocurvature for a rotating background, perturbation transfer, structure formation, star fraction, and profile-dependent Q/M are not calculated.",
+    "No LZ xenon or Casimir-DP coupling is introduced.",
+    "The homogeneous radiation background neglects scalar backreaction; reported early energy fraction is a diagnostic."
+  ]
+}

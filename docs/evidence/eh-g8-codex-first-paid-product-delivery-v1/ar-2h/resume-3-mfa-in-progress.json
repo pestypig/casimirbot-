@@ -1,0 +1,13 @@
+{
+  "observed_at": "2026-09-25T05:36:01.0973440Z",
+  "checkpoint": "owner-mfa-in-progress",
+  "auth0_page_title": "Enter your one-time password to log in | CasimirBot Desktop Account Link",
+  "auth0_page_observed": true,
+  "authorization_url_recorded": false,
+  "credentials_or_codes_read": false,
+  "native_current_device": "unregistered",
+  "native_register_control": "disabled while request is pending",
+  "native_completion_observed": false,
+  "request_restarted": false,
+  "live_provider_call_started": false
+}

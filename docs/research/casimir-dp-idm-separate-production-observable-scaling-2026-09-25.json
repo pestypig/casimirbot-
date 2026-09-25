@@ -1,0 +1,139 @@
+{
+  "classification": "separate_production_conditional_observable_scaling",
+  "model_skeleton": {
+    "phi": "cold complex ultralight field, separately produced; may populate boson stars",
+    "H": "thermal inert-doublet state with IDM inelastic Xe interaction and number-changing channels",
+    "only_shared_constraint": "Omega_phi + Omega_H = Omega_DM; no dynamical conversion assumed"
+  },
+  "inputs": {
+    "Omega_DM_h2_central": 0.1198,
+    "Omega_DM_h2_sigma": 0.0012,
+    "published_IDM_profile_Omega_H_h2": 0.12014,
+    "m_phi_eV": 1e-17,
+    "present_entropy_density_s0_cm3": 2891.2,
+    "f_phi_grid": [
+      0.0,
+      0.01,
+      0.05,
+      0.1,
+      0.25,
+      0.5
+    ],
+    "illustrative_Milky_Way_DM_mass_Msun": 1000000000000.0,
+    "reference_compact_phi_star_mass_Msun": 4020000.0,
+    "pure_H_Casimir_DP_conditional_exponent_ceiling": 7e-19,
+    "10y_encounter_probability_at_local_compact_fraction_0p1": 3.961288e-18
+  },
+  "outputs": [
+    {
+      "f_phi_cosmic": 0.0,
+      "f_H_cosmic": 1.0,
+      "required_Omega_H_h2_central": 0.1198,
+      "required_Omega_H_h2_minus_1sigma": 0.1186,
+      "required_Omega_H_h2_plus_1sigma": 0.12100000000000001,
+      "required_net_U1_charge_yield_YQ_per_epsilon": 0.0,
+      "H_abundance_ratio_to_IDM_profile_central": 0.9971699683702347,
+      "conditional_LZ_rate_ratio_if_local_co_tracing_and_fixed_velocity_response": 1.0,
+      "conditional_H_annihilation_flux_ratio_if_J_profile_co_scales": 1.0,
+      "H_sigma_v_multiplier_to_hold_same_annihilation_flux_if_J_co_scales": 1.0,
+      "conditional_Casimir_DP_exponent_ceiling_if_same_H_channel": 7e-19,
+      "illustrative_identical_4p02e6_Msun_phi_star_count_in_1e12_Msun_halo_if_all_phi_is_compact": 0.0,
+      "conditional_10y_phi_star_encounter_probability_if_stars_trace_halo": 0.0
+    },
+    {
+      "f_phi_cosmic": 0.01,
+      "f_H_cosmic": 0.99,
+      "required_Omega_H_h2_central": 0.118602,
+      "required_Omega_H_h2_minus_1sigma": 0.11741399999999999,
+      "required_Omega_H_h2_plus_1sigma": 0.11979000000000001,
+      "required_net_U1_charge_yield_YQ_per_epsilon": 436632713060320.94,
+      "H_abundance_ratio_to_IDM_profile_central": 0.9871982686865324,
+      "conditional_LZ_rate_ratio_if_local_co_tracing_and_fixed_velocity_response": 0.99,
+      "conditional_H_annihilation_flux_ratio_if_J_profile_co_scales": 0.9801,
+      "H_sigma_v_multiplier_to_hold_same_annihilation_flux_if_J_co_scales": 1.0203040506070808,
+      "conditional_Casimir_DP_exponent_ceiling_if_same_H_channel": 6.93e-19,
+      "illustrative_identical_4p02e6_Msun_phi_star_count_in_1e12_Msun_halo_if_all_phi_is_compact": 2487.5621890547263,
+      "conditional_10y_phi_star_encounter_probability_if_stars_trace_halo": 3.9612880000000004e-19
+    },
+    {
+      "f_phi_cosmic": 0.05,
+      "f_H_cosmic": 0.95,
+      "required_Omega_H_h2_central": 0.11381,
+      "required_Omega_H_h2_minus_1sigma": 0.11266999999999999,
+      "required_Omega_H_h2_plus_1sigma": 0.11495000000000001,
+      "required_net_U1_charge_yield_YQ_per_epsilon": 2183163565301604.8,
+      "H_abundance_ratio_to_IDM_profile_central": 0.947311469951723,
+      "conditional_LZ_rate_ratio_if_local_co_tracing_and_fixed_velocity_response": 0.95,
+      "conditional_H_annihilation_flux_ratio_if_J_profile_co_scales": 0.9025,
+      "H_sigma_v_multiplier_to_hold_same_annihilation_flux_if_J_co_scales": 1.10803324099723,
+      "conditional_Casimir_DP_exponent_ceiling_if_same_H_channel": 6.65e-19,
+      "illustrative_identical_4p02e6_Msun_phi_star_count_in_1e12_Msun_halo_if_all_phi_is_compact": 12437.810945273632,
+      "conditional_10y_phi_star_encounter_probability_if_stars_trace_halo": 1.980644e-18
+    },
+    {
+      "f_phi_cosmic": 0.1,
+      "f_H_cosmic": 0.9,
+      "required_Omega_H_h2_central": 0.10782,
+      "required_Omega_H_h2_minus_1sigma": 0.10674,
+      "required_Omega_H_h2_plus_1sigma": 0.10890000000000001,
+      "required_net_U1_charge_yield_YQ_per_epsilon": 4366327130603209.5,
+      "H_abundance_ratio_to_IDM_profile_central": 0.8974529715332112,
+      "conditional_LZ_rate_ratio_if_local_co_tracing_and_fixed_velocity_response": 0.9,
+      "conditional_H_annihilation_flux_ratio_if_J_profile_co_scales": 0.81,
+      "H_sigma_v_multiplier_to_hold_same_annihilation_flux_if_J_co_scales": 1.2345679012345678,
+      "conditional_Casimir_DP_exponent_ceiling_if_same_H_channel": 6.3e-19,
+      "illustrative_identical_4p02e6_Msun_phi_star_count_in_1e12_Msun_halo_if_all_phi_is_compact": 24875.621890547263,
+      "conditional_10y_phi_star_encounter_probability_if_stars_trace_halo": 3.961288e-18
+    },
+    {
+      "f_phi_cosmic": 0.25,
+      "f_H_cosmic": 0.75,
+      "required_Omega_H_h2_central": 0.08985,
+      "required_Omega_H_h2_minus_1sigma": 0.08895,
+      "required_Omega_H_h2_plus_1sigma": 0.09075000000000001,
+      "required_net_U1_charge_yield_YQ_per_epsilon": 1.0915817826508024e+16,
+      "H_abundance_ratio_to_IDM_profile_central": 0.7478774762776761,
+      "conditional_LZ_rate_ratio_if_local_co_tracing_and_fixed_velocity_response": 0.75,
+      "conditional_H_annihilation_flux_ratio_if_J_profile_co_scales": 0.5625,
+      "H_sigma_v_multiplier_to_hold_same_annihilation_flux_if_J_co_scales": 1.7777777777777777,
+      "conditional_Casimir_DP_exponent_ceiling_if_same_H_channel": 5.25e-19,
+      "illustrative_identical_4p02e6_Msun_phi_star_count_in_1e12_Msun_halo_if_all_phi_is_compact": 62189.05472636816,
+      "conditional_10y_phi_star_encounter_probability_if_stars_trace_halo": 9.903220000000001e-18
+    },
+    {
+      "f_phi_cosmic": 0.5,
+      "f_H_cosmic": 0.5,
+      "required_Omega_H_h2_central": 0.0599,
+      "required_Omega_H_h2_minus_1sigma": 0.0593,
+      "required_Omega_H_h2_plus_1sigma": 0.060500000000000005,
+      "required_net_U1_charge_yield_YQ_per_epsilon": 2.183163565301605e+16,
+      "H_abundance_ratio_to_IDM_profile_central": 0.4985849841851174,
+      "conditional_LZ_rate_ratio_if_local_co_tracing_and_fixed_velocity_response": 0.5,
+      "conditional_H_annihilation_flux_ratio_if_J_profile_co_scales": 0.25,
+      "H_sigma_v_multiplier_to_hold_same_annihilation_flux_if_J_co_scales": 4.0,
+      "conditional_Casimir_DP_exponent_ceiling_if_same_H_channel": 3.5e-19,
+      "illustrative_identical_4p02e6_Msun_phi_star_count_in_1e12_Msun_halo_if_all_phi_is_compact": 124378.10945273632,
+      "conditional_10y_phi_star_encounter_probability_if_stars_trace_halo": 1.9806440000000002e-17
+    }
+  ],
+  "factorized_forward_model": {
+    "LZ_rate_ratio": "f_H_local * eta_H/eta_IDM * detector_response_ratio",
+    "annihilation_gamma_flux_ratio": "(rho_H_GC/rho_IDM_GC)^2 * sigma_v_ratio * yield_ratio",
+    "Casimir_DP_exponent_ratio": "f_H_local * material_kernel_ratio",
+    "boson_star_count": "f_phi_compact * M_MW_DM / mean_star_mass"
+  },
+  "key_limits": [
+    "The table sets local H and Galactic-center H density fractions equal to the cosmic H fraction only for its illustrative co-tracing rows; the physically relevant local and GC fractions are independent model outputs.",
+    "The LZ scaling holds the extreme-tail velocity integral and detector response fixed, despite prior evidence that the 248 keV IDM point is strongly halo-tail and response sensitive.",
+    "The annihilation scaling holds morphology, particle mass, final-state yield, and cross section fixed. It does not fit the 0.5-0.8 TeV b-bbar excess, the 43.2 GeV cluster line, or the Galactic Center source-count analysis.",
+    "The Casimir-DP value is a conditional ceiling from the screened IDM Higgs-elastic channel; the inelastic Z channel is closed on the frozen carbon target. Scaling it cannot make it measurable.",
+    "The compact-star count assumes all phi mass is in identical 4.02e6 Msun stars in a 1e12 Msun Milky Way halo. It is not a formation prediction or measured mass function.",
+    "The encounter probability reuses the fixed-speed local screen and assumes compact stars trace local total DM; it is not a full velocity-distribution fold."
+  ],
+  "required_next_evidence": [
+    "A cold complex-phi production and charge-asymmetry model, plus fragmentation and stable-star mass function.",
+    "A common Galactic calculation of local unbound H, diffuse phi, compact-star fraction, and Galactic-center density profile.",
+    "An integrated H relic calculation with any annihilation into phi radiation and the resulting dark-radiation constraints.",
+    "A response-folded LZ likelihood and a material-response calculation for the exact Casimir-DP target."
+  ]
+}

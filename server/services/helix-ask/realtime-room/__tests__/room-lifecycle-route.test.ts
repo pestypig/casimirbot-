@@ -6,6 +6,9 @@ import {
   signInSharedRealtimeRoomTestAgent,
 } from "./route-harness";
 import { readSharedRealtimeRoom } from "../room-store";
+import { buildHelixAccountCapabilityPolicy } from "@shared/helix-account-session";
+import { HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE } from "@shared/contracts/helix-shared-live-room-agent.v1";
+import { SharedLiveRoomControlService, type SharedLiveRoomControlActor } from "../../../shared-live-room-control/service";
 
 describe("Shared Realtime room lifecycle routes", () => {
   beforeEach(async () => {
@@ -14,6 +17,35 @@ describe("Shared Realtime room lifecycle routes", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it("joins an independent simulated OAuth account through real persistence without acquiring owner authority", async () => {
+    const app = createSharedRealtimeRoomTestApp();
+    const owner = await signInSharedRealtimeRoomTestAgent({ app, profileId: "profile:oauth-join-owner", displayName: "Owner" });
+    const guest = await signInSharedRealtimeRoomTestAgent({ app, profileId: "profile:oauth-join-guest", displayName: "Guest" });
+    const created = await owner.agent.post("/api/agi/realtime/rooms").send({ title: "OAuth join persistence" }).expect(201);
+    const roomId = created.body.room.room_id as string;
+    const invite = await owner.agent.post(`/api/agi/realtime/rooms/${roomId}/invites`).expect(201);
+    const actor: SharedLiveRoomControlActor = {
+      authKind: "external_oauth", profileId: guest.profileId, accountType: "developer",
+      accountPolicy: buildHelixAccountCapabilityPolicy("developer"), sessionId: "external-oauth:guest", isGuest: false,
+      oauthScopes: new Set([HELIX_SHARED_LIVE_ROOM_READ_SCOPE, HELIX_SHARED_LIVE_ROOM_MANAGE_SCOPE]),
+      idempotencyOwner: { tenantId: "tenant-join-test", issuer: "https://issuer.example", subjectId: "guest-subject", accountProfileId: guest.profileId },
+    };
+    const service = new SharedLiveRoomControlService();
+    const input = { actor, idempotencyKey: "persisted-join-001", request: { room_id: roomId, invite_code: invite.body.invite_code } };
+    const [joined, replay] = await Promise.all([service.joinRoom(input), service.joinRoom(input)]);
+    expect(joined.idempotencyReplayed).toBe(false);
+    expect(replay.idempotencyReplayed).toBe(true);
+    const persisted = await readSharedRealtimeRoom({ roomId, profileId: owner.profileId });
+    expect(persisted.participants).toHaveLength(2);
+    const participant = persisted.participants.find(p => p.participant_id === joined.body.room.self_participant_id)!;
+    expect(participant).toMatchObject({ display_name: "Guest", role: "participant", presence: "present" });
+    expect(participant.consent.microphone_to_model).toBe(false);
+    expect(participant.consent.transcript_to_room).toBe(false);
+    expect(persisted.runtime.state).toBe("idle");
+    await guest.agent.post(`/api/agi/realtime/rooms/${roomId}/invites`).expect(403);
+    expect(JSON.stringify(joined)).not.toContain(invite.body.invite_code);
   });
 
   it("requires a signed-in entitled session and derives room identity from the cookie", async () => {

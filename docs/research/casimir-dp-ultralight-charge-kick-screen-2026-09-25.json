@@ -1,0 +1,118 @@
+{
+  "classification": "conditional impulse-limit screen for one temporary off-diagonal mass-mixing toy; not a general charge-generation bound",
+  "model": {
+    "base_potential": "V0 = m_phi^2*(x^2+y^2)/2",
+    "temporary_breaking_term": "delta_V = mu_xy^2(t)*x*y",
+    "field_definition": "phi=(x+i*y)/sqrt(2)",
+    "initial_state": "homogeneous real-field turning point x=X, y=0, xdot=ydot=0",
+    "pulse": "duration Delta_t with m_phi*Delta_t=tau << 1, then exact U(1)_phi restored",
+    "mass_matrix_eigenvalues_during_pulse": "m_phi^2 +/- abs(mu_xy^2); positive definiteness requires abs(mu_xy^2)<m_phi^2",
+    "impulse_limit": "r=abs(delta_ydot)/(m_phi*abs(X)) <= tau; epsilon=2r/(1+r^2)"
+  },
+  "inputs": {
+    "m_phi_eV": 1e-17,
+    "short_pulse_tau_grid": [
+      0.001,
+      0.01,
+      0.03,
+      0.1
+    ],
+    "target_epsilon_grid": [
+      0.01,
+      0.1,
+      0.5,
+      0.9,
+      1.0
+    ],
+    "declared_impulse_domain_tau_max": 0.1
+  },
+  "rows": [
+    {
+      "pulse_duration_tau_m_Delta_t": 0.001,
+      "max_velocity_ratio_r_in_impulse_limit": 0.001,
+      "epsilon_supremum_from_stable_mass_mixing": 0.0019999980000020004,
+      "strictly_below_supremum_for_positive_definite_pulse": true,
+      "expansion_fraction_H_Delta_t_at_3H_eq_m": 0.0003333333333333333,
+      "oscillator_phase_m_Delta_t": 0.001
+    },
+    {
+      "pulse_duration_tau_m_Delta_t": 0.01,
+      "max_velocity_ratio_r_in_impulse_limit": 0.01,
+      "epsilon_supremum_from_stable_mass_mixing": 0.019998000199980003,
+      "strictly_below_supremum_for_positive_definite_pulse": true,
+      "expansion_fraction_H_Delta_t_at_3H_eq_m": 0.0033333333333333335,
+      "oscillator_phase_m_Delta_t": 0.01
+    },
+    {
+      "pulse_duration_tau_m_Delta_t": 0.03,
+      "max_velocity_ratio_r_in_impulse_limit": 0.03,
+      "epsilon_supremum_from_stable_mass_mixing": 0.059946048556299335,
+      "strictly_below_supremum_for_positive_definite_pulse": true,
+      "expansion_fraction_H_Delta_t_at_3H_eq_m": 0.01,
+      "oscillator_phase_m_Delta_t": 0.03
+    },
+    {
+      "pulse_duration_tau_m_Delta_t": 0.1,
+      "max_velocity_ratio_r_in_impulse_limit": 0.1,
+      "epsilon_supremum_from_stable_mass_mixing": 0.19801980198019803,
+      "strictly_below_supremum_for_positive_definite_pulse": true,
+      "expansion_fraction_H_Delta_t_at_3H_eq_m": 0.03333333333333333,
+      "oscillator_phase_m_Delta_t": 0.1
+    }
+  ],
+  "target_requirements": [
+    {
+      "target_net_charge_asymmetry": 0.01,
+      "minimum_r_on_small_branch": 0.005000125006250391,
+      "tau_required_if_impulse_relation_extrapolated": 0.005000125006250391,
+      "within_declared_impulse_domain_tau_le_0p1": true,
+      "initial_real_amplitude_over_final_energy_equivalent_amplitude": 0.9999874996093545,
+      "fraction_of_final_energy_injected_as_y_kinetic_energy": 2.5000625031251956e-05
+    },
+    {
+      "target_net_charge_asymmetry": 0.1,
+      "minimum_r_on_small_branch": 0.05012562893380046,
+      "tau_required_if_impulse_relation_extrapolated": 0.05012562893380046,
+      "within_declared_impulse_domain_tau_le_0p1": true,
+      "initial_real_amplitude_over_final_energy_equivalent_amplitude": 0.9987460731103326,
+      "fraction_of_final_energy_injected_as_y_kinetic_energy": 0.0025062814466900235
+    },
+    {
+      "target_net_charge_asymmetry": 0.5,
+      "minimum_r_on_small_branch": 0.2679491924311227,
+      "tau_required_if_impulse_relation_extrapolated": 0.2679491924311227,
+      "within_declared_impulse_domain_tau_le_0p1": false,
+      "initial_real_amplitude_over_final_energy_equivalent_amplitude": 0.9659258262890684,
+      "fraction_of_final_energy_injected_as_y_kinetic_energy": 0.06698729810778067
+    },
+    {
+      "target_net_charge_asymmetry": 0.9,
+      "minimum_r_on_small_branch": 0.6267890062732586,
+      "tau_required_if_impulse_relation_extrapolated": 0.6267890062732586,
+      "within_declared_impulse_domain_tau_le_0p1": false,
+      "initial_real_amplitude_over_final_energy_equivalent_amplitude": 0.8473163206129299,
+      "fraction_of_final_energy_injected_as_y_kinetic_energy": 0.2820550528229664
+    },
+    {
+      "target_net_charge_asymmetry": 1.0,
+      "minimum_r_on_small_branch": 1.0,
+      "tau_required_if_impulse_relation_extrapolated": 1.0,
+      "within_declared_impulse_domain_tau_le_0p1": false,
+      "initial_real_amplitude_over_final_energy_equivalent_amplitude": 0.7071067811865475,
+      "fraction_of_final_energy_injected_as_y_kinetic_energy": 0.5
+    }
+  ],
+  "validity_limits": [
+    "The impulse result neglects x evolution during the pulse; it is controlled only for tau much less than one and H*Delta_t much less than one.",
+    "At radiation-era onset 3H=m_phi, H*Delta_t=tau/3; tau=0.1 is a conservative short-pulse boundary, not a universal error guarantee.",
+    "For tau approaching unity, the impulse estimate cannot establish the actual generated epsilon; solve the coupled expanding-background equations with the explicit time profile.",
+    "This toy does not specify what UV dynamics generates mu_xy^2(t), whether the pulse occurs at the assumed epoch, the primordial perturbations, or nonlinear fragmentation.",
+    "The stable-mass-mixing bound applies only to equal diagonal masses with this off-diagonal quadratic pulse. Tachyonic intervals, unequal masses, higher-dimensional torques, or other mechanisms require a separate analysis.",
+    "Generating net charge is not equivalent to forming stable boson stars; the stable charge-mass curve and Galactic mass function remain required."
+  ],
+  "falsification_tests": [
+    "Reject a claim that this stable short pulse produces epsilon>=0.5 within tau<=0.1; its impulse-limit supremum is below 0.198.",
+    "For any target outside the impulse domain, integrate the stated field equations through the full pulse and verify post-pulse energy and comoving charge conservation before inferring epsilon.",
+    "Reject the mechanism as a shared-model bridge if its full production and fragmentation history cannot reach the required cold fraction and charge while respecting the common cosmology."
+  ]
+}

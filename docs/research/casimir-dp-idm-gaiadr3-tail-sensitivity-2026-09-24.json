@@ -1,0 +1,154 @@
+{
+  "classification": "kinematic halo-tail sensitivity screen; no velocity posterior and no LZ likelihood",
+  "sources": {
+    "IDM_benchmark": "https://arxiv.org/html/2609.06571",
+    "Gaia_DR3_escape_speed": "https://arxiv.org/html/2402.00108"
+  },
+  "inputs": {
+    "m_H_GeV": 1080.0,
+    "delta_keV": 369.0,
+    "Xe131_recoil_keV": 248.0,
+    "Xe131_mass_GeV": 122.02572741702,
+    "lab_speed_km_s_held_fixed": 254.0,
+    "v0_km_s_held_fixed": 238.0,
+    "Gaia_radial_bin": "8-9 kpc, includes but is not identical to the solar position",
+    "Gaia_SEPL_reported_escape_speed_km_s": "486 +10/-5 (68% interval)",
+    "Gaia_2PL_reported_escape_speed_km_s": "539 +69/-34 (68% interval)",
+    "IDM_source_SHM_escape_speed_km_s": 544.0
+  },
+  "vmin_for_benchmark_recoil_km_s": 786.0095622467645,
+  "reference_eta_at_IDM_paper_v_esc_544_per_km_s": 7.555097800868841e-08,
+  "outputs": [
+    {
+      "escape_speed_fit": "Gaia DR3 SEPL",
+      "cases": {
+        "lower": {
+          "v_escape_km_s": 481.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 735.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": -51.00956224676452,
+          "benchmark_recoil_kinematically_open": false,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 0.0,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 0.0,
+          "largest_splitting_for_248keV_recoil_keV": 327.1401724866255
+        },
+        "central": {
+          "v_escape_km_s": 486.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 740.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": -46.00956224676452,
+          "benchmark_recoil_kinematically_open": false,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 0.0,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 0.0,
+          "largest_splitting_for_248keV_recoil_keV": 331.24330782729675
+        },
+        "upper": {
+          "v_escape_km_s": 496.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 750.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": -36.00956224676452,
+          "benchmark_recoil_kinematically_open": false,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 0.0,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 0.0,
+          "largest_splitting_for_248keV_recoil_keV": 339.4495785086394
+        }
+      }
+    },
+    {
+      "escape_speed_fit": "Gaia DR3 2-component power law",
+      "cases": {
+        "lower": {
+          "v_escape_km_s": 505.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 759.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": -27.009562246764517,
+          "benchmark_recoil_kinematically_open": false,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 0.0,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 0.0,
+          "largest_splitting_for_248keV_recoil_keV": 346.8352221218478
+        },
+        "central": {
+          "v_escape_km_s": 539.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 793.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": 6.990437753235483,
+          "benchmark_recoil_kinematically_open": true,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 2.7209346505593937e-08,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 0.36014552323154364,
+          "largest_splitting_for_248keV_recoil_keV": 374.7365424384127
+        },
+        "upper": {
+          "v_escape_km_s": 608.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 862.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": 75.99043775323548,
+          "benchmark_recoil_kinematically_open": true,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 1.4640149240229552e-06,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 19.37784212210453,
+          "largest_splitting_for_248keV_recoil_keV": 431.3598101396766
+        }
+      }
+    },
+    {
+      "escape_speed_fit": "IDM paper SHM assumption",
+      "cases": {
+        "lower": {
+          "v_escape_km_s": 544.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 798.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": 11.990437753235483,
+          "benchmark_recoil_kinematically_open": true,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 7.555097800868841e-08,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 1.0,
+          "largest_splitting_for_248keV_recoil_keV": 378.83967777908384
+        },
+        "central": {
+          "v_escape_km_s": 544.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 798.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": 11.990437753235483,
+          "benchmark_recoil_kinematically_open": true,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 7.555097800868841e-08,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 1.0,
+          "largest_splitting_for_248keV_recoil_keV": 378.83967777908384
+        },
+        "upper": {
+          "v_escape_km_s": 544.0,
+          "v0_km_s_fixed_to_IDM_SHM": 238.0,
+          "v_lab_fixed_km_s": 254.0,
+          "truncated_SHM_lab_speed_cap_km_s": 798.0,
+          "vmin_for_248keV_recoil_km_s": 786.0095622467645,
+          "speed_headroom_km_s": 11.990437753235483,
+          "benchmark_recoil_kinematically_open": true,
+          "conditional_SHM_mean_inverse_speed_per_km_s": 7.555097800868841e-08,
+          "conditional_SHM_differential_rate_ratio_to_IDM_paper": 1.0,
+          "largest_splitting_for_248keV_recoil_keV": 378.83967777908384
+        }
+      }
+    }
+  ],
+  "interpretation_limits": [
+    "The cap v_lab,max = v_esc + v_lab is the truncated Standard Halo Model construction used here to stress-test the IDM benchmark.",
+    "Gaia measures a stellar escape-speed profile, not the local dark-matter speed distribution. Its SEPL and 2PL fits differ substantially and encode tail-model uncertainty.",
+    "The Gaia analysis defines escape relative to 2 R_200c; direct-detection SHM conventions and adopted outer boundary must be matched before interpreting closure as a physical exclusion.",
+    "A non-Maxwellian dark-matter stream or substructure can change the local high-speed support; no such component is assumed or fitted here.",
+    "A closed kinematic point for the adopted truncated SHM has zero rate, but an open point's event rate still requires the full velocity integral, isotope response, detector efficiency, backgrounds, and LZ likelihood."
+  ],
+  "falsification_test": "The IDM LZ benchmark is not robust to plausible local-tail prescriptions unless a common-convention Galactic model supplies sufficient DM support above 786 km/s in the lab frame."
+}

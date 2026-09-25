@@ -1,0 +1,38 @@
+{
+  "schema": "casimirbot.ar2h.connector_refresh_checkpoint.v1",
+  "observed_at": "2026-09-25T12:44:00Z",
+  "task_id": "01a0798b-b5bd-7bf2-946a-9a77e086316a",
+  "connector": "CasimirBot Device Check",
+  "operation": "Existing developer-mode connector Refresh in ChatGPT settings",
+  "observations": {
+    "steering_read_and_acknowledge_schema_now_include": [
+      "helix_conversation_id",
+      "mission_id",
+      "run_id"
+    ],
+    "room_mission_result_submit_now_listed": true,
+    "post_refresh_read_before_presence": "reasoning_binding_target_inactive",
+    "authenticated_presence_refreshed_at": "2026-09-25T12:43:51.995Z",
+    "post_presence_read": {
+      "ok": true,
+      "reasoning_binding_id": "reasoning_binding:032283f1bfd88958d117a2afb90bdfd9",
+      "deliveries": [],
+      "credential_included": false,
+      "private_endpoint_included": false,
+      "hidden_reasoning_included": false,
+      "answer_authority": false,
+      "assistant_answer": false,
+      "terminal_eligible": false,
+      "raw_content_included": false
+    },
+    "installed_room_paired_candidate_visible": true,
+    "room_mission_selected": false
+  },
+  "limits": [
+    "Empty queue read is not instruction delivery or result evidence.",
+    "No guest admitted; shared authority transport remains unqualified.",
+    "No voice, provider inference, environment action, deployment or rebuild.",
+    "Pairing expires 2026-09-25T13:30:35.074Z; presence and registration do not extend it."
+  ],
+  "credential_included": false
+}

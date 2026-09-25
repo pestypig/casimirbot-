@@ -18,7 +18,9 @@ function fixture() {
   const store = { resolveOwnedPreparationTarget: vi.fn(() => target), verifyTaskAssociation: vi.fn() };
   const presence = [{ authenticated_profile_ref: input.profileRef, client_session_ref: target.clientSessionRef,
     authenticated_mcp_client_ref: target.authenticatedMcpClientRef, conversation_thread_ref: target.clientContinuationRef }];
-  const identity = { environment_binding_id: "environment:a", source_id: "source:a", world_id: "world:a",
+  const identity = { owner_profile_id: input.profileRef, room_id: "room:a",
+    goal_owner_participant_id: "participant:a", participant_id: "participant:a", run_id: input.runId,
+    environment_binding_id: "environment:a", source_id: "source:a", world_id: "world:a",
     subject_binding_id: "subject:a", subject_native_id: "player:a", action_authority_id: "authority:a" };
   const observation = { schema: "helix.environment_connector.probe_observation.v1",
     probe_request_ref: "probe:a", probe_attempt_ref: "attempt:a",
@@ -47,6 +49,37 @@ const bootstrapObjective = { objective_text: "Walk across the platform and stop 
   domain: "minecraft" as const, goal_kind: "custom_survival" as const, game_version: "1.21.8",
   mechanics_collection_ref: null, milestones: [{ milestone_id: "cross", description: "Cross the platform",
     dependency_milestone_ids: [], required_postcondition_ids: ["arrival"] }] };
+
+it.each([
+  ["owner", { owner_profile_id: "profile:other" }],
+  ["room", { room_id: "room:other" }],
+  ["goal owner", { goal_owner_participant_id: "participant:other" }],
+  ["participant", { participant_id: "participant:other" }],
+  ["run", { run_id: "run:other" }],
+])("rejects a %s goal identity before observation", async (_name, patch) => {
+  const f = fixture();
+  const goal = await f.deps.goal();
+  f.deps.goal.mockResolvedValue({ ...goal, identity: { ...goal.identity, ...patch } });
+  await expect(f.run()).rejects.toMatchObject({ projection: {
+    error: "environment_session_goal_identity_mismatch",
+    failure_phase: "goal_lookup", readiness_confirmed: false,
+    execution_authority: false,
+  } });
+  expect(f.deps.observe).not.toHaveBeenCalled();
+  expect(f.deps.prepare).not.toHaveBeenCalled();
+  expect(f.deps.refreshSubject).not.toHaveBeenCalled();
+});
+
+it.each([0, Number.NaN])("rejects invalid goal revision %s before observation", async revision => {
+  const f = fixture();
+  const goal = await f.deps.goal();
+  f.deps.goal.mockResolvedValue({ ...goal, revision });
+  await expect(f.run()).rejects.toMatchObject({ projection: {
+    error: "environment_session_goal_identity_mismatch", failure_phase: "goal_lookup",
+  } });
+  expect(f.deps.observe).not.toHaveBeenCalled();
+  expect(f.deps.prepare).not.toHaveBeenCalled();
+});
 
 it.each([
   ["account", "account_context"], ["target", "task_target"],

@@ -1,0 +1,216 @@
+
+> rest-express@1.0.0 helix:ask:discipline:quick
+> tsx scripts/helix-ask-discipline-check.ts --check-only
+
+[helix:ask:discipline] Codex discipline guard
+repo: C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot
+codex_reference: external/openai-codex-compare (155905cf7)
+changed_files: 200
+sensitive_helix_ask_files: 28
+  - client/src/components/helix/ask-console/HelixAskRealtimeProviderEventHandler.ts
+  - client/src/components/helix/ask-console/shared-live-room/RoomMissionHandoffReview.ts
+  - client/src/components/helix/ask-console/shared-live-room/RoomMissionOwnerApi.ts
+  - client/src/components/helix/ask-console/shared-live-room/RoomResultOwnerApi.ts
+  - client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomActivePanel.tsx
+  - client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomMissionPanel.tsx
+  - client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomOwnerResultsPanel.tsx
+  - client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomPublicResultsPanel.tsx
+  - client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomMissionPanel.spec.tsx
+  - client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomOwnerResultsPanel.spec.tsx
+  - client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPublicResultsPanel.spec.tsx
+  - server/routes/agi.plan.ts
+  - server/services/helix-ask/agent-providers/__tests__/codex-provider-bound-room-evidence.test.ts
+  - server/services/helix-ask/agent-providers/__tests__/codex-provider-realtime-context.test.ts
+  - server/services/helix-ask/agent-providers/codex-provider.ts
+  - server/services/helix-ask/agent-providers/realtime-turn-actor-context.ts
+  - server/services/helix-ask/ask-turn-solver.ts
+  - server/services/helix-ask/committed-ask-route.ts
+  - server/services/helix-ask/realtime-room/__tests__/mission-result-ask.test.ts
+  - server/services/helix-ask/realtime-room/__tests__/turn-actor-context.test.ts
+  - server/services/helix-ask/realtime-room/__tests__/voice-handoff-authority.test.ts
+  - server/services/helix-ask/realtime-room/mission-result-ask.ts
+  - server/services/helix-ask/realtime-room/public-terminal-results.ts
+  - server/services/helix-ask/realtime-room/turn-actor-context.ts
+  - server/services/helix-ask/route-product-contract.ts
+  - server/services/helix-ask/workstation-tool-gateway/account-policy.ts
+  - server/services/helix-ask/workstation-tool-gateway/registry.ts
+  - server/services/helix-ask/workstation-tool-gateway/room-mission-result.ts
+[helix:ask:discipline] per-file Codex comparison report
+- changed_file: client/src/components/helix/ask-console/HelixAskRealtimeProviderEventHandler.ts
+  discipline_category: source_admission
+  closest_codex_analog: turn.rs model/tool arbitration boundary
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; projection_or_visible_state_overrides_terminal_authority
+- changed_file: client/src/components/helix/ask-console/shared-live-room/RoomMissionHandoffReview.ts
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: client/src/components/helix/ask-console/shared-live-room/RoomMissionOwnerApi.ts
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: projection_or_visible_state_overrides_terminal_authority
+- changed_file: client/src/components/helix/ask-console/shared-live-room/RoomResultOwnerApi.ts
+  discipline_category: presentation
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation
+- changed_file: client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomActivePanel.tsx
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomMissionPanel.tsx
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: receipt_becomes_answer_without_goal_authority
+- changed_file: client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomOwnerResultsPanel.tsx
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: client/src/components/helix/ask-console/shared-live-room/SharedLiveRoomPublicResultsPanel.tsx
+  discipline_category: intent_arbitration / route_authority / terminal_authority
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: route_label_or_terminal_kind_used_as_authority
+- changed_file: client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomMissionPanel.spec.tsx
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomOwnerResultsPanel.spec.tsx
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: typed_failure_hidden_by_stale_presentation
+- changed_file: client/src/components/helix/ask-console/shared-live-room/__tests__/SharedLiveRoomPublicResultsPanel.spec.tsx
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: projection_or_visible_state_overrides_terminal_authority; route_label_or_terminal_kind_used_as_authority
+- changed_file: server/routes/agi.plan.ts
+  discipline_category: route_authority / terminal_authority / presentation
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: none_detected
+- changed_file: server/services/helix-ask/agent-providers/__tests__/codex-provider-bound-room-evidence.test.ts
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: receipt_becomes_answer_without_goal_authority
+- changed_file: server/services/helix-ask/agent-providers/__tests__/codex-provider-realtime-context.test.ts
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: server/services/helix-ask/agent-providers/codex-provider.ts
+  discipline_category: capability_admission / evidence_reentry
+  closest_codex_analog: codex_tool_runner.rs tool result events
+  helix_owned_policy_or_runtime_duplication: review for unsafe Codex-owned runtime duplication
+  required_tests: npx vitest run server/__tests__/helix.ask.capability-plan-contract.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.capability-lifecycle-ledger.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation; contextual_tool_mention_becomes_executable_action; capability_result_not_reentered_before_terminal; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/agent-providers/realtime-turn-actor-context.ts
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: server/services/helix-ask/ask-turn-solver.ts
+  discipline_category: intent_arbitration / route_authority / terminal_authority
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation; contextual_tool_mention_becomes_executable_action; retrieval_plan_used_without_result; capability_result_not_reentered_before_terminal; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/committed-ask-route.ts
+  discipline_category: capability_admission
+  closest_codex_analog: codex_tool_runner.rs tool result events
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.capability-plan-contract.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.capability-lifecycle-ledger.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation; contextual_tool_mention_becomes_executable_action; capability_result_not_reentered_before_terminal; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/realtime-room/__tests__/mission-result-ask.test.ts
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; typed_failure_hidden_by_stale_presentation; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/realtime-room/__tests__/turn-actor-context.test.ts
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: none_detected
+- changed_file: server/services/helix-ask/realtime-room/__tests__/voice-handoff-authority.test.ts
+  discipline_category: test_harness
+  closest_codex_analog: Codex regression tests / runtime invariant checks
+  helix_owned_policy_or_runtime_duplication: Helix-owned verification policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; typed_failure_hidden_by_stale_presentation; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/realtime-room/mission-result-ask.ts
+  discipline_category: intent_arbitration / route_authority / terminal_authority
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/realtime-room/public-terminal-results.ts
+  discipline_category: intent_arbitration / route_authority / terminal_authority
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/realtime-room/turn-actor-context.ts
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: receipt_becomes_answer_without_goal_authority
+- changed_file: server/services/helix-ask/route-product-contract.ts
+  discipline_category: runtime_adapter
+  closest_codex_analog: exec.rs / tool execution
+  helix_owned_policy_or_runtime_duplication: allowed only as thin adapter
+  required_tests: npx vitest run server/__tests__/helix.ask.capability-plan-contract.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.capability-lifecycle-ledger.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; projection_or_visible_state_overrides_terminal_authority; typed_failure_hidden_by_stale_presentation; route_label_or_terminal_kind_used_as_authority; stream_debug_ui_terminal_mismatch
+- changed_file: server/services/helix-ask/workstation-tool-gateway/account-policy.ts
+  discipline_category: intent_arbitration / route_authority / terminal_authority
+  closest_codex_analog: turn.rs terminal item completion / final assistant message
+  helix_owned_policy_or_runtime_duplication: review for unsafe Codex-owned runtime duplication
+  required_tests: npx vitest run server/__tests__/helix.ask.terminal-equivalence-harness.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.prompt-solving-benchmark.test.ts --pool=forks
+  shortcut_risks: receipt_becomes_answer_without_goal_authority
+- changed_file: server/services/helix-ask/workstation-tool-gateway/registry.ts
+  discipline_category: runtime_adapter
+  closest_codex_analog: exec.rs / tool execution
+  helix_owned_policy_or_runtime_duplication: allowed only as thin adapter
+  required_tests: npx vitest run server/__tests__/helix.ask.capability-plan-contract.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.capability-lifecycle-ledger.test.ts --pool=forks; npx vitest run server/__tests__/helix.ask.api-parity-matrix.test.ts --pool=forks
+  shortcut_risks: receipt_becomes_answer_without_goal_authority; projection_or_visible_state_overrides_terminal_authority; contextual_tool_mention_becomes_executable_action; retrieval_plan_used_without_result; route_label_or_terminal_kind_used_as_authority
+- changed_file: server/services/helix-ask/workstation-tool-gateway/room-mission-result.ts
+  discipline_category: helix_policy
+  closest_codex_analog: turn.rs procedural turn lifecycle
+  helix_owned_policy_or_runtime_duplication: Helix-owned policy
+  required_tests: npm run helix:ask:discipline:quick
+  shortcut_risks: contextual_tool_mention_becomes_executable_action
+classification: source admission, presentation, terminal authority, Codex-owned runtime behavior, evidence normalization, follow-up reasoning, prompt interpretation, tool admission, evidence re-entry, intent arbitration
+[WARN] live_pipeline_receipt_touched server/services/helix-ask/agent-providers/codex-provider.ts: Receipts are observations, not answers. Confirm this path is pure control/status or guarded by solver arbitration and re-entry.
+[WARN] shortcut_terminal_product_touched server/services/helix-ask/agent-providers/codex-provider.ts: Shortcut-like terminal products must be suppressed for hard source-targeted and complex prompts unless route authority explicitly allows them.
+[WARN] shortcut_terminal_product_touched server/services/helix-ask/ask-turn-solver.ts: Shortcut-like terminal products must be suppressed for hard source-targeted and complex prompts unless route authority explicitly allows them.
+[WARN] live_pipeline_receipt_touched server/services/helix-ask/committed-ask-route.ts: Receipts are observations, not answers. Confirm this path is pure control/status or guarded by solver arbitration and re-entry.
+[WARN] shortcut_terminal_product_touched server/services/helix-ask/committed-ask-route.ts: Shortcut-like terminal products must be suppressed for hard source-targeted and complex prompts unless route authority explicitly allows them.
+[WARN] live_pipeline_receipt_touched server/services/helix-ask/route-product-contract.ts: Receipts are observations, not answers. Confirm this path is pure control/status or guarded by solver arbitration and re-entry.
+[WARN] shortcut_terminal_product_touched server/services/helix-ask/route-product-contract.ts: Shortcut-like terminal products must be suppressed for hard source-targeted and complex prompts unless route authority explicitly allows them.
+[WARN] classification_not_declared: Set HELIX_ASK_DISCIPLINE_CLASSIFICATION for patch review, or record the inferred categories in the handoff.
+[helix:ask:discipline] static checks passed

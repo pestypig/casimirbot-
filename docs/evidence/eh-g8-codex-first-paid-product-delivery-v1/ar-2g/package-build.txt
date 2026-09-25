@@ -1,0 +1,9 @@
+  • electron-builder  version=26.15.3 os=10.0.26200
+  • loaded configuration  file=C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\apps\desktop\electron-builder.config.cjs
+  • skipped dependencies rebuild  reason=npmRebuild is set to false
+  • packaging       platform=win32 arch=x64 electron=43.4.0 appOutDir=release-ar2g-20260925\win-unpacked
+  • downloaded      label=electron progress=100%
+  • downloaded electron zip extracted successfully  output=C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\apps\desktop\release-ar2g-20260925\win-unpacked
+  • searching for node modules  pm=npm searchDir=C:\Users\dan\Desktop\RESEARCH 1,0\research\Alcubierre drive\casimirbot.com\versions\CasimirBot (9-3-25)\CasimirBot (9-3-25)\CasimirBot\apps\desktop
+  • updating asar integrity executable resource  executablePath=release-ar2g-20260925\win-unpacked\CasimirBot.exe
+  • file signing skipped via signExecutable configuration  file=release-ar2g-20260925\win-unpacked\CasimirBot.exe

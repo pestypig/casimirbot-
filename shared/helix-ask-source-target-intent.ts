@@ -14,6 +14,7 @@ export type HelixAskSourceTarget =
   | "scholarly_research"
   | "internet_search"
   | "runtime_evidence"
+  | "room_mission_result"
   | "workspace_directory"
   | "moral_graph"
   | "theory_locator"

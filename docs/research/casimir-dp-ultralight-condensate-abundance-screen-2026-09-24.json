@@ -1,0 +1,57 @@
+{
+  "model": "quadratic, canonical, homogeneous real-component misalignment; no self-interaction or star-formation calculation",
+  "inputs": {
+    "m_phi_eV": 1e-17,
+    "omega_dm_h2": 0.1198,
+    "reduced_planck_mass_GeV": 2.435e+18,
+    "T_CMB0_eV": 0.0002348,
+    "gstar_rho_at_oscillation": 3.36,
+    "gstar_s_at_oscillation": 3.91,
+    "gstar_s_today": 3.91,
+    "oscillation_condition": "3 H(T_osc) = m_phi"
+  },
+  "derived": {
+    "T_osc_keV": 115.63511245579362,
+    "a_osc_over_a_today": 2.0305251148500606e-09,
+    "canonical_real_amplitude_for_full_DM_GeV": 4813703737792768.0,
+    "amplitude_over_reduced_planck_mass": 0.0019768803851305003
+  },
+  "fractions": [
+    {
+      "global_phi_fraction": 0.001,
+      "global_heavy_fraction_if_two_components_only": 0.999,
+      "phi_initial_canonical_real_amplitude_GeV": 152222677926910.94,
+      "naive_LZ_rate_scaling_if_local_heavy_fraction_tracks_global": 0.999
+    },
+    {
+      "global_phi_fraction": 0.01,
+      "global_heavy_fraction_if_two_components_only": 0.99,
+      "phi_initial_canonical_real_amplitude_GeV": 481370373779276.8,
+      "naive_LZ_rate_scaling_if_local_heavy_fraction_tracks_global": 0.99
+    },
+    {
+      "global_phi_fraction": 0.1,
+      "global_heavy_fraction_if_two_components_only": 0.9,
+      "phi_initial_canonical_real_amplitude_GeV": 1522226779269109.8,
+      "naive_LZ_rate_scaling_if_local_heavy_fraction_tracks_global": 0.9
+    },
+    {
+      "global_phi_fraction": 0.5,
+      "global_heavy_fraction_if_two_components_only": 0.5,
+      "phi_initial_canonical_real_amplitude_GeV": 3403802555616297.0,
+      "naive_LZ_rate_scaling_if_local_heavy_fraction_tracks_global": 0.5
+    },
+    {
+      "global_phi_fraction": 1.0,
+      "global_heavy_fraction_if_two_components_only": 0.0,
+      "phi_initial_canonical_real_amplitude_GeV": 4813703737792768.0,
+      "naive_LZ_rate_scaling_if_local_heavy_fraction_tracks_global": 0.0
+    }
+  ],
+  "limitations": [
+    "The amplitude matches a homogeneous harmonic-field abundance only; it does not establish gravitational condensation into boson stars.",
+    "A charged complex boson-star solution requires a specified U(1) charge/asymmetry; this zero-charge real-component estimate does not supply one.",
+    "Local heavy-particle fraction need not equal global fraction if the fields cluster differently.",
+    "Portal conversion products are treated separately in the IDM thermal momentum screen."
+  ]
+}

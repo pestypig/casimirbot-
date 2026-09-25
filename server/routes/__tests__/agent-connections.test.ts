@@ -36,6 +36,8 @@ it.each([
   ["post", "reasoning-invitations/fixture-request/cancel"],
   ["post", "reasoning-pairings/fixture-pairing/revoke"],
   ["post", "reasoning-deliveries/fixture-pairing"],
+  ["post", "room-missions/select"],
+  ["post", "room-missions/fixture-room/revoke"],
 ] as const)("default browser identity rejects asserted fixture authority: %s %s", async (method, path) => {
   // No resolver/authenticator override, live service, database, cookie or key.
   // The default resolver rejects missing session identity before store access.
@@ -131,7 +133,8 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
   prepareEnvironmentSession?: Parameters<typeof createAgentConnectionsRouter>[0]["prepareEnvironmentSession"];
   prepareBrowserSession?: Parameters<typeof createAgentConnectionsRouter>[0]["prepareBrowserSession"];
   preparationIntentStore?: Parameters<typeof createAgentConnectionsRouter>[0]["preparationIntentStore"];
-  readPreparationMembership?: Parameters<typeof createAgentConnectionsRouter>[0]["readPreparationMembership"] }) => {
+  readPreparationMembership?: Parameters<typeof createAgentConnectionsRouter>[0]["readPreparationMembership"];
+  roomMissionStore?: Parameters<typeof createAgentConnectionsRouter>[0]["roomMissionStore"] }) => {
   const listBindings = vi.fn(async () => ({
     schema: "helix.agent_account_bindings.v1" as const,
     oauth_ready: (input?.bindings ?? [binding]).some((entry) => entry.status === "active"),
@@ -161,6 +164,9 @@ const setup = (input?: { bindings?: HelixAgentAccountBindingProjection[]; presen
     prepareBrowserSession: input?.prepareBrowserSession,
     preparationIntentStore: input?.preparationIntentStore,
     readPreparationMembership: input?.readPreparationMembership,
+    roomMissionStore: input?.roomMissionStore,
+    missionAccountStatus: async () => ({ session: { session_id: SESSION_ID, profile: { profile_id: PROFILE_ID } },
+      account_policy: { account_type: "developer", feature_flags: ["shared_realtime_rooms"], locked_features: [] } }) as never,
     resolveSession,
     resolveRunAssociation: input?.resolveRunAssociation,
   }));
@@ -570,6 +576,79 @@ describe("owner-scoped AI app connection readiness", () => {
     harness.reasoningStore.revoke({ profileRef: PROFILE_ID, bindingId: bound.reasoning_binding_id });
     await post().expect(409);
     expect(prepare).toHaveBeenCalledTimes(1);
+  });
+
+  it("selects and revokes only an authenticated owner's exact current room task", async () => {
+    const select = vi.fn(async () => ({ schema: "helix.room_external_mission.v1",
+      room_id: "room-owned", mission_id: "room_mission:owned", mission_revision: 1,
+      status: "active", answer_authority: false, terminal_eligible: false }));
+    const revoke = vi.fn(async () => ({ schema: "helix.room_external_mission.v1",
+      room_id: "room-owned", mission_id: "room_mission:owned", mission_revision: 2,
+      status: "revoked", answer_authority: false, terminal_eligible: false }));
+    const inspect = vi.fn(async () => ({ owner_profile_id: PROFILE_ID }));
+    const membership = vi.fn(async () => ({ participantId: "participant-owned", role: "owner",
+      presence: "present", roomStatus: "active" }) as never);
+    const harness = setup({ roomMissionStore: { select, revoke, inspect } as never,
+      readPreparationMembership: membership,
+      presence: [presence({ observed_at: new Date().toISOString(),
+        heartbeat_expires_at: new Date(Date.now() + 120_000).toISOString(),
+        thread_observability_bridge: {
+          supported_levels: ["tool_activity_only", "continuation_ready"],
+          requested_level: "continuation_ready",
+          declaration_basis: "authenticated_client_declaration",
+          provider_thread_content_included: false, hidden_reasoning_included: false,
+          answer_authority: false, terminal_eligible: false,
+        } })] });
+    const issued = harness.reasoningStore.issueClaim({ profileRef: PROFILE_ID,
+      clientSessionRef: "client-session-owned", helixConversationId: "chat-owned",
+      runId: "run-owned" });
+    const bound = harness.reasoningStore.claim({ profileRef: PROFILE_ID,
+      authenticatedMcpClientRef: "mcp-client-owned", clientSessionRef: "client-session-owned",
+      claimHandle: issued.claim_handle });
+    const body = { request_id: "select:owned", room_id: "room-owned",
+      reasoning_binding_id: bound.reasoning_binding_id,
+      binding_epoch: bound.binding_epoch, helix_conversation_id: "chat-owned",
+      binding_mission_id: null, run_id: "run-owned", expected_revision: null };
+    const post = (value: object) => request(harness.app)
+      .post("/api/account/session/agent-connections/room-missions/select")
+      .set("Cookie", `helix_session=${SESSION_ID}`).send(value);
+    const selected = await post(body).expect(200);
+    expect(selected.body).toMatchObject({ mission: { mission_id: "room_mission:owned",
+      mission_revision: 1 }, dispatch_authority: false, answer_authority: false });
+    expect(select).toHaveBeenCalledWith({ roomId: "room-owned", ownerProfileId: PROFILE_ID,
+      ownerParticipantId: "participant-owned", bindingId: bound.reasoning_binding_id,
+      bindingEpoch: bound.binding_epoch, helixConversationId: "chat-owned",
+      bindingMissionId: null, runId: "run-owned", expectedRevision: null,
+      requestId: "select:owned" });
+    await post({ ...body, binding_epoch: bound.binding_epoch + 1 }).expect(409);
+    await post({ ...body, helix_conversation_id: "chat-foreign" }).expect(409);
+    await post({ ...body, client_continuation_ref: "forged-task" }).expect(400);
+    expect(select).toHaveBeenCalledTimes(1);
+    membership.mockResolvedValueOnce({ participantId: "participant-owned", role: "guest",
+      presence: "present", roomStatus: "active" } as never);
+    await post(body).expect(403);
+    expect(select).toHaveBeenCalledTimes(1);
+    inspect.mockResolvedValueOnce({ owner_profile_id: "profile-foreign" });
+    await request(harness.app)
+      .post("/api/account/session/agent-connections/room-missions/room-owned/revoke")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .send({ request_id: "revoke:foreign", expected_revision: 1 }).expect(403);
+    expect(revoke).not.toHaveBeenCalled();
+    membership.mockResolvedValue(null as never);
+    const membershipReads = membership.mock.calls.length;
+    const revoked = await request(harness.app)
+      .post("/api/account/session/agent-connections/room-missions/room-owned/revoke")
+      .set("Cookie", `helix_session=${SESSION_ID}`)
+      .send({ request_id: "revoke:owned", expected_revision: 1 }).expect(200);
+    expect(revoked.body.mission).toMatchObject({ status: "revoked", mission_revision: 2 });
+    expect(membership).toHaveBeenCalledTimes(membershipReads);
+    expect(revoke).toHaveBeenCalledWith({ roomId: "room-owned", ownerProfileId: PROFILE_ID,
+      expectedRevision: 1, requestId: "revoke:owned" });
+    membership.mockResolvedValue({ participantId: "participant-owned", role: "owner",
+      presence: "present", roomStatus: "active" } as never);
+    harness.reasoningStore.revoke({ profileRef: PROFILE_ID, bindingId: bound.reasoning_binding_id });
+    await post(body).expect(409);
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it("binds only the explicitly selected current run and preserves the claim on stale selection", async () => {

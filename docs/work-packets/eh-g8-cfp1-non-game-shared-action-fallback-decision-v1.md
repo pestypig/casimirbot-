@@ -12,6 +12,13 @@ Downstream gate unlocked: none automatically; CFP-1 closure and canonical stage 
 
 # CFP-1 non-game shared-action fallback decision v1
 
+The [G1 engineering freeze](eh-g8-g1-release-matrix-and-engineering-admission-v1.md#g11--conditional-operations-and-fallback-engineering-freeze)
+now specifies the planned canvas package, exact offer/request/document tuple,
+numeric clocks and prospective CF-01–08 fixtures. Its canonical G1-T1 admission
+permits isolated test-only contract development, not this packet's production
+connector, customer claim or installed shared-action acceptance. The action
+remains absent from the runtime; rights and customer usefulness remain open.
+
 The owner selected [Minecraft conditionally, with a non-game fallback](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-conditional-minecraft-paid-action-owner-selection-46.md) for the [action-inclusive paid offer and trial](eh-g8-cfp1-first-paid-shared-action-candidate-v1.md), then [selected Path A as the provisional fallback development target](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-20-cfp1-non-game-fallback-development-selection-113.md). This does **not** replace the admitted Minecraft technical pilot or approve a new customer claim. The [source check](../evidence/eh-g8-codex-first-paid-product-delivery-v1/cfp-1/2026-09-19-first-paid-action-fallback-source-check-45.md) found only a read-only non-game clock profile; the inspected action registry has only the Minecraft Fabric player profile. The [public connector kit](eh-g8-cfp1-public-interface-and-source-boundary-v1.md) is likewise probe-oriented. Either non-game path therefore needs new action admission and installed evidence.
 
 ## Product-owner choice

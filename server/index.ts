@@ -87,6 +87,8 @@ import { helixAgentAccountLinkStore } from
 import { getAccountSessionById } from
   "./services/helix-account/account-session-store";
 import { createAgentConnectionsRouter } from "./routes/agent-connections";
+import { createRoomResultAskMiddleware } from "./services/helix-ask/realtime-room/mission-result-ask";
+import { createRoomResultCatalogRouter } from "./routes/room-result-catalog";
 import { createOperatorActivityRouter } from "./routes/operator-activity";
 import { operatorActivityStore } from
   "./services/helix-ask/operator-activity-ingestion";
@@ -1518,6 +1520,8 @@ app.use((req, res, next) => {
       log("app ready (fast boot)");
     } else {
       const { registerRoutes } = await import("./routes");
+      app.use("/api/agi", createRoomResultAskMiddleware({ reasoningBindingStore: reasoningTaskBindingStore }));
+      app.use("/api/account", createRoomResultCatalogRouter({ reasoningBindingStore: reasoningTaskBindingStore }));
       await registerRoutes(app, server, { reasoningTaskBindingStore });
 
       if (process.env.ENABLE_LATTICE_WATCHER === "1") {

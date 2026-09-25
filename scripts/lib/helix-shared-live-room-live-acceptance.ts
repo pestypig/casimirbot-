@@ -294,6 +294,11 @@ const ROOM_TOOL_OUTPUT_REQUIRED: Record<RoomToolName, readonly string[]> = {
   ],
   helix_room_command_request: [
     "api_version",
+    "content_role",
+    "reentry_required",
+    "answer_authority",
+    "assistant_answer",
+    "terminal_eligible",
     "error",
     "message",
     "request_id",
@@ -438,6 +443,11 @@ const ROOM_TOOL_OUTPUT_LITERALS: Record<
   helix_room_command_request: {
     api_version: "v1",
     schema: "helix.shared_live_room.error.v1",
+    content_role: "room_control_error_not_assistant_answer",
+    reentry_required: true,
+    answer_authority: false,
+    assistant_answer: false,
+    terminal_eligible: false,
   },
   helix_room_source_list: {
     ...NONTERMINAL_OUTPUT_LITERALS,

@@ -1,0 +1,77 @@
+{
+  "schema": "casimirbot.ar2h.pairing_checkpoint.v1",
+  "observed_at": "2026-09-25T12:37:38Z",
+  "task_id": "01a0798b-b5bd-7bf2-946a-9a77e086316a",
+  "pairing": {
+    "schema": "helix.pairing_status.v1",
+    "id": "pairing:72714b9e-88d5-4fdd-b2a1-cc4eaf6b8a03",
+    "revision": 2,
+    "destinationDigest": "4c0e3064e94cd1587f01548bbc95a4191482aa5238e119433cb26494b29f78d1",
+    "chatId": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+    "environment": null,
+    "state": "accepted",
+    "createdAt": "2026-09-25T12:30:35.074Z",
+    "invitationExpiresAt": "2026-09-25T12:45:35.074Z",
+    "pairingExpiresAt": "2026-09-25T13:30:35.074Z",
+    "acceptedAt": "2026-09-25T12:31:10.764Z",
+    "revokedAt": null,
+    "executionAuthority": false,
+    "answerAuthority": false
+  },
+  "binding": {
+    "schema": "helix.reasoning_task_binding.v1",
+    "reasoning_binding_id": "reasoning_binding:032283f1bfd88958d117a2afb90bdfd9",
+    "pairing_id": "pairing:72714b9e-88d5-4fdd-b2a1-cc4eaf6b8a03",
+    "binding_epoch": 1,
+    "status": "active",
+    "service_instance_ref": "service_instance:b8c6177b0e2393a83ae117af797d86f6",
+    "authenticated_profile_ref": "user:earnDsXQhAxnMGRbxwikP3Lt5iqtDGoF",
+    "authenticated_mcp_client_ref": "mcp_client:native_desktop:0fa264e9afc8db953121030a73f03842e7c60d940b4109108ccb89cdef0be5e4",
+    "client_session_ref": "supervisor_client:e3b5a4df90b28ba3b8855e7de2254679",
+    "provider_thread_ref_hash": "d9848db4e381f8c365d25f8fb26eebb626c08c8c565a25c3c4adaae25496e1d2",
+    "helix_conversation_id": "534a24b1-62e2-4feb-9e47-48a8f6caff64",
+    "mission_id": null,
+    "run_id": null,
+    "reasoning_role": "principal",
+    "continuation_transport": "polling",
+    "negotiated_observability_level": "continuation_ready",
+    "created_by": "signed_in_operator",
+    "created_at": "2026-09-25T12:30:35.074Z",
+    "expires_at": "2026-09-25T13:30:35.074Z",
+    "claimed_at": "2026-09-25T12:31:10.764Z",
+    "revoked_at": null,
+    "provider_thread_content_included": false,
+    "hidden_reasoning_included": false,
+    "execution_authority": false,
+    "evidence_authority": false,
+    "answer_authority": false,
+    "terminal_eligible": false
+  },
+  "runtime_binding_active": true,
+  "installed_ui": [
+    "Pairing: accepted",
+    "Chat binding: active. A missing heartbeat does not revoke this binding."
+  ],
+  "clipboard": "consumed invitation cleared only after matching pairing ID",
+  "steering_probe": {
+    "ok": false,
+    "error": "INVALID_ARGUMENT",
+    "missing_required_fields": [
+      "helix_conversation_id",
+      "mission_id",
+      "run_id"
+    ],
+    "advertised_tool_fields": [
+      "after_cursor",
+      "binding_epoch",
+      "client_continuation_ref",
+      "reasoning_binding_id"
+    ],
+    "explicit_extra_fields_attempt": "same missing-field error; refreshed connector metadata still required",
+    "authority_checks_weakened": false
+  },
+  "guest_present": false,
+  "provider_calls_started": false,
+  "environment_actions_started": false,
+  "full_live_acceptance_passed": false
+}

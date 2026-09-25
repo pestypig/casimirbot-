@@ -1,0 +1,40 @@
+{
+  "status": "two-body kinematics only; no interaction rate or detector likelihood",
+  "inputs": {
+    "LZ_event_recoil_keV": 248.0,
+    "combined_recoil_uncertainty_keV": 32.526911934581186,
+    "xenon_nucleus_mass_GeV": 122.29865518902906,
+    "generous_lab_speed_cap_km_s": 800.0,
+    "ultralight_mass_eV": 1e-17,
+    "IDM_benchmark_mass_GeV": 1080.0,
+    "IDM_endothermic_splitting_keV": 369.0
+  },
+  "ultralight_elastic": {
+    "maximum_nuclear_recoil_eV": 1.1645198138502431e-50,
+    "LZ_event_energy_over_recoil_ceiling": 2.1296331505089593e+55,
+    "single_boson_rest_energy_eV": 1e-17,
+    "event_energy_over_single_boson_rest_energy": 2.48e+22,
+    "elastic_mass_required_for_central_recoil_GeV_at_speed_cap": 74.11398115842184
+  },
+  "inelastic_IDM": {
+    "reduced_mass_GeV": 109.85835094640855,
+    "minimum_speed_for_central_event_km_s": 785.2083093049484,
+    "minimum_speed_over_recoil_uncertainty_band_km_s": [
+      795.1062564101536,
+      779.7258496105676
+    ],
+    "maximum_endothermic_splitting_at_central_recoil_keV": 381.1520288778537,
+    "kinematically_allowed_at_speed_cap": true
+  },
+  "equations": {
+    "elastic_max_recoil": "E_R,max=2 mu^2 v^2/M_Xe",
+    "endothermic_minimum_speed": "v_min(E_R)=(M_Xe E_R/mu+delta)/sqrt(2 M_Xe E_R)"
+  },
+  "limitations": [
+    "The 800 km/s speed cap is a deliberately generous kinematic ceiling, not a halo distribution or expected rate.",
+    "The elastic mass threshold is a two-body kinematic minimum at that cap; LZ signal fits and rates impose stronger model-dependent requirements.",
+    "The 1080 GeV, 369 keV IDM point is a repository benchmark, not an official LZ best fit. Its v_min must be folded through the actual halo distribution and detector response.",
+    "A coherent multiparticle process or nonstandard energy-transfer mechanism is outside the single-particle WIMP recoil screen.",
+    "LZ reports one NR-compatible 248 keV event with global 2.6 sigma significance; this is not a confirmed dark-matter detection."
+  ]
+}

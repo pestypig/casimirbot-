@@ -23,6 +23,7 @@ import {
 import { migration026 } from "../../../db/migrations/026_helix_accounts";
 import { migration032 } from "../../../db/migrations/032_helix_agent_api";
 import { HelixAgentRunStore } from "../../helix-agent-api/run-store";
+import { SharedRealtimeRoomDomainError } from "../../helix-ask/realtime-room/room-store";
 import {
   SharedLiveRoomControlError,
   SharedLiveRoomControlService,
@@ -183,6 +184,7 @@ const sourceBinding = (
 });
 
 type HarnessOverrides = {
+  assertJoinAdmission?: SharedLiveRoomControlDependencies["assertJoinAdmission"];
   pool?: Pool;
   roomMembership?: ReturnType<typeof membership> | null;
   listedRooms?: HelixSharedRealtimeRoom[];
@@ -199,6 +201,9 @@ type HarnessOverrides = {
 
 const createHarness = async (overrides: HarnessOverrides = {}) => {
   const pool = overrides.pool ?? (await createPool());
+  const idempotencyStore = new HelixAgentRunStore(pool);
+  const joinRoom = vi.fn(async (_input: { profileId: string; roomId?: string | null; inviteCode: string }) => room());
+  const assertJoinAdmission = overrides.assertJoinAdmission ?? vi.fn();
   let roomSequence = 0;
   let deliverySequence = 0;
   const createRoom = vi.fn(
@@ -294,8 +299,10 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
     })),
   };
   const service = new SharedLiveRoomControlService({
-    idempotencyStore: new HelixAgentRunStore(pool),
+    idempotencyStore,
+    assertJoinAdmission,
     domainStore: {
+      joinRoom,
       createRoom,
       listRooms,
       readRoom,
@@ -318,6 +325,9 @@ const createHarness = async (overrides: HarnessOverrides = {}) => {
     afterFloorAcquire: overrides.afterFloorAcquire,
   });
   return {
+    idempotencyStore,
+    joinRoom,
+    assertJoinAdmission,
     pool,
     service,
     createRoom,
@@ -343,6 +353,88 @@ const expectControlError = async (
 };
 
 describe("SharedLiveRoomControlService", () => {
+  const joinRequest = { room_id: ROOM_ID, invite_code: `helix_live_${"a".repeat(32)}` };
+  const joinInput = () => ({ actor: actor(), idempotencyKey: "join-retry-001", request: joinRequest });
+
+  it("joins as the authenticated profile and replays current membership without saving invitation plaintext", async () => {
+    const h = await createHarness();
+    const save = vi.spyOn(h.idempotencyStore, "completeIdempotency");
+    const first = await h.service.joinRoom(joinInput());
+    h.readRoom.mockResolvedValueOnce(room({ title: "Current room title" }));
+    const replay = await h.service.joinRoom(joinInput());
+    expect(h.joinRoom).toHaveBeenCalledTimes(1);
+    expect(h.joinRoom).toHaveBeenCalledWith({ profileId: "profile-a", roomId: ROOM_ID, inviteCode: joinRequest.invite_code });
+    expect(h.assertJoinAdmission).toHaveBeenCalledWith("profile-a", "session-a");
+    expect(first).toMatchObject({ status: 201, idempotencyReplayed: false, body: { answer_authority: false, terminal_eligible: false } });
+    expect(first.body.room.participants[0].consent).toEqual(buildDefaultHelixSharedRealtimeRoomConsent());
+    expect(replay).toMatchObject({ idempotencyReplayed: true, body: { room: { title: "Current room title" } } });
+    expect(JSON.stringify(save.mock.calls)).not.toContain(joinRequest.invite_code);
+    expect(JSON.stringify(first)).not.toContain(joinRequest.invite_code);
+  });
+
+  it("rejects changed invitation under the same key", async () => {
+    const h = await createHarness();
+    await h.service.joinRoom(joinInput());
+    await expectControlError(h.service.joinRoom({ ...joinInput(), request: { ...joinRequest, invite_code: `helix_live_${"b".repeat(32)}` } }), 409, "idempotency_conflict");
+    expect(h.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not share a caller's receipt with another OAuth identity", async () => {
+    const h = await createHarness();
+    await h.service.joinRoom(joinInput());
+    h.joinRoom.mockRejectedValueOnce(new SharedRealtimeRoomDomainError("shared_realtime_room_invite_redeemed", 409, "Already redeemed."));
+    const other = actor({ profileId: "profile-b", idempotencyOwner: { ...actor().idempotencyOwner, subjectId: "subject-b", accountProfileId: "profile-b" } });
+    await expectControlError(h.service.joinRoom({ ...joinInput(), actor: other }), 409, "room_invite_redeemed");
+    expect(h.joinRoom).toHaveBeenLastCalledWith(expect.objectContaining({ profileId: "profile-b" }));
+    expect(h.readRoom).not.toHaveBeenCalled();
+  });
+
+  it.each(["closed", "left", "replacement"])("denies retry after membership becomes %s", async (state) => {
+    const h = await createHarness();
+    await h.service.joinRoom(joinInput());
+    const current = room();
+    if (state === "closed") current.status = "closed";
+    if (state === "left") current.participants[0].presence = "left";
+    if (state === "replacement") {
+      current.self_participant_id = "participant:replacement";
+      current.participants[0].participant_id = current.self_participant_id;
+    }
+    h.readRoom.mockResolvedValueOnce(current);
+    await expectControlError(h.service.joinRoom(joinInput()), 409, "room_forbidden");
+    expect(h.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["invite_expired", "invite_redeemed", "full"])("returns a typed %s failure and releases an unused reservation", async (suffix) => {
+    const h = await createHarness();
+    h.joinRoom.mockRejectedValueOnce(new SharedRealtimeRoomDomainError(`shared_realtime_room_${suffix}`, 409, "Join rejected."));
+    await expectControlError(h.service.joinRoom(joinInput()), 409, `room_${suffix}`);
+    await expect(h.service.joinRoom(joinInput())).resolves.toMatchObject({ idempotencyReplayed: false });
+  });
+
+  it.each(["join", "receipt"])("keeps an uncertain %s outcome from repeating a redemption", async (stage) => {
+    const h = await createHarness();
+    if (stage === "join") h.joinRoom.mockRejectedValueOnce(new Error("Connection interrupted"));
+    else vi.spyOn(h.idempotencyStore, "completeIdempotency").mockRejectedValueOnce(new Error("Connection interrupted"));
+    await expect(h.service.joinRoom(joinInput())).rejects.toBeInstanceOf(SharedLiveRoomControlError);
+    await expectControlError(h.service.joinRoom(joinInput()), 409, "outcome_unknown");
+    expect(h.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects personal-session conflicts before reserving or joining", async () => {
+    const h = await createHarness({ assertJoinAdmission: () => { throw new SharedRealtimeRoomDomainError("shared_realtime_room_personal_session_blocked", 409, "Stop personal session."); } });
+    const acquire = vi.spyOn(h.idempotencyStore, "acquireIdempotency");
+    await expectControlError(h.service.joinRoom(joinInput()), 409, "room_personal_session_blocked");
+    expect(acquire).not.toHaveBeenCalled();
+    expect(h.joinRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects caller-supplied identity and missing manage scope", async () => {
+    const h = await createHarness();
+    await expectControlError(h.service.joinRoom({ ...joinInput(), request: { ...joinRequest, profile_id: "forged" } }), 400, "invalid_request");
+    await expectControlError(h.service.joinRoom({ ...joinInput(), actor: actor({ oauthScopes: new Set([HELIX_SHARED_LIVE_ROOM_READ_SCOPE]) }) }), 403, "insufficient_scope");
+    expect(h.joinRoom).not.toHaveBeenCalled();
+  });
+
   it("sets only the authenticated actor's own room presence", async () => {
     const harness = await createHarness();
     const receipt = await harness.service.setOwnPresence({

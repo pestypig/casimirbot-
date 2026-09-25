@@ -1,6 +1,7 @@
 const REDACTION = "[REDACTED_SECRET]";
 
 const SECRET_PATTERNS: readonly RegExp[] = [
+  /\bhelix_live_[A-Za-z0-9_-]{32}/gu,
   /\bhelix_room_src_[A-Za-z0-9_-]+/gu,
   /\broom_source_claim_[A-Za-z0-9:._~-]+/gu,
   /\bagent_chat_claim_[A-Za-z0-9:._~-]+/gu,

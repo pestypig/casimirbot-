@@ -1,0 +1,24 @@
+{
+  "schema": "casimirbot.ar2e.post_smoke_state.v1",
+  "observed_at": "2026-09-25T04:07:28.8899449Z",
+  "qualified_source_hashes_match": true,
+  "remaining_casimirbot_processes": 0,
+  "preserved_packages": [
+    {
+      "root": "apps/desktop/release/win-unpacked",
+      "source_commit": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+      "generated_at": "2026-09-21T17:09:08.913Z",
+      "exe_exists": true
+    },
+    {
+      "root": "apps/desktop/release-nav-eq-verified-20260920/win-unpacked",
+      "source_commit": "cc5a7a4c1ac956606aea756f59e6fcb0324a9f93",
+      "generated_at": "2026-09-20T19:52:45.947Z",
+      "exe_exists": true
+    }
+  ],
+  "browser_control": "initialization still fails after reset: kernel assets path not found",
+  "paid_provider_calls": 0,
+  "domain_deployed": false,
+  "user_profile_modified_by_smoke": false
+}

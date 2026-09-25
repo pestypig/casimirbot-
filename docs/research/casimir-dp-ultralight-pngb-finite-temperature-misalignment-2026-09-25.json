@@ -1,0 +1,141 @@
+{
+  "status": "finite-temperature homogeneous KG abundance normalization; not a boson-star or full BBN calculation",
+  "model": {
+    "potential": "V(X)=m_phi^2 X^2/2 for one canonical real component of the pNGB field",
+    "mass_eV": 1e-17,
+    "initial_condition": "X_i=1 in normalized solver, dX/dln(a)=0 at 10 MeV; linearity then sets the required X_i",
+    "neutrino_decoupling": "instantaneous at 2 MeV; T_nu/T follows EM entropy conservation thereafter",
+    "cosmology": "standard radiation domination with finite-temperature e+e- equation of state",
+    "charge": "single-axis real misalignment; generated U(1) charge is zero",
+    "isocurvature_bound": "conditional on symmetry broken before inflation, light spectator fluctuations deltaX=H_I/(2pi), no restoration, and uncorrelated scale-invariant CDM isocurvature"
+  },
+  "inputs": {
+    "Omega_DM_h2": 0.1198,
+    "h": 0.674,
+    "f_phi_grid": [
+      0.1,
+      1.0
+    ],
+    "f_pNGB_reference_GeV": 6.7e+17,
+    "Planck_uncorrelated_CDI_beta_upper": 0.038,
+    "curvature_power_at_pivot": 2.1e-09,
+    "electron_mass_MeV": 0.5109989500000001,
+    "neutrino_decoupling_MeV": 2.0
+  },
+  "outputs": {
+    "H_over_m_at_start": 4458.825806848992,
+    "H_over_m_at_stop": 0.009999999999999972,
+    "T_start_MeV": 10.000000000000004,
+    "T_stop_MeV": 0.020012467628382418,
+    "finite_temperature_gstar_at_T_0p1MeV": 4.311230590941256,
+    "comoving_energy_per_initial_field2_GeV2": 1.598281206389017e-79,
+    "fractions": {
+      "0.1": {
+        "initial_canonical_real_field_GeV": 2463069280007737.5,
+        "initial_angle_for_f_6p7e17": 0.003676222805981698,
+        "conditional_H_inflation_upper_GeV_from_CDI_isocurvature": 704758641894.8795,
+        "rho_phi_over_radiation_at_sampled_BBN_temperatures_envelope": [
+          5.369115000186825e-12,
+          1.473393782592432e-06
+        ]
+      },
+      "1.0": {
+        "initial_canonical_real_field_GeV": 7788908959615482.0,
+        "initial_angle_for_f_6p7e17": 0.011625237253157436,
+        "conditional_H_inflation_upper_GeV_from_CDI_isocurvature": 222864250907.47845,
+        "rho_phi_over_radiation_at_sampled_BBN_temperatures_envelope": [
+          5.369115000186825e-11,
+          1.4733937825924316e-05
+        ]
+      }
+    },
+    "BBN_temperature_samples": [
+      {
+        "f_phi_of_total_DM": 0.1,
+        "temperature_MeV": 2.0,
+        "H_over_m": 178.2189980010537,
+        "rho_phi_over_radiation": 5.369115000186825e-12
+      },
+      {
+        "f_phi_of_total_DM": 0.1,
+        "temperature_MeV": 1.0,
+        "H_over_m": 44.253588867692805,
+        "rho_phi_over_radiation": 8.707505290398631e-11
+      },
+      {
+        "f_phi_of_total_DM": 0.1,
+        "temperature_MeV": 0.5,
+        "H_over_m": 10.770275942329667,
+        "rho_phi_over_radiation": 1.4693442114716974e-09
+      },
+      {
+        "f_phi_of_total_DM": 0.1,
+        "temperature_MeV": 0.2,
+        "H_over_m": 1.4727402463627712,
+        "rho_phi_over_radiation": 7.640275683458763e-08
+      },
+      {
+        "f_phi_of_total_DM": 0.1,
+        "temperature_MeV": 0.1,
+        "H_over_m": 0.2823776235238183,
+        "rho_phi_over_radiation": 9.606256347197743e-07
+      },
+      {
+        "f_phi_of_total_DM": 0.1,
+        "temperature_MeV": 0.05,
+        "H_over_m": 0.06263185639492147,
+        "rho_phi_over_radiation": 1.473393782592432e-06
+      },
+      {
+        "f_phi_of_total_DM": 1.0,
+        "temperature_MeV": 2.0,
+        "H_over_m": 178.2189980010537,
+        "rho_phi_over_radiation": 5.369115000186825e-11
+      },
+      {
+        "f_phi_of_total_DM": 1.0,
+        "temperature_MeV": 1.0,
+        "H_over_m": 44.253588867692805,
+        "rho_phi_over_radiation": 8.707505290398629e-10
+      },
+      {
+        "f_phi_of_total_DM": 1.0,
+        "temperature_MeV": 0.5,
+        "H_over_m": 10.770275942329667,
+        "rho_phi_over_radiation": 1.469344211471697e-08
+      },
+      {
+        "f_phi_of_total_DM": 1.0,
+        "temperature_MeV": 0.2,
+        "H_over_m": 1.4727402463627712,
+        "rho_phi_over_radiation": 7.640275683458761e-07
+      },
+      {
+        "f_phi_of_total_DM": 1.0,
+        "temperature_MeV": 0.1,
+        "H_over_m": 0.2823776235238183,
+        "rho_phi_over_radiation": 9.60625634719774e-06
+      },
+      {
+        "f_phi_of_total_DM": 1.0,
+        "temperature_MeV": 0.05,
+        "H_over_m": 0.06263185639492147,
+        "rho_phi_over_radiation": 1.4733937825924316e-05
+      }
+    ]
+  },
+  "numerical": {
+    "thermodynamics_grid_points": 520,
+    "solver": "SciPy solve_ivp DOP853, rtol=2e-9, atol=2e-11, max_step=0.001 in ln(a)",
+    "final_cycle_samples": 1000,
+    "comoving_energy_cycle_relative_scatter": 0.01140687551444205
+  },
+  "limitations": [
+    "Neutrino decoupling is instantaneous at 2 MeV; non-instantaneous neutrino heating and QED corrections are omitted.",
+    "The scalar potential is treated as exactly harmonic with constant mass; the full O(3)/O(2) potential and radial mode are not included.",
+    "The scalar is a canonical real displacement with no angular rotation, so it carries no U(1) charge and does not initialize the charged-star solution.",
+    "The quoted inflation bound does not apply unchanged if the symmetry is restored after inflation, the pNGB is heavy during inflation, inflationary fluctuations are suppressed or correlated, or other isocurvature sources compensate.",
+    "BBN ratios are background diagnostics only, not an abundance/light-element likelihood or perturbation calculation.",
+    "No isocurvature transfer, late structure formation, star fraction, IDM relic, gamma-ray rate, xenon response or Casimir-DP response is computed."
+  ]
+}

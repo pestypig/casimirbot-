@@ -1,0 +1,70 @@
+{
+  "classification": "pointwise_numerical_Yukawa_crosscheck_not_velocity_averaged_prediction",
+  "source_benchmark": "Yamashita arXiv:2609.02868v2; Table 1 values use Cassel analytic approximation",
+  "inputs": {
+    "m_X_GeV": 420.0,
+    "alpha_eff": 0.2,
+    "m_mediator_GeV": 0.4,
+    "v_relative_freezeout": 0.3,
+    "v_relative_halo": 0.001,
+    "v_relative_dwarf": 0.0001,
+    "paper_sigma_v_halo_cm3_s": 2.7e-24,
+    "paper_sigma_v_dwarf_cm3_s": 6.5e-26,
+    "radial_equation_variable": "t = m_X * v_relative * r",
+    "radial_equation": "u'' + [1/4 + (alpha/v) exp(-m_med*t/(m_X*v))/t - l(l+1)/t^2]u = 0, l=1"
+  },
+  "pointwise_S1": {
+    "freezeout": {
+      "v_relative": 0.3,
+      "S1_Cassel_Hulthen": 6.1126035693887095,
+      "S1_exact_Yukawa_pointwise": 6.106043431388096,
+      "exact_over_approx": 0.9989267849736786
+    },
+    "milky_way": {
+      "v_relative": 0.001,
+      "S1_Cassel_Hulthen": 12878007.723809296,
+      "S1_exact_Yukawa_pointwise": 41205847.53047946,
+      "exact_over_approx": 3.1997066948714976
+    },
+    "dwarf": {
+      "v_relative": 0.0001,
+      "S1_Cassel_Hulthen": 30658323.317522194,
+      "S1_exact_Yukawa_pointwise": 465894454.4019612,
+      "exact_over_approx": 15.1963448743359
+    }
+  },
+  "derived": {
+    "paper_dwarf_over_halo_sigma_v": 0.024074074074074074,
+    "Cassel_proxy_dwarf_over_halo_sigma_v": 0.023806728474653777,
+    "exact_pointwise_dwarf_over_halo_sigma_v": 0.11306513087914156,
+    "conditional_exact_pointwise_dwarf_rate_if_halo_anchored_cm3_s": 3.0527585337368225e-25,
+    "exact_rate_ratio_over_paper_rate_ratio": 4.696551590364342,
+    "solver_function_evaluations": {
+      "freezeout": 228986,
+      "milky_way": 9266,
+      "dwarf": 9770
+    },
+    "convergence_relative_change_max_step_0_1_vs_0_03": {
+      "milky_way": 1.1383782805296505e-11,
+      "dwarf": 1.1111556119658417e-11
+    }
+  },
+  "interpretation": [
+    "Cassel's Hulthen approximation reproduces the paper's quoted S1 values (about 6.1 at freeze-out, 1.3e7 in the halo and 3.1e7 in dwarfs).",
+    "The direct pointwise Yukawa solve gives larger low-speed S1 values; attractive finite-range Yukawa potentials can have p-wave resonances, and a single representative speed can land differently from a velocity-distribution average.",
+    "The source paper explicitly says its resonance features are not included and velocity averaging can smear them; the exact values here must not be interpreted as a gamma-ray fit or a constraint result."
+  ],
+  "limits": [
+    "No Maxwellian or astrophysical relative-speed distribution is folded in; the quoted representative speeds are treated as points only.",
+    "The halo-anchored dwarf rate is an illustrative ratio using sigma*v proportional to v^2*S1 and is not a refit of the source's freeze-out normalization.",
+    "No bound-state formation, coupled channels, finite-temperature effects, mediator decay, or UV completion is included.",
+    "This tests the annihilation mediator only; xenon and Casimir-DP response calculations are unchanged and unconnected."
+  ],
+  "checks": {
+    "Cassel_halo_reproduces_rounded_source_within_2_percent": true,
+    "Cassel_dwarf_reproduces_rounded_source_within_2_percent": true,
+    "exact_solver_halo_converges_within_1e_minus_6": true,
+    "exact_solver_dwarf_converges_within_1e_minus_6": true,
+    "interpretation_keeps_velocity_average_unresolved": true
+  }
+}

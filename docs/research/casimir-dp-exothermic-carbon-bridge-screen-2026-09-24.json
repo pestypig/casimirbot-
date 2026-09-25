@@ -1,0 +1,119 @@
+{
+  "classification": "conditional transfer of phenomenological SI recoil normalization; not a bosonic fit or full material prediction",
+  "source": "https://arxiv.org/html/2609.04673v1",
+  "inputs": {
+    "sigma_p_times_fstar_cm2": [
+      5e-46,
+      3e-45
+    ],
+    "m_X_GeV": [
+      40.0,
+      60.0,
+      90.0
+    ],
+    "LZ_recoil_peak_keV": 248.0,
+    "local_total_DM_density_GeV_cm3": 0.3,
+    "speed_support_cap_km_s": 798.0,
+    "frozen_configuration_path": "configs/research/casimir-dp-integrated-feasibility-pilot-stage4-2r.v1.json",
+    "frozen_configuration_sha256": "5a7c4f26968c5ed800e4b1ef7428aabc94a5bcf14e64599b9779d6f940cd8d11",
+    "frozen_C_sphere_mass_kg": 3.0925052683774525e-16,
+    "frozen_sphere_radius_m": 2.76302362398029e-07,
+    "frozen_branch_separation_m": 2.5e-07,
+    "frozen_hold_s": 0.25,
+    "registered_one_sigma_D_precision": 0.005816,
+    "carbon_nuclear_form_factor_squared": 1.0
+  },
+  "outputs": [
+    {
+      "m_X_GeV": 40.0,
+      "delta_keV": 1004.559509985524,
+      "carbon_peak_keV": 785.1505718332227,
+      "carbon_momentum_transfer_GeV": 0.13248665990273928,
+      "carbon_qR_for_frozen_sphere": 185511261.78055623,
+      "sigma_p_times_fstar_cm2": 5e-46,
+      "sigma_C_times_fstar_cm2_F2eq1": 6.242408387128741e-42,
+      "maximum_exothermic_outgoing_speed_km_s": 4615.764181047476,
+      "expected_C_collisions_in_frozen_hold": 8.384499955920307e-26,
+      "D_upper_two_perfectly_distinguishable_branches": 1.6768999911840615e-25,
+      "fraction_of_registered_one_sigma_precision": 2.883253079752513e-23
+    },
+    {
+      "m_X_GeV": 40.0,
+      "delta_keV": 1004.559509985524,
+      "carbon_peak_keV": 785.1505718332227,
+      "carbon_momentum_transfer_GeV": 0.13248665990273928,
+      "carbon_qR_for_frozen_sphere": 185511261.78055623,
+      "sigma_p_times_fstar_cm2": 3e-45,
+      "sigma_C_times_fstar_cm2_F2eq1": 3.745445032277245e-41,
+      "maximum_exothermic_outgoing_speed_km_s": 4615.764181047476,
+      "expected_C_collisions_in_frozen_hold": 5.030699973552185e-25,
+      "D_upper_two_perfectly_distinguishable_branches": 1.006139994710437e-24,
+      "fraction_of_registered_one_sigma_precision": 1.729951847851508e-22
+    },
+    {
+      "m_X_GeV": 60.0,
+      "delta_keV": 752.3730066570159,
+      "carbon_peak_keV": 634.2187934993091,
+      "carbon_momentum_transfer_GeV": 0.11907353013547897,
+      "carbon_qR_for_frozen_sphere": 166729849.15095642,
+      "sigma_p_times_fstar_cm2": 5e-46,
+      "sigma_C_times_fstar_cm2_F2eq1": 7.261217010481336e-42,
+      "maximum_exothermic_outgoing_speed_km_s": 3871.644055916366,
+      "expected_C_collisions_in_frozen_hold": 5.453746623861463e-26,
+      "D_upper_two_perfectly_distinguishable_branches": 1.0907493247722927e-25,
+      "fraction_of_registered_one_sigma_precision": 1.8754286877102694e-23
+    },
+    {
+      "m_X_GeV": 60.0,
+      "delta_keV": 752.3730066570159,
+      "carbon_peak_keV": 634.2187934993091,
+      "carbon_momentum_transfer_GeV": 0.11907353013547897,
+      "carbon_qR_for_frozen_sphere": 166729849.15095642,
+      "sigma_p_times_fstar_cm2": 3e-45,
+      "sigma_C_times_fstar_cm2_F2eq1": 4.3567302062888016e-41,
+      "maximum_exothermic_outgoing_speed_km_s": 3871.644055916366,
+      "expected_C_collisions_in_frozen_hold": 3.272247974316878e-25,
+      "D_upper_two_perfectly_distinguishable_branches": 6.544495948633756e-25,
+      "fraction_of_registered_one_sigma_precision": 1.1252572126261616e-22
+    },
+    {
+      "m_X_GeV": 90.0,
+      "delta_keV": 584.2486711046773,
+      "carbon_peak_keV": 519.7020812749428,
+      "carbon_momentum_transfer_GeV": 0.10778861799537189,
+      "carbon_qR_for_frozen_sphere": 150928422.11120135,
+      "sigma_p_times_fstar_cm2": 5e-46,
+      "sigma_C_times_fstar_cm2_F2eq1": 8.085577779847378e-42,
+      "maximum_exothermic_outgoing_speed_km_s": 3346.479194893186,
+      "expected_C_collisions_in_frozen_hold": 3.4994359345698797e-26,
+      "D_upper_two_perfectly_distinguishable_branches": 6.998871869139759e-26,
+      "fraction_of_registered_one_sigma_precision": 1.2033823708974826e-23
+    },
+    {
+      "m_X_GeV": 90.0,
+      "delta_keV": 584.2486711046773,
+      "carbon_peak_keV": 519.7020812749428,
+      "carbon_momentum_transfer_GeV": 0.10778861799537189,
+      "carbon_qR_for_frozen_sphere": 150928422.11120135,
+      "sigma_p_times_fstar_cm2": 3e-45,
+      "sigma_C_times_fstar_cm2_F2eq1": 4.851346667908426e-41,
+      "maximum_exothermic_outgoing_speed_km_s": 3346.479194893186,
+      "expected_C_collisions_in_frozen_hold": 2.099661560741928e-25,
+      "D_upper_two_perfectly_distinguishable_branches": 4.199323121483856e-25,
+      "fraction_of_registered_one_sigma_precision": 7.220294225384896e-23
+    }
+  ],
+  "calculation": {
+    "peak_relation": "E0 = mu_XN * abs(delta) / m_N",
+    "carbon_cross_section": "sigma_p*fstar * A_C^2 * (mu_XC/mu_Xp)^2 * F_C(q)^2",
+    "flux_rate": "(rho_X/m_X) * sigma_C*fstar * sqrt(v_cap^2 + 2*abs(delta)/mu_XC)",
+    "D_bound": "2 * expected independent carbon collisions; ignores branch-phase suppression"
+  },
+  "interpretation_limits": [
+    "The source paper fits a pseudo-Dirac fermion. Its sigma_p*fstar is transferred only as a conditional SI recoil-level normalization; no scalar amplitude matching has been derived.",
+    "The source sideband inference assumes the published NR efficiency plateaus into a high-energy region beyond the calibrated WIMP ROI. It is not an official detector-level exclusion.",
+    "Local excited-state density is represented by the fitted product rho*fstar*sigma_p with total rho_DM=0.3 GeV/cm^3; no bosonic relic or excited-fraction history is calculated.",
+    "Carbon F_C^2=1 and D per collision=2 are deliberately generous independent-nucleus ceilings. Screening, material structure, finite form factors, and actual branch-phase kernels can only change this benchmark and need dedicated response work.",
+    "This is not a Casimir apparatus prediction, DP collapse calculation, or evidence that the LZ event is dark matter."
+  ]
+}

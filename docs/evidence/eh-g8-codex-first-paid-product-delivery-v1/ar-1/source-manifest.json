@@ -1,0 +1,156 @@
+{
+  "schema": "casimirbot.ar1.source-snapshot.v1",
+  "captured_at_utc": "2026-09-21T20:26:48.6769838Z",
+  "git_head": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "scope": "Referenced implementation and test files; local working-tree contents, not only committed HEAD",
+  "files": [
+    {
+      "path": "server/db/migrations/030_shared_realtime_rooms.ts",
+      "sha256": "dbe57dff2d156e9cc1ba0c20ea3311b44a42c90708a464a041c8db001db324c7"
+    },
+    {
+      "path": "server/services/environment-connectors/profiles/__tests__/room-read-grant-federation.test.ts",
+      "sha256": "31e5f26106065c2f5bc1a5007178dc5c1da63ac0df8d41e8e2f6095a8f0edd6d"
+    },
+    {
+      "path": "server/services/environment-connectors/profiles/room-read-grant-lifecycle.ts",
+      "sha256": "a34975f0cfadc3750c71fc3c141499b8c2283d1ca3d225b3b0359288159ddfb1"
+    },
+    {
+      "path": "server/services/helix-agent-api/full-ask-turn-executor.ts",
+      "sha256": "95ff5c42fcb66b91891e065b85386ac7ea5901917ccbc76c292dcaa42517f9d8"
+    },
+    {
+      "path": "server/services/helix-agent-api/governed-external-turn-executor.ts",
+      "sha256": "e80c89973c8a3f810273d3e8c814471f62138a7ab5675185d2ea7f763646b21a"
+    },
+    {
+      "path": "server/services/helix-ask/agent-providers/__tests__/codex-provider-realtime-context.test.ts",
+      "sha256": "c4e635a50247faa4bccd5edb69f8ff22551f39a85c75c7bb165cf8ad9ff17cc9"
+    },
+    {
+      "path": "server/services/helix-ask/agent-providers/codex-native/codex-binary.ts",
+      "sha256": "cb9ac52e5e3c4188519ee37f31c1f3cccd6da7f2f942aade51decf02636b5042"
+    },
+    {
+      "path": "server/services/helix-ask/live-source/realtime-stage-play-handoff.ts",
+      "sha256": "087c3ec6330a5471a727f9b6aec31775e17a645d4b0b09af34227be48c34f7cd"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/room-lifecycle-route.test.ts",
+      "sha256": "08f97448ff646e069603284e027f6c4a9052f8d92b568e908e331cd306aa4a23"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/room-participant-route.test.ts",
+      "sha256": "2bff4ffb6d4e3462db8d26eced5ec0f1bc49242fac4da6f8ab34c5cbb0cba15d"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/room-runtime-route.test.ts",
+      "sha256": "cd1a9fcfe96d012f2e1a3839655fdf32823136e459347e20c9ed8138bf461905"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/room-visual-route.test.ts",
+      "sha256": "da378d89df6b1604f059aa87a141656d55ceb0918280faa86f4f7a203992879e"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/__tests__/turn-actor-context.test.ts",
+      "sha256": "d6a8fed9d420ae62ecaf8c07ac5e7218dd980000e39e08d61c5594f93307107d"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/provider-item-deletion.ts",
+      "sha256": "eb89fa8068be3723cf490a3c19982294d79903cb4704bc321670f261981d243f"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/public-terminal-results.ts",
+      "sha256": "b3f042f53a83f2ce3a433b17c8174d81a6bf237886816615e9a737453ef18414"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/room-store/invites.ts",
+      "sha256": "7faaf2a8dcd130326d842dd7bd0ffb2c2f60aeab4a319ba6b34f230b009fd216"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/room-store/participants.ts",
+      "sha256": "3c57bf0c1903c97b8f792f6b285f40e73a853815ee7afccdb488a1d44ae5c777"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/room-store/repository.ts",
+      "sha256": "6999635c668fb0b969994587a5e373cfbc0c682aad7d4d87c62f8dc318f90cf7"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/runtime-registry/state.ts",
+      "sha256": "a63391cf99933c567613dbd0543a158a316f3f8d83e6f4c5ba3cce84e8e41dc6"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/runtime-session-binding.ts",
+      "sha256": "8c603d973834c7069ac236213a7ed350687ccbe5930cb6e7352f6d1427798ad3"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-room/turn-actor-context.ts",
+      "sha256": "d40636da9bb16aeceafb3ce20c8a4b482d668f031db79762554b7e879b287c0b"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/__tests__/adapter.test.ts",
+      "sha256": "e74205053e095ee45d357bef194fcdac7e8d0479ae4a6acfc0bd9ca1538504ed"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/__tests__/grounded-answer-relay.test.ts",
+      "sha256": "a3682e167bcaf2d2a58677afd25f5b66aa119b97f103ffeb11fe3c3cc3acc8e6"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/__tests__/worker-admission.test.ts",
+      "sha256": "d51e95ce7e2047a6a34273bc5d270220506ba0188954b196d7dc872e0542c949"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/adapter.ts",
+      "sha256": "795e455e45369d2ae5fc09e70af7c5b0e255cc53ac87920f02a02e249e17bc15"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/context-pack.ts",
+      "sha256": "d92821cea29c6f215036d926a4d1bc92b158b4c1fae9cfa53a1c47a933314569"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/grounded-answer-feedback.ts",
+      "sha256": "0744c1cfdc6fb91cbb88eb8c589ed10a10bcdac76c512927af05dda70efadc08"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/grounded-answer-relay.ts",
+      "sha256": "a82aa3929f3be022afd7b6e23940f0b4f22deb1dd32e8ea29dae575a18d5332a"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/sideband-control-channel.ts",
+      "sha256": "3b00cdc290419f5aec182fcc097a3e82f5ea79034dc96e0b8514d9edbe119380"
+    },
+    {
+      "path": "server/services/helix-ask/realtime-session/worker-admission.ts",
+      "sha256": "db8cd698d374078185b0fd5cc68f5631b6178217745c10f0087df23287c92564"
+    },
+    {
+      "path": "server/services/local-supervisor/__tests__/reasoning-task-binding-store.test.ts",
+      "sha256": "5ec0d67651093d494e80a85a2946821b86125d8075c697806371529b250658dd"
+    },
+    {
+      "path": "server/services/local-supervisor/reasoning-task-binding-store.ts",
+      "sha256": "579bd5adebc505ca62351c70d090482a31d3f1d20f1d4d5f701ec4c8c78945fa"
+    },
+    {
+      "path": "server/services/shared-live-room-control/__tests__/binding-store.test.ts",
+      "sha256": "d0d7e9a9a26b2f5a61bd869a998a745c1c3c15f20d6558b87f6e814a09c9a5d6"
+    },
+    {
+      "path": "server/services/shared-live-room-control/__tests__/service.test.ts",
+      "sha256": "f0eea537a9fec14bc45f6b17e5ad3badc9aef5918136a4afd2e00f8c23574694"
+    },
+    {
+      "path": "server/services/shared-live-room-control/binding-store.ts",
+      "sha256": "c7fb8b6f20fa19b01dcdd4062b6e64e00009a16e5d276590236557e29666bbe8"
+    },
+    {
+      "path": "shared/contracts/helix-agent-api.v1.ts",
+      "sha256": "363852823a97818b1f0c7f6d8e7bfc91d71f6e5bfbb6d2fa656d1028f31a09ed"
+    },
+    {
+      "path": "shared/helix-shared-realtime-room.ts",
+      "sha256": "5ed4e91a2147c4906282f81d79d125a5ae4894a720ba9d3a304eca154100cdf7"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "status": "exploratory scale screen; not a field-equation solution",
+  "inputs": {
+    "m_H_GeV": 1080.0,
+    "delta_AH_GeV": 0.000369,
+    "lambda_2": 4.06,
+    "lambda_5_derived": -1.3170733959583659e-05,
+    "lambda5_convention": "m_A^2 - m_H^2 = -lambda_5 v^2",
+    "lambda_effective_assumption": "lambda_eff=lambda_2 for the H^4/4 term",
+    "M_planck_GeV_unreduced": 1.22089e+19,
+    "reference_central_object_Msun": 4000000.0
+  },
+  "outputs": {
+    "strong_coupling_parameter_Lambda": 4.1287798988787925e+31,
+    "quartic_complex_scalar_Mmax_GeV": 1.9510251343360923e+50,
+    "quartic_complex_scalar_Mmax_kg": 3.478018213894862e+23,
+    "quartic_complex_scalar_Mmax_Msun": 1.7490926259359515e-07,
+    "reference_object_over_proxy_Mmax": 22869000421630.457,
+    "delta_over_m": 3.416666666666667e-07
+  },
+  "limits": [
+    "The mass formula is for a complex scalar with a conserved charge and repulsive quartic self-interaction in the strong-coupling regime.",
+    "The IDM H field is real and protected by Z2, not a continuous U(1); lambda_5 splits H and A. Real-field oscillatons and the full electroweak multiplet require their own solutions.",
+    "The comparison is a structural scale test only; it does not rule out small IDM condensates or identify the local dark matter population.",
+    "Order-one potential-normalization changes affect Mmax by a square-root factor, not the many-orders-of-magnitude gap to a 4e6-solar-mass object."
+  ]
+}

@@ -45,6 +45,12 @@ class LauncherPreflightTests(unittest.TestCase):
         self.assertIn("BLOCK_HOST_MEMORY_CAPACITY", self.check(memory=None))
         self.assertNotIn("BLOCK_HOST_MEMORY_CAPACITY", self.check(memory=4_294_967_296))
 
+    def test_noninteger_capacity_samples_fail_closed(self):
+        for bad in (True, float("nan"), float("inf"), -1, 30_000_000_000.0):
+            with self.subTest(bad=bad):
+                self.assertIn("BLOCK_HOST_DISK_CAPACITY", self.check(disk=bad))
+                self.assertIn("BLOCK_HOST_MEMORY_CAPACITY", self.check(memory=bad))
+
     def test_inlist_and_image_identity_fail_closed(self):
         self.assertIn("BLOCK_INLIST_HASH_MISMATCH", self.check(inlist=self.inlist + b"\n"))
         model = dict(self.model, image="unbound:latest")
@@ -52,6 +58,8 @@ class LauncherPreflightTests(unittest.TestCase):
 
     def test_resource_policy_cannot_silently_relax(self):
         model = dict(self.model, resources=dict(self.model["resources"], network="bridge"))
+        self.assertIn("BLOCK_RESOURCE_POLICY_DRIFT", self.check(model=model))
+        model = dict(self.model, resources=dict(self.model["resources"], jobConcurrency=True))
         self.assertIn("BLOCK_RESOURCE_POLICY_DRIFT", self.check(model=model))
         model = dict(self.model, resources=dict(self.model["resources"],
                                                 minimumHostFreeBytesBeforeStart=0))
@@ -66,6 +74,45 @@ class LauncherPreflightTests(unittest.TestCase):
         blockers = self.check(model=model, acceptance=acceptance,
                               structural=structural, provenance=provenance)
         self.assertEqual(blockers, ["BLOCK_EXECUTION_ADAPTER_NOT_IMPLEMENTED"])
+
+    def test_runtime_sample_stops_before_frozen_hard_limits(self):
+        resources = self.model["resources"]
+        sample = launcher.ResourceSample(0, 0, 30_000_000_000, 1)
+        self.assertIsNone(launcher.runtime_stop_reason(sample, resources))
+        self.assertEqual(launcher.runtime_stop_reason(
+            launcher.ResourceSample(7140, 0, 30_000_000_000, 1), resources),
+            "STOP_WALL_CLOCK_MARGIN")
+        self.assertEqual(launcher.runtime_stop_reason(
+            launcher.ResourceSample(0, 4_500_000_000, 30_000_000_000, 1), resources),
+            "STOP_ATTEMPT_BYTES_MARGIN")
+        self.assertEqual(launcher.runtime_stop_reason(
+            launcher.ResourceSample(0, 0, 21_000_000_000, 1), resources),
+            "STOP_HOST_FREE_MARGIN")
+        self.assertEqual(launcher.runtime_stop_reason(
+            launcher.ResourceSample(0, 0, 30_000_000_000, 2), resources),
+            "STOP_JOB_CONCURRENCY")
+        self.assertEqual(launcher.runtime_stop_reason(
+            launcher.ResourceSample(float("nan"), 0, 30_000_000_000, 1), resources),
+            "STOP_INVALID_RESOURCE_SAMPLE")
+
+    def test_runtime_monitor_does_not_accept_relaxed_limits_or_invalid_samples(self):
+        resources = self.model["resources"]
+        safe = launcher.ResourceSample(0, 0, 30_000_000_000, 1)
+        for key, value in (("jobConcurrency", 2), ("pilotTimeoutSeconds", 9000),
+                           ("maximumAttemptWorkingAndOutputBytes", 6_000_000_000),
+                           ("stopBelowHostFreeBytes", 19_000_000_000),
+                           ("jobConcurrency", True)):
+            with self.subTest(key=key):
+                changed = dict(resources, **{key: value})
+                self.assertEqual(launcher.runtime_stop_reason(safe, changed),
+                                 "STOP_RESOURCE_POLICY_DRIFT")
+        for sample in (launcher.ResourceSample(-1, 0, 30_000_000_000, 1),
+                       launcher.ResourceSample(0, True, 30_000_000_000, 1),
+                       launcher.ResourceSample(0, 0, 30_000_000_000, 1.5),
+                       launcher.ResourceSample(0, 0, float("inf"), 1)):
+            with self.subTest(sample=sample):
+                self.assertEqual(launcher.runtime_stop_reason(sample, resources),
+                                 "STOP_INVALID_RESOURCE_SAMPLE")
 
 
 if __name__ == "__main__":

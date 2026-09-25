@@ -1042,6 +1042,7 @@ const sourceTargeted = new Set([
   "visual_scene_memory",
   "repo_code",
   "runtime_evidence",
+  "room_mission_result",
   "workspace_directory",
   "workspace_diagnostic",
   "theory_locator",
@@ -1060,7 +1061,7 @@ const sourceTargeted = new Set([
 ]);
 
 const sourceRequiresEvidence = (sourceTarget: string): boolean =>
-  /visual_capture|procedure_memory|conversation_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|workspace_directory|workspace_diagnostic|theory_locator|context_reflection|calculator_stream|docs_viewer|active_doc|world_event|internet_search|scholarly_research|process_graph|live_environment|live_source_mailbox/i.test(
+  /visual_capture|procedure_memory|conversation_memory|situation_epoch|visual_scene_memory|repo_code|runtime_evidence|room_mission_result|workspace_directory|workspace_diagnostic|theory_locator|context_reflection|calculator_stream|docs_viewer|active_doc|world_event|internet_search|scholarly_research|process_graph|live_environment|live_source_mailbox/i.test(
     sourceTarget,
   );
 

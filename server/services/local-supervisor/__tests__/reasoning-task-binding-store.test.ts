@@ -252,6 +252,32 @@ describe("HelixReasoningTaskBindingStore", () => {
     expect(() => store.verifyTaskAssociation(input)).toThrow("reasoning_binding_target_inactive");
   });
 
+  it("rejects another continuation in the same client session before pickup or acknowledgement", () => {
+    const { store, entries } = setup();
+    const { binding } = issueAndClaim(store);
+    entries.push(presence({ conversation_thread_ref: "provider-thread-other" }));
+    const task = { profileRef: "profile-current", authenticatedMcpClientRef: "mcp-client-current",
+      clientSessionRef: "client-session-current", clientContinuationRef: "provider-thread-private",
+      bindingId: binding.reasoning_binding_id, bindingEpoch: binding.binding_epoch,
+      helixConversationId: "helix-conversation-current", missionId: "mission-current", runId: "run-current" };
+    const event = store.dispatch({ profileRef: task.profileRef, bindingId: task.bindingId,
+      bindingEpoch: task.bindingEpoch, clientEventRef: "voice-final:exact-pickup",
+      origin: "gpt_live_finalized", instructionText: "Inspect this mission." });
+    for (const wrong of [{ clientContinuationRef: "provider-thread-other" },
+      { helixConversationId: "helix-conversation-other" }, { missionId: "mission-other" },
+      { runId: "run-other" }, { bindingEpoch: binding.binding_epoch + 1 }]) {
+      expect(() => store.readForTask({ ...task, ...wrong })).toThrow(HelixReasoningTaskBindingError);
+      expect(() => store.acknowledgeForTask({ ...task, ...wrong,
+        eventRef: event.steering_event_ref })).toThrow(HelixReasoningTaskBindingError);
+      expect(store.inspectEvent({ ...task, eventRef: event.steering_event_ref }).delivery_state).toBe("pending");
+    }
+    expect(store.readForTask(task)).toMatchObject([{ event: { steering_event_ref: event.steering_event_ref } }]);
+    expect(store.acknowledgeForTask({ ...task, eventRef: event.steering_event_ref }).delivery_state)
+      .toBe("acknowledged");
+    store.revoke({ profileRef: task.profileRef, bindingId: task.bindingId });
+    expect(() => store.readForTask(task)).toThrow("reasoning_binding_revoked");
+  });
+
   it("does not validate an association after revoke or a presence capability loss", () => {
     const { store, entries } = setup();
     const { binding } = issueAndClaim(store);

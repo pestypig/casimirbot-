@@ -1,0 +1,29 @@
+{
+  "schema": "casimirbot.ar2g.package_identity.v1",
+  "observed_at": "2026-09-25T04:54:47.069Z",
+  "package_root": "apps/desktop/release-ar2g-20260925/win-unpacked",
+  "source_commit": "cb5bd3c89106359667ef129ee1f3245cc3924bb0",
+  "generated_at": "2026-09-25T04:52:44.992Z",
+  "server_sha256": "c060c85947e2eeb53efe2f454cf190a1be561919b324869c3ff475f1eda3da7b",
+  "client_tree_sha256": "0681fda72bf642b90a54cab7e53f3516c7feafbb8c2fa31731b503f910918ad0",
+  "manifest_sha256": "9a4091576e0ac8e4a6d7ade3900f6267b2aeac4ff816e5a7b35c480d085f7116",
+  "asar_sha256": "39c14782eef89ab70d6af73d2e75a2a96f344222362eb4d4a75a8b03883f678f",
+  "executable_sha256": "898683ad2e0e764103247c5c89ac50e84ff58a09520ba717054cc4a58cf316fe",
+  "checks": {
+    "main.cjs": true,
+    "preload.cjs": true,
+    "service.mjs": true,
+    "manifest_server": true,
+    "owner_catalog": true,
+    "exact_dispatch": true,
+    "result_source": true,
+    "owner_selection_ui": true,
+    "owner_dispatch_ui": true,
+    "owner_results_ui": true,
+    "qualified_source_unchanged": true,
+    "prior_packages_unchanged": true
+  },
+  "development_worktree": true,
+  "signed_release_claimed": false,
+  "deployment_performed": false
+}
