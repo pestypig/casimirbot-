@@ -121,9 +121,9 @@ const byH=(h)=>report.rows.find((r)=>r.heightDifferenceM===h);
   const slide=base("Opposite energy–spin correlations");
   para(slide,"Each atom has a ground and excited optical clock level, plus two nuclear-spin projections.",139,80,28);
   textbox(slide,"Preparation +",{left:76,top:269,width:290,height:51},28,C.teal,true);
-  para(slide,"Excitation travels with spin up; the ground state carries spin down.",321,95,26,76,500);
+  para(slide,"The excited level is paired with spin up; the ground level with spin down.",321,95,26,76,500);
   textbox(slide,"Preparation −",{left:655,top:269,width:290,height:51},28,C.teal,true);
-  para(slide,"Excitation travels with spin down; the ground state carries spin up.",321,95,26,655,500);
+  para(slide,"The excited level is paired with spin down; the ground level with spin up.",321,95,26,655,500);
   small(slide,"Both states contain one excitation and have the same local energy and spin populations.",521,77);
   notes(slide,[src.architecture,src.shared,"The state formulas and ideal spin-degenerate limit are in the accompanying proposal. Spin-dependent shifts must be measured in the real system."]);
 }
@@ -131,7 +131,7 @@ const byH=(h)=>report.rows.find((r)=>r.heightDifferenceM===h);
   const slide=base("Gravity changes the relative clock phase");
   textbox(slide,"Δν/ν₀ = ΔU/c²",{left:74,top:167,width:800,height:72},44,C.teal,true);
   textbox(slide,"x = (ΔE/ℏ) Δτ",{left:74,top:278,width:800,height:72},44,C.teal,true);
-  para(slide,"The alternative with the excitation higher in the building evolves relative to the alternative with the excitation lower down. Spectroscopy fixes ΔE. An independent potential survey fixes the predicted Δτ.",407,174,26);
+  para(slide,"The alternative with the excitation higher in the building evolves relative to the alternative with the excitation lower down. Spectroscopy fixes ΔE. An independent potential survey and interrogation time fix the predicted Δτ.",407,174,26);
   notes(slide,[src.bipm,src.qep,"Leading-order stationary-clock relation. The corresponding potential difference must be determined independently of the clock comparison."]);
 }
 {
@@ -140,6 +140,20 @@ const byH=(h)=>report.rows.find((r)=>r.heightDifferenceM===h);
   para(slide,"Measurements in complementary bases test the shared Bell coherence. The same populations could also come from an incoherent mixture.",327,133,28);
   small(slide,"Field shifts, trapping light, link phase, and readout bias must enter the uncertainty model.",546,70);
   notes(slide,[src.entangled,src.architecture,"The ideal parity readout in the shared conversation is a proposed control model, not a verified complete apparatus."]);
+}
+{
+  const slide=base("Ideal phase readout for the two preparations");
+  textbox(slide,"Πₛ = Cₛ cos(xₛ + sθ − φref)",{left:74,top:153,width:1100,height:78},40,C.teal,true);
+  para(slide,"With x = 0.5 rad, θ = π/2 and perfect contrast, the predicted probability of matching outcomes is 26.0% for preparation + and 74.0% for preparation −.",288,147,27);
+  small(slide,"That raw difference follows from the analysis control. The test compares the phase inferred from each pattern with its independent gravitational prediction.",539,95);
+  notes(slide,[src.shared,"Ideal parity model checked by shared/theory/ytterbium-clock-proposal-calculation.ts. This algebraic model check is not validation of the complete measurement hardware.","Exact example: "+JSON.stringify(report.idealHalfRadianMatchingProbabilities)]);
+}
+{
+  const slide=base("Normalize each measured phase independently");
+  textbox(slide,"κₛ = xₛ(gravity, measured) / xₛ(GR, predicted)",{left:74,top:161,width:1130,height:76},38,C.teal,true);
+  textbox(slide,"xₛ(GR, predicted) = (ΔEₛ/ℏ)(ΔU/c²)T",{left:74,top:294,width:1130,height:72},36,C.teal,true);
+  para(slide,"Measure each encoding’s ΔEₛ by spectroscopy. Survey ΔU independently. Correct ordinary field and link shifts before extracting the gravitational phase.",460,140,27);
+  notes(slide,[src.shared,src.bipm,src.architecture,"Operational ratio under the stated diagonal-coupling interpretation. A nonzero result needs systematics and model checks before physical interpretation."]);
 }
 {
   const slide=base("Three dimensionless responses");
@@ -171,7 +185,7 @@ const outputDir=path.join(workspaceDir,"artifacts/presentations/ytterbium-clock-
 const staging=path.join(workspaceDir,".codex-build/ytterbium-clock-proposal");
 await fs.mkdir(outputDir,{recursive:true}); await fs.mkdir(staging,{recursive:true});
 const candidatePath=path.join(staging,"candidate.pptx");
-const finalPath=path.join(outputDir,"ytterbium-energy-spin-gravity-proposal.pptx");
+const finalPath=path.join(outputDir,"ytterbium-energy-spin-gravity-proposal-v2.pptx");
 await (await PresentationFile.exportPptx(ppt)).save(candidatePath);
 const result=await finalizePresentation({
   workspaceDir,candidatePath,finalPath,pythonExecutable:RUNTIME_PYTHON,
@@ -181,6 +195,6 @@ const result=await finalizePresentation({
   requiredNativeTableOwnerSlides:[3,6],
   fontPolicy:{basis:"design",families:[family]},
   verifyArtifactToolImport:true,
-  receiptPath:path.join(staging,"validation.json"),
+  receiptPath:path.join(staging,"validation-v2.json"),
 });
 console.log(JSON.stringify({finalPath,font:family,result},null,2));
