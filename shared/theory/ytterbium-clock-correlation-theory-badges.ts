@@ -19,6 +19,9 @@ const common = {
   equationFamilies: ["weak_field_clock_redshift", "distributed_clock_correlation"],
   sourceRefs: [
     { kind: "doc" as const, path: proposal, note: "Standalone experimental proposal; analytic design only." },
+    { kind: "repo_module" as const, path: "shared/theory/ytterbium-clock-proposal-calculation.ts", note: "Analytic weak-field signal and ideal response calculations." },
+    { kind: "artifact" as const, path: "docs/research/ytterbium-clock-proposal-calculations.json", note: "Generated design numbers used by the proposal and presentation." },
+    { kind: "test" as const, path: "tests/ytterbium-clock-proposal-calculation.spec.ts", note: "Focused arithmetic and control-model checks." },
     { kind: "literature_ref" as const, id: "doi:10.1038/s41566-020-0619-8", note: "Conventional tower-clock precedent, using strontium." },
     { kind: "literature_ref" as const, id: "doi:10.1038/s41586-022-05088-z", note: "Remote entangled-clock component precedent, using strontium ions." },
   ],
@@ -46,7 +49,7 @@ export const YTTERBIUM_CLOCK_CORRELATION_BADGES: TheoryBadgeV1[] = [
     ],
     assumptions: ["Stationary weak-field illustration; real analysis uses a consistent terrestrial frame and independently determined potential.", "The numerical benchmark is not a measured clock result."],
     calculatorPayloads: [],
-    hintKeys: { subjects: ["Yb-171 tower clock", "building-scale gravitational redshift"], symbols: ["Delta_U", "Delta_nu", "x_GR"], unitSignatures: ["L^2 T^-2", "T^-1", "1"], repoPaths: [proposal], equationFamilies: ["weak_field_clock_redshift"], simulationOwners: ["ytterbium_clock_correlation_proposal"] },
+    hintKeys: { subjects: ["Yb-171 tower clock", "building-scale gravitational redshift"], symbols: ["Delta_U", "Delta_nu", "x_GR"], unitSignatures: ["L^2 T^-2", "T^-1", "1"], repoPaths: [proposal,"shared/theory/ytterbium-clock-proposal-calculation.ts","docs/research/ytterbium-clock-proposal-calculations.json"], equationFamilies: ["weak_field_clock_redshift"], simulationOwners: ["ytterbium_clock_correlation_proposal"] },
   },
   {
     ...common,
@@ -67,7 +70,7 @@ export const YTTERBIUM_CLOCK_CORRELATION_BADGES: TheoryBadgeV1[] = [
     ],
     assumptions: ["Each encoding's actual spectroscopic gap and state-dependent shifts must be measured.", "Complementary-basis measurements must verify Bell coherence; the integrated building-scale ytterbium system is not demonstrated."],
     calculatorPayloads: [],
-    hintKeys: { subjects: ["Yb-171 energy-spin correlation", "distributed entangled optical clocks"], symbols: ["Delta_E_s", "Delta_tau", "x_s"], unitSignatures: ["M L^2 T^-2", "T", "1"], repoPaths: [proposal], equationFamilies: ["distributed_clock_correlation"], simulationOwners: ["ytterbium_clock_correlation_proposal"] },
+    hintKeys: { subjects: ["Yb-171 energy-spin correlation", "distributed entangled optical clocks"], symbols: ["Delta_E_s", "Delta_tau", "x_s"], unitSignatures: ["M L^2 T^-2", "T", "1"], repoPaths: [proposal,"shared/theory/ytterbium-clock-proposal-calculation.ts"], equationFamilies: ["distributed_clock_correlation"], simulationOwners: ["ytterbium_clock_correlation_proposal"] },
   },
   {
     ...common,
@@ -89,7 +92,7 @@ export const YTTERBIUM_CLOCK_CORRELATION_BADGES: TheoryBadgeV1[] = [
     ],
     assumptions: ["Potential and spectroscopy are determined independently of the response fit.", "A height scan and calibrated field controls are required to identify the gravitational slope.", "No result or apparatus certificate exists; this badge cannot promote an unexplained residual to a mechanism claim."],
     calculatorPayloads: [],
-    hintKeys: { subjects: ["dimensionless gravitational response", "Yb-171 energy-spin experimental proposal"], symbols: ["kappa_cl", "kappa_0", "eta_ES"], unitSignatures: ["1"], repoPaths: [proposal], equationFamilies: ["distributed_clock_correlation"], simulationOwners: ["ytterbium_clock_correlation_proposal"] },
+    hintKeys: { subjects: ["dimensionless gravitational response", "Yb-171 energy-spin experimental proposal"], symbols: ["kappa_cl", "kappa_0", "eta_ES"], unitSignatures: ["1"], repoPaths: [proposal,"shared/theory/ytterbium-clock-proposal-calculation.ts","tests/ytterbium-clock-proposal-calculation.spec.ts"], equationFamilies: ["distributed_clock_correlation"], simulationOwners: ["ytterbium_clock_correlation_proposal"] },
   },
 ];
 
